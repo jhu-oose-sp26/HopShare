@@ -49,7 +49,7 @@ This will primarily be a web app
 The tech stack will be: 
 
 - Frontend: React, TypeScript, Next.js
-- Backend: [Node.js](http://node.js), Express
+- Backend: Node.js, Express
 - Database: SQLite using Django
 - Deployment: Vercel
 
