@@ -25,8 +25,20 @@ function SubmitBox({ onSubmit }) {
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!date) return;
-    const payload = { name, startLocation, endLocation, date, time };
-    onSubmit?.(payload);
+    const formData = {
+      name,
+      email,
+      phone,
+      startLocation,
+      endLocation,
+      date,
+      time,
+    };
+
+    // TODO: send this object to backend
+    console.log('SubmitBox form data (ready for DB):', formData);
+
+    onSubmit?.(formData);
     setName('');
     setEmail('');
     setPhone('');
@@ -134,7 +146,7 @@ function SubmitBox({ onSubmit }) {
             id="submit-end"
             type="text"
             className={inputBase}
-            placeholder="e.g. Penn Station, NYC"
+            placeholder="e.g. BWI Airport"
             value={endLocation}
             onChange={(e) => setEndLocation(e.target.value)}
             required
