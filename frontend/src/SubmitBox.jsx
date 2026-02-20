@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { format, parse } from 'date-fns';
-import { MapPin, Calendar as CalendarIcon, Clock, User } from 'lucide-react';
+import { MapPin, Calendar as CalendarIcon, Clock, User, Mail, Phone } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
@@ -35,8 +35,8 @@ function SubmitBox({ onSubmit }) {
       time,
     };
 
-    // TODO: send this object to backend
-    console.log('SubmitBox form data (ready for DB):', formData);
+    // TODO: send this object to backend (formData is the object name)
+    console.log(formData);
 
     onSubmit?.(formData);
     setName('');
@@ -82,7 +82,7 @@ function SubmitBox({ onSubmit }) {
             htmlFor="submit-email"
             className="flex items-center gap-2 text-sm font-medium text-foreground"
           >
-            <User className="size-4 text-muted-foreground" />
+            <Mail className="size-4 text-muted-foreground" />
             Email
           </label>
           <input
@@ -101,7 +101,7 @@ function SubmitBox({ onSubmit }) {
             htmlFor="submit-phone"
             className="flex items-center gap-2 text-sm font-medium text-foreground"
           >
-            <User className="size-4 text-muted-foreground" />
+            <Phone className="size-4 text-muted-foreground" />
             Phone
           </label>
           <input
