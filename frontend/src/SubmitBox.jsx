@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { format, parse } from 'date-fns';
-import { MapPin, Calendar as CalendarIcon, Clock, User, Mail, Phone } from 'lucide-react';
+import { MapPin, Calendar as CalendarIcon, Clock, User, Mail, Phone, MessageCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
@@ -21,6 +21,7 @@ function SubmitBox({ onSubmit }) {
   const [endLocation, setEndLocation] = useState('');
   const [date, setDate] = useState('');
   const [time, setTime] = useState('');
+  const [description, setDescription] = useState('');
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -33,6 +34,7 @@ function SubmitBox({ onSubmit }) {
       endLocation,
       date,
       time,
+      description,
     };
 
     // TODO: send this object to backend (formData is the object name)
@@ -46,6 +48,7 @@ function SubmitBox({ onSubmit }) {
     setEndLocation('');
     setDate('');
     setTime('');
+    setDescription('');
   };
 
   return (
@@ -210,6 +213,23 @@ function SubmitBox({ onSubmit }) {
           </div>
         </div>
 
+        <div className="space-y-2">
+          <label
+            htmlFor="submit-description"
+            className="flex items-center gap-2 text-sm font-medium text-foreground"
+          >
+            <MessageCircle className="size-4 text-muted-foreground" />
+            Description
+          </label>
+          <textarea
+            id="submit-description"
+            className={inputBase}
+            placeholder="Describe your trip"
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            required
+          />
+        </div>
         <div className="pt-2">
           <Button type="submit" size="lg" className="w-full sm:w-auto">
             Submit
