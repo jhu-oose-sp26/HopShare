@@ -10,6 +10,15 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover';
 
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+
 const inputBase =
   'flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50';
 
@@ -22,10 +31,12 @@ function SubmitBox({ onSubmit }) {
   const [date, setDate] = useState('');
   const [time, setTime] = useState('');
   const [description, setDescription] = useState('');
+  const [isSubmitted, setIsSubmitted] = useState(false);
 
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!date) return;
+  
     const formData = {
       name,
       email,
@@ -36,11 +47,15 @@ function SubmitBox({ onSubmit }) {
       time,
       description,
     };
-
-    // TODO: send this object to backend (formData is the object name)
+  
     console.log(formData);
-
+  
     onSubmit?.(formData);
+  
+    // Show confirmation popup
+    setIsSubmitted(true);
+  
+    // Clear form
     setName('');
     setEmail('');
     setPhone('');
@@ -236,6 +251,21 @@ function SubmitBox({ onSubmit }) {
           </Button>
         </div>
       </form>
+      <Dialog open={isSubmitted} onOpenChange={setIsSubmitted}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Ride Submitted 🎉</DialogTitle>
+            <DialogDescription>
+              Your ride details have been successfully submitted.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button onClick={() => setIsSubmitted(false)}>
+              OK
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
