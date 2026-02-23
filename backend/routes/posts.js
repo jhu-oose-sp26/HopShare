@@ -3,6 +3,11 @@ const router = express.Router();
 const { getDB } = require('../db');
 const { ObjectId } = require('mongodb');
 
+function toObjectId(id) {
+  if (!ObjectId.isValid(id)) return null;
+  return new ObjectId(id);
+}
+
 
 // READ ALL POSTS
 router.get('/', async (req, res) => { 
@@ -62,6 +67,7 @@ router.post('/', async (req, res) => {
 // DELETE
 router.delete('/:id', async (req, res) => { 
   const postId = toObjectId(req.params.id);
+  
   if (!postId) {
     return res.status(400).json({ error: 'Invalid post id' });
   }
