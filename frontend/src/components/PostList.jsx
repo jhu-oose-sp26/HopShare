@@ -50,27 +50,16 @@ const mockPosts = [
 
 const PostList = () => {
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white border-b border-gray-200">
-        <div className="container mx-auto px-6 py-8 max-w-6xl">
-          <h1 className="text-3xl font-bold text-gray-900">HopShare</h1>
-          <p className="mt-2 text-gray-600">Find and share rides with fellow Hopkins students</p>
-        </div>
+    <div className="container mx-auto px-6 py-8 max-w-6xl">
+      <div className="mb-6">
+        <h2 className="text-xl font-semibold text-gray-900 mb-2">Available Rides</h2>
+        <p className="text-gray-600">{mockPosts.length} rides available</p>
       </div>
-
-      {/* Posts Grid */}
-      <div className="container mx-auto px-6 py-8 max-w-6xl">
-        <div className="mb-6">
-          <h2 className="text-xl font-semibold text-gray-900 mb-2">Available Rides</h2>
-          <p className="text-gray-600">{mockPosts.length} rides available</p>
-        </div>
-        
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {mockPosts.map((post) => (
-            <PostCard key={post._id} post={post} />
-          ))}
-        </div>
+      
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+        {mockPosts.map((post) => (
+          <PostCard key={post._id} post={post} />
+        ))}
       </div>
     </div>
   );

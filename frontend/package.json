@@ -3,26 +3,29 @@
   "version": "0.1.0",
   "private": true,
   "dependencies": {
+    "@radix-ui/react-popover": "^1.1.15",
     "@testing-library/dom": "^10.4.1",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^13.5.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "date-fns": "^4.1.0",
     "lucide-react": "^0.574.0",
     "radix-ui": "^1.4.3",
     "react": "^19.2.4",
+    "react-day-picker": "^9.13.2",
     "react-dom": "^19.2.4",
     "tailwind-merge": "^3.4.1",
     "tailwindcss-animate": "^1.0.7",
     "web-vitals": "^2.1.4"
   },
   "scripts": {
-    "dev": "vite",
-    "start": "vite",
-    "build": "vite build",
-    "preview": "vite preview",
-    "test": "vitest"
+    "dev": "npx vite",
+    "start": "npx vite",
+    "build": "npx vite build",
+    "preview": "npx vite preview",
+    "test": "npx vitest"
   },
   "eslintConfig": {
     "extends": [
