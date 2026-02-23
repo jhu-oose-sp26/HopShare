@@ -1,7 +1,10 @@
 import PostList from './components/PostList';
 import SubmitBox from './components/SubmitBox';
+import { usePosts } from './hooks/usePosts';
 
 function App() {
+  const { posts, addPost } = usePosts();
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Submit Box Section */}
@@ -9,12 +12,12 @@ function App() {
         <div className="container mx-auto px-6 py-8 max-w-4xl">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">HopShare</h1>
           <p className="text-gray-600 mb-6">Create and find rides with fellow Hopkins students</p>
-          <SubmitBox />
+          <SubmitBox onSubmit={addPost} />
         </div>
       </div>
 
       {/* Post List Section */}
-      <PostList />
+      <PostList posts={posts} />
     </div>
   );
 }
