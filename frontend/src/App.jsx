@@ -1,5 +1,5 @@
 import PostList from './components/PostList';
-import SubmitBox from './SubmitBox';
+import SubmitBox from './components/SubmitBox';
 
 function App() {
   return (
