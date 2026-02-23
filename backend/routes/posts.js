@@ -3,31 +3,88 @@ const router = express.Router();
 const { getDB } = require('../db');
 const { ObjectId } = require('mongodb');
 
-router.get('/', async (req, res) => { // READ
+
+// READ ALL POSTS
+router.get('/', async (req, res) => { 
   const posts = await getDB().collection('posts').find().toArray();
   res.json(posts);
 });
 
-router.post('/', async (req, res) => { // CREATE
-  const result = await getDB().collection('posts').insertOne(req.body);
-  res.status(201).json(result);
+// GET ONE POST
+router.get('/:id', async (req, res) => { 
+  const postId = toObjectId(req.params.id);
+  if (!postId) {
+    return res.status(400).json({ error: 'Invalid post id' });
+  }
+
+  const post = await getDB().collection('posts').findOne({ _id: postId });
+
+  if (!post) {
+    return res.status(404).json({ error: 'Post not found' });
+  }
+  res.json(post);
 });
 
-router.delete('/:id', async (req, res) => { // DELETE
-  await getDB().collection('posts').deleteOne({
-    _id: new ObjectId(req.params.id)
-  });
+// CREATE
+router.post('/', async (req, res) => { 
+  const postInfo = req.body;
+
+  // validate the post info
+  if (!postInfo.title || !postInfo.content) {
+    return res.status(400).json({ error: 'Title and content are required' });
+  }
+
+  const db = getDB();
+  const result = await db.collection('posts').insertOne(postInfo);
+  const tripsCollection = db.collection('trips');
+
+  let tripId = null;
+  // if there has trip info, insert it into the trips collection
+  if (postInfo.trip) {
+    const tripResult = await tripsCollection.insertOne({
+        ...postInfo.trip,
+        postId: result.insertedId,
+      });
+      tripId = tripResult.insertedId;
+  }
+
+  if (tripId) {
+    await db.collection('posts').updateOne(
+      { _id: result.insertedId },
+      { $set: { tripId } }
+    );
+  }
+
+    res.status(201).json({ ...result, postId: result.insertedId, tripId: tripId || null });
+});
+
+
+// DELETE
+router.delete('/:id', async (req, res) => { 
+  const postId = toObjectId(req.params.id);
+  if (!postId) {
+    return res.status(400).json({ error: 'Invalid post id' });
+  }
+  const postDeleteResult = await getDB().collection('posts').deleteOne({ _id: postId });
+
+  if (postDeleteResult.deletedCount === 0) {
+    return res.status(404).json({ error: 'Post not found' });
+  }
+  // delete the related trips
+  await getDB().collection('trips').deleteMany({ postId });
   res.json({ success: true });
 });
 
-router.put('/:id', async (req, res) => { // UPDATE
+// UPDATE
+router.put('/:id', async (req, res) => { 
   try {
     const { ObjectId } = require('mongodb');
 
     const { id } = req.params;
     const updateData = req.body;
 
-    const result = await getDB()
+    // update the post data
+    const result = await db
       .collection('posts')
       .updateOne(
         { _id: new ObjectId(id) },
