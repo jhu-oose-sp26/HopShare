@@ -1,6 +1,6 @@
 import React from 'react';
 import { MapPin, Calendar, Clock, User, MessageCircle } from 'lucide-react';
-import { Button } from '@/components//ui/button';
+import { Button } from '@/components/ui/button';
 
 const PostCard = ({ post }) => {
     const { _id, title, content, creatorId, trip } = post;
