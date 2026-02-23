@@ -55,8 +55,8 @@ function SubmitBox({ onSubmit }) {
             description,
         };
 
+        // debug formData
         console.log(formData);
-
         onSubmit?.(formData);
 
         // Clear form

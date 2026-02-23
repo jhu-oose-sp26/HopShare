@@ -3,7 +3,7 @@ import { MapPin, Calendar, Clock, User, MessageCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 const PostCard = ({ post }) => {
-    const { _id, title, content, creatorId, trip } = post;
+    const { _id, title, description, user, trip } = post;
 
     return (
         <div className='rounded-xl border border-gray-200 bg-white p-6 shadow-sm hover:shadow-md transition-shadow'>
@@ -16,7 +16,7 @@ const PostCard = ({ post }) => {
                     <div>
                         <h3 className='font-semibold text-gray-900'>{title}</h3>
                         <p className='text-sm text-gray-500'>
-                            User {creatorId}
+                            User {user.name} ({user.email})
                         </p>
                     </div>
                 </div>
@@ -24,7 +24,7 @@ const PostCard = ({ post }) => {
             </div>
 
             {/* Post content */}
-            <p className='text-gray-700 mb-4'>{content}</p>
+            <p className='text-gray-700 mb-4'>{description}</p>
 
             {/* Trip details (if exists) */}
             {trip && (

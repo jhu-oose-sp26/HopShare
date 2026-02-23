@@ -5,9 +5,13 @@ const initialPosts = [
     {
         _id: '507f1f77bcf86cd799439011',
         title: 'Airport Ride to BWI',
-        content:
+        description:
             'Looking for 2 people to split Uber to BWI airport tomorrow morning. Leaving at 8 AM from Homewood campus. Will split cost 3 ways!',
-        creatorId: 123,
+        user: {
+            email: 'a@jh.edu',
+            name: 'John Doe',
+            phone: '123-456-7890',
+        },
         trip: {
             startLocation: 'Hopkins Homewood Campus',
             endLocation: 'BWI Airport',
@@ -18,9 +22,13 @@ const initialPosts = [
     {
         _id: '507f1f77bcf86cd799439012',
         title: 'Shopping Trip - Towson Mall',
-        content:
+        description:
             'Going to Towson Town Center this Saturday afternoon. Can take 3 passengers, just split gas money.',
-        creatorId: 456,
+        user: {
+            email: 'a@jh.edu',
+            name: 'John Doe',
+            phone: '123-456-7890',
+        },
         trip: {
             startLocation: 'Charles Village',
             endLocation: 'Towson Town Center',
@@ -31,9 +39,13 @@ const initialPosts = [
     {
         _id: '507f1f77bcf86cd799439013',
         title: "Grocery Run - Target & Trader Joe's",
-        content:
+        description:
             "Weekly grocery trip to Target and Trader Joe's. Looking for people to split gas costs. Planning to leave Sunday morning.",
-        creatorId: 789,
+        user: {
+            email: 'a@jh.edu',
+            name: 'John Doe',
+            phone: '123-456-7890',
+        },
         trip: {
             startLocation: 'Hopkins Campus',
             endLocation: "Target/Trader Joe's",
@@ -44,9 +56,13 @@ const initialPosts = [
     {
         _id: '507f1f77bcf86cd799439014',
         title: 'Late Night Food Run',
-        content:
+        description:
             "Anyone want to grab late night food? Thinking McDonald's or 24hr diner. Can drive if we split gas.",
-        creatorId: 321,
+        user: {
+            email: 'a@jh.edu',
+            name: 'John Doe',
+            phone: '123-456-7890',
+        },
         trip: null,
     },
 ];
@@ -57,23 +73,30 @@ export const usePosts = () => {
     const addPost = (formData) => {
         const newPost = {
             _id: Date.now().toString(),
-            title:
-                formData.title ||
-                `${formData.startLocation} to ${formData.endLocation}` ||
-                'New Ride Request',
-            content: formData.description,
-            creatorId: Date.now(),
-            trip:
-                formData.startLocation || formData.endLocation
-                    ? {
-                          startLocation: formData.startLocation,
-                          endLocation: formData.endLocation,
-                          date: formData.date,
-                          time: formData.time,
-                      }
-                    : null,
+    
+            // Display title
+            title: `${formData.startLocation} → ${formData.endLocation}`,
+    
+            // Main description
+            description: formData.description,
+    
+            // Store contact info properly
+            user: {
+                name: formData.name,
+                email: formData.email,
+                phone: formData.phone,
+            },
+    
+            trip: {
+                startLocation: formData.startLocation,
+                endLocation: formData.endLocation,
+                date: formData.date,
+                time: formData.time,
+            },
+    
+            createdAt: new Date().toISOString(),
         };
-
+    
         setPosts((prevPosts) => [newPost, ...prevPosts]);
     };
 

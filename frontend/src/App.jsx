@@ -37,10 +37,10 @@ function App() {
                             </DialogHeader>
 
                             <SubmitBox
-                            onSubmit={(data) => {
-                                addPost(data)
-                                setIsOpen(false)
-                            }}
+                                onSubmit={(data) => {
+                                    addPost(data)
+                                    setIsOpen(false)
+                                }}
                             />
                         </DialogContent>
                     </Dialog>
