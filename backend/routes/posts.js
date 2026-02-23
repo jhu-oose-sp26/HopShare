@@ -35,8 +35,8 @@ router.post('/', async (req, res) => {
   const postInfo = req.body;
 
   // validate the post info
-  if (!postInfo.title || !postInfo.content) {
-    return res.status(400).json({ error: 'Title and content are required' });
+  if (postInfo.title===null || postInfo.description===null) {
+    return res.status(400).json({ error: 'Title and description are required' });
   }
 
   const db = getDB();
