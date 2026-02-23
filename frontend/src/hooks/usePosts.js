@@ -4,7 +4,7 @@ import { useState } from 'react';
 const initialPosts = [
     {
         _id: '507f1f77bcf86cd799439011',
-        title: 'Airport Ride to BWI',
+        title: 'Airport Ride → BWI',
         description:
             'Looking for 2 people to split Uber to BWI airport tomorrow morning. Leaving at 8 AM from Homewood campus. Will split cost 3 ways!',
         user: {
@@ -16,54 +16,42 @@ const initialPosts = [
             startLocation: 'Hopkins Homewood Campus',
             endLocation: 'BWI Airport',
             date: '2024-02-24',
-            time: '08:00 AM',
+            time: '08:00',
         },
     },
     {
         _id: '507f1f77bcf86cd799439012',
-        title: 'Shopping Trip - Towson Mall',
+        title: 'Shopping Trip → Towson Mall',
         description:
             'Going to Towson Town Center this Saturday afternoon. Can take 3 passengers, just split gas money.',
         user: {
-            email: 'a@jh.edu',
-            name: 'John Doe',
+            email: 'b@jh.edu',
+            name: 'Jane Doe',
             phone: '123-456-7890',
         },
         trip: {
             startLocation: 'Charles Village',
             endLocation: 'Towson Town Center',
             date: '2024-02-25',
-            time: '2:00 PM',
+            time: '21:00',
         },
     },
     {
         _id: '507f1f77bcf86cd799439013',
-        title: "Grocery Run - Target & Trader Joe's",
+        title: "Grocery Run → Target & Trader Joe's",
         description:
             "Weekly grocery trip to Target and Trader Joe's. Looking for people to split gas costs. Planning to leave Sunday morning.",
         user: {
-            email: 'a@jh.edu',
-            name: 'John Doe',
+            email: 'c@jh.edu',
+            name: 'Ben Dover',
             phone: '123-456-7890',
         },
         trip: {
             startLocation: 'Hopkins Campus',
             endLocation: "Target/Trader Joe's",
             date: '2024-02-26',
-            time: '10:00 AM',
+            time: '09:00',
         },
-    },
-    {
-        _id: '507f1f77bcf86cd799439014',
-        title: 'Late Night Food Run',
-        description:
-            "Anyone want to grab late night food? Thinking McDonald's or 24hr diner. Can drive if we split gas.",
-        user: {
-            email: 'a@jh.edu',
-            name: 'John Doe',
-            phone: '123-456-7890',
-        },
-        trip: null,
     },
 ];
 

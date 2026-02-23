@@ -31,7 +31,7 @@ function App() {
                             <Button>Create a Request</Button>
                         </DialogTrigger>
 
-                        <DialogContent className="w-[90%] max-w-sm max-h-[80vh] overflow-y-auto">
+                        <DialogContent className="w-[90%] max-w-[800px] sm:max-w-[800px] max-h-[80vh] overflow-y-auto">
                             <DialogHeader>
                             <DialogTitle>Create a Ride Request</DialogTitle>
                             </DialogHeader>

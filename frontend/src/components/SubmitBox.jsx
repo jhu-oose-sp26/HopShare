@@ -18,15 +18,6 @@ import {
     PopoverTrigger,
 } from '@/components/ui/popover';
 
-import {
-    Dialog,
-    DialogContent,
-    DialogHeader,
-    DialogTitle,
-    DialogDescription,
-    DialogFooter,
-} from '@/components/ui/dialog';
-
 const inputBase =
     'flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50';
 
@@ -71,7 +62,7 @@ function SubmitBox({ onSubmit }) {
     };
 
     return (
-        <div className='rounded-xl border border-border bg-card p-6 shadow-sm'>
+        <div className='rounded-xl border border-border bg-card p-6 shadow-sm w-full max-w-[700px]'>
             <h2 className='text-lg font-semibold text-card-foreground'>
                 Share a ride
             </h2>
@@ -207,27 +198,22 @@ function SubmitBox({ onSubmit }) {
                                 </Button>
                             </PopoverTrigger>
                             <PopoverContent
-                                className='w-auto p-0'
-                                align='start'
+                                side='bottom'
+                                sideOffset={4}
+                                align='center' 
+                                className="p-0 w-full"
+                                style={{ minWidth: '100%' }}
                             >
-                                <Calendar
-                                    mode='single'
-                                    selected={
-                                        date
-                                            ? parse(
-                                                  date,
-                                                  'yyyy-MM-dd',
-                                                  new Date()
-                                              )
-                                            : undefined
-                                    }
-                                    onSelect={(selected) => {
-                                        if (selected)
-                                            setDate(
-                                                format(selected, 'yyyy-MM-dd')
-                                            );
-                                    }}
-                                />
+                                <div className="rounded-md border border-input overflow-hidden">
+                                    <Calendar
+                                        mode='single'
+                                        selected={date ? parse(date,'yyyy-MM-dd', new Date()): undefined}
+                                        onSelect={(selected) => {
+                                            if (selected) setDate(format(selected, 'yyyy-MM-dd'));
+                                        }}
+                                        numberOfWeeks={7}
+                                    />
+                                </div>
                             </PopoverContent>
                         </Popover>
                     </div>

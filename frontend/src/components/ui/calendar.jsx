@@ -37,7 +37,7 @@ function Calendar({
                 ...formatters,
             }}
             classNames={{
-                root: cn('w-fit', defaultClassNames.root),
+                root: cn('w-[300px] h-[336px]', defaultClassNames.root), // 7 weeks * 48px per cell approx
                 months: cn(
                     'flex gap-4 flex-col md:flex-row relative',
                     defaultClassNames.months
