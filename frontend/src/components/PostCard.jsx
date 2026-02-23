@@ -16,7 +16,7 @@ const PostCard = ({ post }) => {
                     <div>
                         <h3 className='font-semibold text-gray-900'>{title}</h3>
                         <p className='text-sm text-gray-500'>
-                            User {user.name} ({user.email})
+                            {user.name} ({user.email})
                         </p>
                     </div>
                 </div>
