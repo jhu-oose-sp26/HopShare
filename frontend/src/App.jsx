@@ -1,9 +1,19 @@
-import PostList from './components/PostList';
-import SubmitBox from './components/SubmitBox';
-import { usePosts } from './hooks/usePosts';
+import PostList from './components/PostList'
+import SubmitBox from './components/SubmitBox'
+import { usePosts } from './hooks/usePosts'
+import { Button } from './components/ui/button'
+import { useState } from 'react'
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger
+} from '@/components/ui/dialog';
 
 function App() {
-    const { posts, addPost } = usePosts();
+    const { posts, addPost } = usePosts()
+    const [isOpen, setIsOpen] = useState(false)
 
     return (
         <div className='min-h-screen bg-gray-50'>
@@ -16,7 +26,24 @@ function App() {
                     <p className='text-gray-600 mb-6'>
                         Create and find rides with fellow Hopkins students
                     </p>
-                    <SubmitBox onSubmit={addPost} />
+                    <Dialog open={isOpen} onOpenChange={setIsOpen}>
+                        <DialogTrigger asChild>
+                            <Button>Create a Request</Button>
+                        </DialogTrigger>
+
+                        <DialogContent className="w-[90%] max-w-sm max-h-[80vh] overflow-y-auto">
+                            <DialogHeader>
+                            <DialogTitle>Create a Ride Request</DialogTitle>
+                            </DialogHeader>
+
+                            <SubmitBox
+                            onSubmit={(data) => {
+                                addPost(data)
+                                setIsOpen(false)
+                            }}
+                            />
+                        </DialogContent>
+                    </Dialog>
                 </div>
             </div>
 

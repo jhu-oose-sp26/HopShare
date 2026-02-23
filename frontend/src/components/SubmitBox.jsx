@@ -39,7 +39,6 @@ function SubmitBox({ onSubmit }) {
     const [date, setDate] = useState('');
     const [time, setTime] = useState('');
     const [description, setDescription] = useState('');
-    const [isSubmitted, setIsSubmitted] = useState(false);
 
     const handleSubmit = (e) => {
         e.preventDefault();
@@ -59,9 +58,6 @@ function SubmitBox({ onSubmit }) {
         console.log(formData);
 
         onSubmit?.(formData);
-
-        // Show confirmation popup
-        setIsSubmitted(true);
 
         // Clear form
         setName('');
@@ -281,21 +277,6 @@ function SubmitBox({ onSubmit }) {
                     </Button>
                 </div>
             </form>
-            <Dialog open={isSubmitted} onOpenChange={setIsSubmitted}>
-                <DialogContent>
-                    <DialogHeader>
-                        <DialogTitle>Ride Submitted 🎉</DialogTitle>
-                        <DialogDescription>
-                            Your ride details have been successfully submitted.
-                        </DialogDescription>
-                    </DialogHeader>
-                    <DialogFooter>
-                        <Button onClick={() => setIsSubmitted(false)}>
-                            OK
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
         </div>
     );
 }
