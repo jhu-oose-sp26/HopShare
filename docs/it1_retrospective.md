@@ -2,7 +2,7 @@ During this iteration, the team successfully implemented both the frontend and b
 
 What Went Well
 - The frontend and backend were both implemented with core functionality.
-- By the end of the iteration, we were able to integrate the two components.
+- We were able to integrate the two components (although 1 day late).
 - The integration effort helped clarify how the system components interact, which should reduce conflicts in future merges.
 
 Challenges
