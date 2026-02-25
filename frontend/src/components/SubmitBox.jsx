@@ -30,10 +30,15 @@ function SubmitBox({ onSubmit }) {
     const [date, setDate] = useState('');
     const [time, setTime] = useState('');
     const [description, setDescription] = useState('');
+    const [submitError, setSubmitError] = useState('');
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
-        if (!date) return;
+        if (!date) {
+            setSubmitError('Please select a date.');
+            return;
+        }
 
         const formData = {
             name,
@@ -46,19 +51,28 @@ function SubmitBox({ onSubmit }) {
             description,
         };
 
-        // debug formData
-        console.log(formData);
-        onSubmit?.(formData);
+        setSubmitError('');
+        setIsSubmitting(true);
 
-        // Clear form
-        setName('');
-        setEmail('');
-        setPhone('');
-        setStartLocation('');
-        setEndLocation('');
-        setDate('');
-        setTime('');
-        setDescription('');
+        try {
+            await onSubmit?.(formData);
+
+            // Clear form after successful submit.
+            setName('');
+            setEmail('');
+            setPhone('');
+            setStartLocation('');
+            setEndLocation('');
+            setDate('');
+            setTime('');
+            setDescription('');
+        } catch (err) {
+            setSubmitError(
+                err instanceof Error ? err.message : 'Failed to submit ride'
+            );
+        } finally {
+            setIsSubmitting(false);
+        }
     };
 
     return (
@@ -253,13 +267,17 @@ function SubmitBox({ onSubmit }) {
                         required
                     />
                 </div>
+                {submitError && (
+                    <p className='text-sm text-red-600'>{submitError}</p>
+                )}
                 <div className='pt-2'>
                     <Button
                         type='submit'
                         size='lg'
                         className='w-full sm:w-auto'
+                        disabled={isSubmitting}
                     >
-                        Submit
+                        {isSubmitting ? 'Submitting...' : 'Submit'}
                     </Button>
                 </div>
             </form>
