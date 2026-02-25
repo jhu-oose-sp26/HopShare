@@ -24,3 +24,21 @@ With Hop-Share, students can:
 - Backend: Node.js, Express
 - Database: MongoDB
 - Deployment: Vercel
+
+## How to install
+
+### Backend
+
+1. Install npm (and optionally pnpm [here](https://pnpm.io/installation))
+2. Run ``cd backend``
+3. Run ``npm install``/``pnpm install``
+4. Create a .env using the .env.example as a template
+5. Install mongodb at this [link](https://www.mongodb.com/try/download/community) and install Compass when prompted
+6. Start a server at the default localhost using Compass or the mongodb shell
+7. Run ``npm start``/``pnpm start``
+
+### Frontend
+
+1. Run ``cd frontend``
+2. Run ``npm install``/``pnpm install``
+3. Run ``npm start``/``pnpm start``
