@@ -1,17 +1,27 @@
 import React from 'react';
 import PostCard from './PostCard';
 
-const PostList = ({ posts }) => {
+const PostList = ({ posts, isLoading = false, error = '' }) => {
     return (
         <div className='container mx-auto px-6 py-8 max-w-6xl'>
             <div className='mb-6'>
                 <h2 className='text-xl font-semibold text-gray-900 mb-2'>
                     Available Rides
                 </h2>
-                <p className='text-gray-600'>{posts.length} rides available</p>
+                <p className='text-gray-600'>
+                    {isLoading ? 'Loading rides...' : `${posts.length} rides available`}
+                </p>
             </div>
 
-            {posts.length === 0 ? (
+            {error && (
+                <p className='mb-4 text-sm text-red-600'>{error}</p>
+            )}
+
+            {isLoading ? (
+                <div className='text-center py-12'>
+                    <p className='text-gray-500 text-lg'>Loading rides...</p>
+                </div>
+            ) : posts.length === 0 ? (
                 <div className='text-center py-12'>
                     <p className='text-gray-500 text-lg'>
                         No rides available yet.

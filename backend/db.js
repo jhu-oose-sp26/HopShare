@@ -1,19 +1,28 @@
 // db.js
 const { MongoClient } = require('mongodb');
-require('dotenv').config();
+const path = require('path');
+require('dotenv').config({ path: path.resolve(__dirname, '.env') });
 
 const uri = process.env.MONGO_URI;
-const client = new MongoClient(uri);
+let client;
 
 let db;
 
 async function connectDB() {
+  if (!uri) {
+    throw new Error(
+      'MONGO_URI is not set. Please add it to backend/.env before starting the server.'
+    );
+  }
+
+  client = new MongoClient(uri);
   try {
     await client.connect();
     db = client.db("hopshare");
     console.log('Connected to MongoDB');
   } catch (err) {
     console.error('Failed to connect to MongoDB', err);
+    throw err;
   }
 }
 
