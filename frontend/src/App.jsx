@@ -12,7 +12,7 @@ import {
 } from '@/components/ui/dialog';
 
 function App() {
-    const { posts, addPost, isLoading, error } = usePosts()
+    const { posts, addPost } = usePosts()
     const [isOpen, setIsOpen] = useState(false)
 
     return (
@@ -37,8 +37,8 @@ function App() {
                             </DialogHeader>
 
                             <SubmitBox
-                                onSubmit={async (data) => {
-                                    await addPost(data)
+                                onSubmit={(data) => {
+                                    addPost(data)
                                     setIsOpen(false)
                                 }}
                             />
@@ -48,7 +48,7 @@ function App() {
             </div>
 
             {/* Post List Section */}
-            <PostList posts={posts} isLoading={isLoading} error={error} />
+            <PostList posts={posts} />
         </div>
     );
 }
