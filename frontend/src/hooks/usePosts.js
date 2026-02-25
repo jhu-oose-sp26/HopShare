@@ -1,103 +1,148 @@
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
-// Initial mock data
-const initialPosts = [
-    {
-        _id: '507f1f77bcf86cd799439011',
-        title: 'Airport Ride → BWI',
-        description:
-            'Looking for 2 people to split Uber to BWI airport tomorrow morning. Leaving at 8 AM from Homewood campus. Will split cost 3 ways!',
+const API_ROOT = (import.meta.env.VITE_API_BASE_URL || '/api').replace(
+    /\/$/,
+    ''
+);
+const POSTS_ENDPOINT = `${API_ROOT}/posts`;
+
+function createPostPayload(formData) {
+    return {
+        title: `${formData.startLocation} → ${formData.endLocation}`,
+        description: formData.description,
         user: {
-            email: 'a@jh.edu',
-            name: 'John Doe',
-            phone: '123-456-7890',
+            name: formData.name,
+            email: formData.email,
+            phone: formData.phone,
         },
         trip: {
-            startLocation: 'Hopkins Homewood Campus',
-            endLocation: 'BWI Airport',
-            date: '2024-02-24',
-            time: '08:00',
+            startLocation: formData.startLocation,
+            endLocation: formData.endLocation,
+            date: formData.date,
+            time: formData.time,
         },
-    },
-    {
-        _id: '507f1f77bcf86cd799439012',
-        title: 'Shopping Trip → Towson Mall',
-        description:
-            'Going to Towson Town Center this Saturday afternoon. Can take 3 passengers, just split gas money.',
-        user: {
-            email: 'b@jh.edu',
-            name: 'Jane Doe',
-            phone: '123-456-7890',
-        },
-        trip: {
-            startLocation: 'Charles Village',
-            endLocation: 'Towson Town Center',
-            date: '2024-02-25',
-            time: '21:00',
-        },
-    },
-    {
-        _id: '507f1f77bcf86cd799439013',
-        title: "Grocery Run → Target & Trader Joe's",
-        description:
-            "Weekly grocery trip to Target and Trader Joe's. Looking for people to split gas costs. Planning to leave Sunday morning.",
-        user: {
-            email: 'c@jh.edu',
-            name: 'Ben Dover',
-            phone: '123-456-7890',
-        },
-        trip: {
-            startLocation: 'Hopkins Campus',
-            endLocation: "Target/Trader Joe's",
-            date: '2024-02-26',
-            time: '09:00',
-        },
-    },
-];
+        createdAt: new Date().toISOString(),
+    };
+}
+
+function normalizeId(id, fallback) {
+    if (id) {
+        return String(id);
+    }
+    return fallback;
+}
+
+async function readErrorMessage(response) {
+    try {
+        const payload = await response.json();
+        if (payload?.error) {
+            return payload.error;
+        }
+    } catch {
+        // ignore parse errors and use status fallback
+    }
+    return `Request failed (${response.status})`;
+}
 
 export const usePosts = () => {
-    const [posts, setPosts] = useState(initialPosts);
+    const [posts, setPosts] = useState([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [error, setError] = useState('');
 
-    const addPost = (formData) => {
-        const newPost = {
-            _id: Date.now().toString(),
-    
-            // Display title
-            title: `${formData.startLocation} → ${formData.endLocation}`,
-    
-            // Main description
-            description: formData.description,
-    
-            // Store contact info properly
-            user: {
-                name: formData.name,
-                email: formData.email,
-                phone: formData.phone,
-            },
-    
-            trip: {
-                startLocation: formData.startLocation,
-                endLocation: formData.endLocation,
-                date: formData.date,
-                time: formData.time,
-            },
-    
-            createdAt: new Date().toISOString(),
+    const fetchPosts = useCallback(async () => {
+        const response = await fetch(POSTS_ENDPOINT);
+        if (!response.ok) {
+            throw new Error(await readErrorMessage(response));
+        }
+
+        const payload = await response.json();
+        return Array.isArray(payload) ? payload : [];
+    }, []);
+
+    useEffect(() => {
+        let isMounted = true;
+
+        const loadPosts = async () => {
+            setIsLoading(true);
+            try {
+                const loadedPosts = await fetchPosts();
+                if (isMounted) {
+                    setPosts(loadedPosts);
+                    setError('');
+                }
+            } catch (err) {
+                if (isMounted) {
+                    setError(
+                        err instanceof Error
+                            ? err.message
+                            : 'Failed to load rides'
+                    );
+                }
+            } finally {
+                if (isMounted) {
+                    setIsLoading(false);
+                }
+            }
         };
-    
-        setPosts((prevPosts) => [newPost, ...prevPosts]);
-    };
 
-    const removePost = (postId) => {
+        loadPosts();
+
+        return () => {
+            isMounted = false;
+        };
+    }, [fetchPosts]);
+
+    const addPost = useCallback(async (formData) => {
+        const postPayload = createPostPayload(formData);
+        const response = await fetch(POSTS_ENDPOINT, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(postPayload),
+        });
+
+        if (!response.ok) {
+            throw new Error(await readErrorMessage(response));
+        }
+
+        const createdResult = await response.json();
+        const createdPost = {
+            ...postPayload,
+            _id: normalizeId(
+                createdResult.postId || createdResult.insertedId,
+                Date.now().toString()
+            ),
+            tripId: createdResult.tripId
+                ? normalizeId(createdResult.tripId, null)
+                : null,
+        };
+
+        setPosts((prevPosts) => [createdPost, ...prevPosts]);
+        setError('');
+        return createdPost;
+    }, []);
+
+    const removePost = useCallback(async (postId) => {
+        const response = await fetch(`${POSTS_ENDPOINT}/${postId}`, {
+            method: 'DELETE',
+        });
+
+        if (!response.ok) {
+            throw new Error(await readErrorMessage(response));
+        }
+
         setPosts((prevPosts) =>
-            prevPosts.filter((post) => post._id !== postId)
+            prevPosts.filter((post) => String(post._id) !== String(postId))
         );
-    };
+    }, []);
 
     return {
         posts,
         addPost,
         removePost,
         postCount: posts.length,
+        isLoading,
+        error,
     };
 };
