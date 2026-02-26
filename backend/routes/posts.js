@@ -32,35 +32,42 @@ router.get('/:id', async (req, res) => {
 
 // CREATE
 router.post('/', async (req, res) => { 
-  const postInfo = req.body;
-
-  // validate the post info
+  try {
+    const postInfo = req.body || {};
+      // validate the post info
   if (postInfo.title===null || postInfo.description===null) {
     return res.status(400).json({ error: 'Title and description are required' });
   }
+    const db = getDB();
+    const postsCollection = db.collection('posts');
+    const tripsCollection = db.collection('trips');
 
-  const db = getDB();
-  const result = await db.collection('posts').insertOne(postInfo);
-  const tripsCollection = db.collection('trips');
+    const postResult = await postsCollection.insertOne(postInfo);
+    let tripId = null;
 
-  let tripId = null;
-  // if there has trip info, insert it into the trips collection
-  if (postInfo.trip) {
-    const tripResult = await tripsCollection.insertOne({
+    if (postInfo.trip) {
+      const tripResult = await tripsCollection.insertOne({
         ...postInfo.trip,
-        postId: result.insertedId,
+        postId: postResult.insertedId,
       });
+
       tripId = tripResult.insertedId;
-  }
 
-  if (tripId) {
-    await db.collection('posts').updateOne(
-      { _id: result.insertedId },
-      { $set: { tripId } }
-    );
-  }
+      await postsCollection.updateOne(
+        { _id: postResult.insertedId },
+        { $set: { tripId } }
+      );
+    }
 
-    res.status(201).json({ ...result, postId: result.insertedId, tripId: tripId || null });
+    res.status(201).json({
+      acknowledged: postResult.acknowledged,
+      postId: postResult.insertedId,
+      tripId,
+    });
+  } catch (error) {
+    console.error('Failed to create post:', error);
+    res.status(500).json({ error: 'Failed to create post' });
+  }
 });
 
 
