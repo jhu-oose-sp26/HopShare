@@ -46,6 +46,7 @@ router.post('/', async (req, res) => {
     let tripId = null;
 
     if (postInfo.trip) {
+      // insert the trip and get the tripId
       const tripResult = await tripsCollection.insertOne({
         ...postInfo.trip,
         postId: postResult.insertedId,
@@ -91,24 +92,78 @@ router.delete('/:id', async (req, res) => {
 // UPDATE
 router.put('/:id', async (req, res) => { 
   try {
-    const { ObjectId } = require('mongodb');
+    const postId = toObjectId(req.params.id);
+    if (!postId) {
+      return res.status(400).json({ error: 'Invalid post id' });
+    }
 
-    const { id } = req.params;
-    const updateData = req.body;
+    // get the update data
+    const updateData = { ...(req.body || {}) };
+    delete updateData._id;
 
-    // update the post data
-    const result = await db
-      .collection('posts')
-      .updateOne(
-        { _id: new ObjectId(id) },
-        { $set: updateData }
-      );
+    const db = getDB();
+    const postsCollection = db.collection('posts');
+    const tripsCollection = db.collection('trips');
+
+    const result = await postsCollection.updateOne(
+      { _id: postId },
+      { $set: updateData }
+    );
 
     if (result.matchedCount === 0) {
       return res.status(404).json({ error: 'Post not found' });
     }
 
-    res.json({ success: true, updatedCount: result.modifiedCount });
+    let tripId = null;
+
+    // update the trip
+    if (Object.prototype.hasOwnProperty.call(updateData, 'trip')) {
+      // check if trip field has content (not null/empty object)
+      const hasTripValue =
+        updateData.trip &&(typeof updateData.trip !== 'object' || Object.keys(updateData.trip).length > 0);
+
+      // create/update trip only when trip has content
+      if (hasTripValue) {
+        // get the existing trip by postID
+        const existingTrip = await tripsCollection.findOne({ postId });
+
+        if (existingTrip) {
+          // update the trip
+          await tripsCollection.updateOne(
+            { _id: existingTrip._id },
+            { $set: { ...updateData.trip, postId } }
+          );
+          tripId = existingTrip._id;
+        } else {
+          const tripResult = await tripsCollection.insertOne({
+            ...updateData.trip,
+            postId,
+          });
+          tripId = tripResult.insertedId;
+        }
+
+        await postsCollection.updateOne(
+          { _id: postId },
+          { $set: { tripId } }
+        );
+      } else {
+        // trip is null/empty object, delete related trip and remove trip fields from post
+        await tripsCollection.deleteMany({ postId });
+        await postsCollection.updateOne(
+          { _id: postId },
+          { $unset: { tripId: '', trip: '' } }
+        );
+      }
+    } else {
+      // no trip field in update data, keep the existing tripId
+      const post = await postsCollection.findOne(
+        { _id: postId },
+        { projection: { tripId: 1 } }
+      );
+      tripId = post?.tripId || null;
+    }
+
+    res.json({ success: true, updatedCount: result.modifiedCount, postId, tripId });
   } catch (err) {
     res.status(500).json({ error: 'Failed to update post' });
   }
