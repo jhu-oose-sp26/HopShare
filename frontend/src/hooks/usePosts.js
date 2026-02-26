@@ -6,9 +6,20 @@ const API_ROOT = (import.meta.env.VITE_API_BASE_URL || '/api').replace(
 );
 const POSTS_ENDPOINT = `${API_ROOT}/posts`;
 
+function toShortPlaceName(value) {
+    const raw = typeof value === 'string' ? value.trim() : '';
+    if (!raw) return '';
+    return raw.replace(/\s*,.*$/, '').trim();
+}
+
 function createPostPayload(formData) {
+    const startShort = toShortPlaceName(formData.startTitle);
+    const endShort = toShortPlaceName(formData.endTitle);
+
     return {
-        title: `${formData.startTitle} → ${formData.endTitle}`,
+        title: `${startShort || formData.startTitle} -> ${
+            endShort || formData.endTitle
+        }`,
         description: formData.description,
         type: formData.type,
         user: {
