@@ -1,0 +1,104 @@
+import { useEffect, useRef, useState } from 'react';
+
+const inputBase =
+    'flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50';
+
+function LocationAutocomplete({ id, value, onChange, onSelect, placeholder, required, coords }) {
+    const [query, setQuery] = useState(value || '');
+    const [suggestions, setSuggestions] = useState([]);
+    const [isOpen, setIsOpen] = useState(false);
+    const containerRef = useRef(null);
+
+    // Sync query when parent resets value to empty (e.g. form clear)
+    useEffect(() => {
+        if (value === '') setQuery('');
+    }, [value]);
+
+    // Debounced fetch
+    useEffect(() => {
+        if (query.trim().length < 2) {
+            setSuggestions([]);
+            setIsOpen(false);
+            return;
+        }
+
+        const timer = setTimeout(async () => {
+            try {
+                const params = new URLSearchParams({ q: query });
+                if (coords) {
+                    params.set('lat', coords.lat);
+                    params.set('lng', coords.lng);
+                }
+                const res = await fetch(`/api/places/autocomplete?${params}`);
+                const data = await res.json();
+                setSuggestions(data.suggestions || []);
+                setIsOpen(true);
+            } catch {
+                setSuggestions([]);
+            }
+        }, 300);
+
+        return () => clearTimeout(timer);
+    }, [query]);
+
+    // Close dropdown on outside click
+    useEffect(() => {
+        function handleClickOutside(e) {
+            if (containerRef.current && !containerRef.current.contains(e.target)) {
+                setIsOpen(false);
+            }
+        }
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
+    function handleSelect(suggestion) {
+        const full = suggestion.subtext
+            ? `${suggestion.label}, ${suggestion.subtext}`
+            : suggestion.label;
+        setQuery(full);
+        onChange(full);
+        onSelect?.({ label: full, latitude: suggestion.latitude, longitude: suggestion.longitude });
+        setSuggestions([]);
+        setIsOpen(false);
+    }
+
+    function handleChange(e) {
+        const val = e.target.value;
+        setQuery(val);
+        onChange(val);
+    }
+
+    return (
+        <div ref={containerRef} className='relative'>
+            <input
+                id={id}
+                type='text'
+                className={inputBase}
+                placeholder={placeholder}
+                value={query}
+                onChange={handleChange}
+                required={required}
+                autoComplete='off'
+            />
+            {isOpen && suggestions.length > 0 && (
+                <ul className='absolute z-50 mt-1 w-full rounded-md border border-input bg-background shadow-md'>
+                    {suggestions.map((s, i) => (
+                        <li
+                            key={i}
+                            className='cursor-pointer px-3 py-2 hover:bg-accent hover:text-accent-foreground'
+                            onMouseDown={() => handleSelect(s)}
+                        >
+                            <div className='text-sm font-medium'>{s.label}</div>
+                            {s.subtext && (
+                                <div className='text-xs text-muted-foreground'>{s.subtext}</div>
+                            )}
+                        </li>
+                    ))}
+                </ul>
+            )}
+        </div>
+    );
+}
+
+export default LocationAutocomplete;

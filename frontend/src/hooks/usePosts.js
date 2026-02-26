@@ -8,16 +8,29 @@ const POSTS_ENDPOINT = `${API_ROOT}/posts`;
 
 function createPostPayload(formData) {
     return {
-        title: `${formData.startLocation} → ${formData.endLocation}`,
+        title: `${formData.startTitle} → ${formData.endTitle}`,
         description: formData.description,
+        type: formData.type,
         user: {
             name: formData.name,
             email: formData.email,
             phone: formData.phone,
         },
         trip: {
-            startLocation: formData.startLocation,
-            endLocation: formData.endLocation,
+            startLocation: {
+                title: formData.startTitle,
+                gps_coordinates: {
+                    latitude: formData.startLatitude,
+                    longitude: formData.startLongitude,
+                }
+            },
+            endLocation: {
+                title: formData.endTitle,
+                gps_coordinates: {
+                    latitude: formData.endLatitude,
+                    longitude: formData.endLongitude,
+                }
+            },
             date: formData.date,
             time: formData.time,
         },

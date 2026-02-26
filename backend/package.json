@@ -64,6 +64,7 @@
     "router": "^2.2.0",
     "safer-buffer": "^2.1.2",
     "send": "^1.2.1",
+    "serpapi": "^2.2.1",
     "serve-static": "^2.2.1",
     "setprototypeof": "^1.2.0",
     "side-channel": "^1.1.0",

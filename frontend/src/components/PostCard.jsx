@@ -1,18 +1,23 @@
 import React from 'react';
-import { MapPin, Calendar, Clock, User, MessageCircle } from 'lucide-react';
+import { MapPin, Calendar, Clock, MessageCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 const PostCard = ({ post }) => {
-    const { _id, title, description, user, trip } = post;
+    const { _id, title, description, user, trip, type = 'request' } = post;
+    const isOffer = type === 'offer';
 
     return (
         <div className='rounded-xl border border-gray-200 bg-white p-6 shadow-sm hover:shadow-md transition-shadow'>
+            {/* Ride type badge */}
+            <div className='flex justify-center mb-4'>
+                <span className={`text-xs font-medium px-3 py-1 rounded-full ${isOffer ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}`}>
+                    {isOffer ? 'Offering' : 'Requesting'}
+                </span>
+            </div>
+
             {/* Header with user info and post ID */}
             <div className='flex items-center justify-between mb-4'>
                 <div className='flex items-center gap-3'>
-                    <div className='w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center'>
-                        <User className='w-5 h-5 text-blue-600' />
-                    </div>
                     <div>
                         <h3 className='font-semibold text-gray-900'>{title}</h3>
                         <p className='text-sm text-gray-500'>
@@ -33,19 +38,19 @@ const PostCard = ({ post }) => {
                         Trip Details
                     </h4>
                     <div className='space-y-2'>
-                        {trip.startLocation && (
+                        {trip.startLocation?.title && (
                             <div className='flex items-center gap-2 text-sm'>
                                 <MapPin className='w-4 h-4 text-green-600' />
                                 <span className='text-gray-600'>
-                                    From: {trip.startLocation}
+                                    From: {trip.startLocation.title}
                                 </span>
                             </div>
                         )}
-                        {trip.endLocation && (
+                        {trip.endLocation?.title && (
                             <div className='flex items-center gap-2 text-sm'>
                                 <MapPin className='w-4 h-4 text-red-600' />
                                 <span className='text-gray-600'>
-                                    To: {trip.endLocation}
+                                    To: {trip.endLocation.title}
                                 </span>
                             </div>
                         )}
