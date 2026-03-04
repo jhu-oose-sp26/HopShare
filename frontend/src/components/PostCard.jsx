@@ -130,7 +130,7 @@ const PostCard = ({ post, onDelete, onUpdate, coords }) => {
             )}
 
             {/* Action buttons */}
-            <div className='flex gap-2'>
+            <div className='flex flex-wrap gap-2'>
                 <Button variant='default' size='sm' className='flex-1'>
                     <MessageCircle className='w-4 h-4 mr-1' />
                     Contact
