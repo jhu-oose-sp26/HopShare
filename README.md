@@ -3,9 +3,6 @@
 
 <!-- PROJECT SHIELDS -->
 [![Contributors][contributors-shield]][contributors-url]
-[![Forks][forks-shield]][forks-url]
-[![Stargazers][stars-shield]][stars-url]
-[![Issues][issues-shield]][issues-url]
 
 <!-- PROJECT LOGO -->
 <br />
@@ -212,7 +209,7 @@ Project Link: [https://github.com/jhu-oose-sp26/HopShare](https://github.com/jhu
 
 
 <!-- MARKDOWN LINKS & IMAGES -->
-[contributors-shield]: https://img.shields.io/github/contributors/jhu-oose-sp26/HopShare.svg?style=for-the-badge
+[contributors-shield]: https://img.shields.io/badge/contributors-5-orange?style=for-the-badge
 [contributors-url]: https://github.com/jhu-oose-sp26/HopShare/graphs/contributors
 [forks-shield]: https://img.shields.io/github/forks/jhu-oose-sp26/HopShare.svg?style=for-the-badge
 [forks-url]: https://github.com/jhu-oose-sp26/HopShare/network/members
