@@ -23,20 +23,20 @@ import {
 const inputBase =
     'flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50';
 
-function SubmitBox({ onSubmit, coords }) {
-    const [name, setName] = useState('');
-    const [email, setEmail] = useState('');
-    const [phone, setPhone] = useState('');
-    const [startTitle, setStartTitle] = useState('');
-    const [startLatitude, setStartLatitude] = useState('');
-    const [startLongitude, setStartLongitude] = useState('');
-    const [endTitle, setEndTitle] = useState('');
-    const [endLatitude, setEndLatitude] = useState('');
-    const [endLongitude, setEndLongitude] = useState('');
-    const [date, setDate] = useState('');
-    const [time, setTime] = useState('');
-    const [description, setDescription] = useState('');
-    const [type, setType] = useState('request');
+function SubmitBox({ onSubmit, coords, initialData = null }) {
+    const [name, setName] = useState(initialData?.name ?? '');
+    const [email, setEmail] = useState(initialData?.email ?? '');
+    const [phone, setPhone] = useState(initialData?.phone ?? '');
+    const [startTitle, setStartTitle] = useState(initialData?.startTitle ?? '');
+    const [startLatitude, setStartLatitude] = useState(initialData?.startLatitude ?? '');
+    const [startLongitude, setStartLongitude] = useState(initialData?.startLongitude ?? '');
+    const [endTitle, setEndTitle] = useState(initialData?.endTitle ?? '');
+    const [endLatitude, setEndLatitude] = useState(initialData?.endLatitude ?? '');
+    const [endLongitude, setEndLongitude] = useState(initialData?.endLongitude ?? '');
+    const [date, setDate] = useState(initialData?.date ?? '');
+    const [time, setTime] = useState(initialData?.time ?? '');
+    const [description, setDescription] = useState(initialData?.description ?? '');
+    const [type, setType] = useState(initialData?.type ?? 'request');
     const [submitError, setSubmitError] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -69,20 +69,22 @@ function SubmitBox({ onSubmit, coords }) {
         try {
             await onSubmit?.(formData);
 
-            // Clear form after successful submit.
-            setName('');
-            setEmail('');
-            setPhone('');
-            setStartTitle('');
-            setStartLatitude('');
-            setStartLongitude('');
-            setEndTitle('');
-            setEndLatitude('');
-            setEndLongitude('');
-            setDate('');
-            setTime('');
-            setDescription('');
-            setType('request');
+            // Clear form after successful submit (only for new posts, not edits)
+            if (!initialData) {
+                setName('');
+                setEmail('');
+                setPhone('');
+                setStartTitle('');
+                setStartLatitude('');
+                setStartLongitude('');
+                setEndTitle('');
+                setEndLatitude('');
+                setEndLongitude('');
+                setDate('');
+                setTime('');
+                setDescription('');
+                setType('request');
+            }
         } catch (err) {
             setSubmitError(
                 err instanceof Error ? err.message : 'Failed to submit ride'

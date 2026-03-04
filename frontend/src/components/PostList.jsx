@@ -1,7 +1,7 @@
 import React from 'react';
 import PostCard from './PostCard';
 
-const PostList = ({ posts, isLoading = false, error = '' }) => {
+const PostList = ({ posts, isLoading = false, error = '', onDeletePost, onUpdatePost, coords }) => {
     return (
         <div className='container mx-auto px-6 py-8 max-w-6xl'>
             <div className='mb-6'>
@@ -33,7 +33,13 @@ const PostList = ({ posts, isLoading = false, error = '' }) => {
             ) : (
                 <div className='grid gap-6 md:grid-cols-2 lg:grid-cols-3'>
                     {posts.map((post) => (
-                        <PostCard key={post._id} post={post} />
+                        <PostCard
+                            key={post._id}
+                            post={post}
+                            onDelete={() => onDeletePost?.(post._id)}
+                            onUpdate={(formData) => onUpdatePost?.(post._id, formData)}
+                            coords={coords}
+                        />
                     ))}
                 </div>
             )}

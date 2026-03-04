@@ -1,10 +1,63 @@
-import React from 'react';
-import { MapPin, Calendar, Clock, MessageCircle } from 'lucide-react';
+import React, { useMemo, useState } from 'react';
+import { MapPin, Calendar, Clock, MessageCircle, Pencil, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
+} from '@/components/ui/dialog';
+import SubmitBox from './SubmitBox';
 
-const PostCard = ({ post }) => {
+const PostCard = ({ post, onDelete, onUpdate, coords }) => {
     const { _id, title, description, user, trip, type = 'request' } = post;
     const isOffer = type === 'offer';
+
+    const [editOpen, setEditOpen] = useState(false);
+    const [deleteOpen, setDeleteOpen] = useState(false);
+    const [isDeleting, setIsDeleting] = useState(false);
+    const [deleteError, setDeleteError] = useState('');
+
+    // Build initialData for SubmitBox from existing post
+    const initialData = useMemo(() => ({
+        type: type ?? 'request',
+        name: user?.name ?? '',
+        email: user?.email ?? '',
+        phone: user?.phone ?? '',
+        startTitle: trip?.startLocation?.title ?? '',
+        startLatitude: trip?.startLocation?.gps_coordinates?.latitude ?? '',
+        startLongitude: trip?.startLocation?.gps_coordinates?.longitude ?? '',
+        endTitle: trip?.endLocation?.title ?? '',
+        endLatitude: trip?.endLocation?.gps_coordinates?.latitude ?? '',
+        endLongitude: trip?.endLocation?.gps_coordinates?.longitude ?? '',
+        date: trip?.date ?? '',
+        time: trip?.time ?? '',
+        description: description ?? '',
+    }), [type, user, trip, description]);
+
+    const handleEditSubmit = async (formData) => {
+        await onUpdate?.(formData);
+        setEditOpen(false);
+    };
+
+    const handleDelete = async () => {
+        setDeleteError('');
+        setIsDeleting(true);
+
+        try {
+            await onDelete?.();
+            setDeleteOpen(false);
+        } catch (err) {
+            setDeleteError(
+                err instanceof Error ? err.message : 'Failed to delete ride'
+            );
+        } finally {
+            setIsDeleting(false);
+        }
+    };
 
     return (
         <div className='rounded-xl border border-gray-200 bg-white p-6 shadow-sm hover:shadow-md transition-shadow'>
@@ -77,14 +130,77 @@ const PostCard = ({ post }) => {
             )}
 
             {/* Action buttons */}
-            <div className='flex gap-2'>
+            <div className='flex flex-wrap gap-2'>
                 <Button variant='default' size='sm' className='flex-1'>
                     <MessageCircle className='w-4 h-4 mr-1' />
                     Contact
                 </Button>
+
+                {/* Edit Dialog */}
+                <Dialog open={editOpen} onOpenChange={setEditOpen}>
+                    <DialogTrigger asChild>
+                        <Button variant='outline' size='sm'>
+                            <Pencil className='w-4 h-4 mr-1' />
+                            Edit
+                        </Button>
+                    </DialogTrigger>
+
+                    <DialogContent className="w-[90%] max-w-[800px] sm:max-w-[800px] max-h-[80vh] overflow-y-auto">
+                        <DialogHeader>
+                            <DialogTitle>Edit Ride</DialogTitle>
+                        </DialogHeader>
+
+                        <SubmitBox
+                            onSubmit={handleEditSubmit}
+                            coords={coords}
+                            initialData={initialData}
+                        />
+                    </DialogContent>
+                </Dialog>
+
                 <Button variant='outline' size='sm'>
                     Details
                 </Button>
+
+                {/* Delete Confirmation Dialog */}
+                <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+                    <DialogTrigger asChild>
+                        <Button variant='destructive' size='sm'>
+                            <Trash2 className='w-4 h-4 mr-1' />
+                            Delete
+                        </Button>
+                    </DialogTrigger>
+
+                    <DialogContent className="sm:max-w-[425px]">
+                        <DialogHeader>
+                            <DialogTitle>Delete Ride</DialogTitle>
+                            <DialogDescription>
+                                Are you sure you want to delete this ride? This action cannot be undone.
+                            </DialogDescription>
+                        </DialogHeader>
+
+                        {deleteError && (
+                            <p className='text-sm text-red-600'>{deleteError}</p>
+                        )}
+
+                        <DialogFooter>
+                            <Button
+                                variant='outline'
+                                onClick={() => setDeleteOpen(false)}
+                                disabled={isDeleting}
+                            >
+                                Cancel
+                            </Button>
+                            <Button
+                                variant='destructive'
+                                onClick={handleDelete}
+                                disabled={isDeleting}
+                            >
+                                {isDeleting ? 'Deleting...' : 'Delete'}
+                            </Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
             </div>
         </div>
     );

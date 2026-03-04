@@ -12,7 +12,7 @@ import {
 } from '@/components/ui/dialog';
 
 function App() {
-    const { posts, addPost, isLoading, error } = usePosts()
+    const { posts, addPost, removePost, updatePost, isLoading, error } = usePosts()
     const [isOpen, setIsOpen] = useState(false)
     const [coords, setCoords] = useState(null)
 
@@ -59,7 +59,14 @@ function App() {
             </div>
 
             {/* Post List Section */}
-            <PostList posts={posts} isLoading={isLoading} error={error} />
+            <PostList
+                posts={posts}
+                isLoading={isLoading}
+                error={error}
+                onDeletePost={removePost}
+                onUpdatePost={updatePost}
+                coords={coords}
+            />
         </div>
     );
 }
