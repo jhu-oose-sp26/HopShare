@@ -162,10 +162,35 @@ export const usePosts = () => {
         );
     }, []);
 
+    const updatePost = useCallback(async (postId, formData) => {
+        const postPayload = createPostPayload(formData);
+        const response = await fetch(`${POSTS_ENDPOINT}/${postId}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(postPayload),
+        });
+
+        if (!response.ok) {
+            throw new Error(await readErrorMessage(response));
+        }
+
+        // Update local state with the new data
+        setPosts((prevPosts) =>
+            prevPosts.map((post) =>
+                String(post._id) === String(postId)
+                    ? { ...post, ...postPayload }
+                    : post
+            )
+        );
+    }, []);
+
     return {
         posts,
         addPost,
         removePost,
+        updatePost,
         postCount: posts.length,
         isLoading,
         error,
