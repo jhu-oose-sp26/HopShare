@@ -11,6 +11,7 @@ import {
     DialogTrigger,
 } from '@/components/ui/dialog';
 import SubmitBox from './SubmitBox';
+import { getDistanceFromLatLonInKm } from '@/lib/utils';
 
 const PostCard = ({ post, onDelete, onUpdate, coords }) => {
     const { _id, title, description, user, trip, type = 'request' } = post;
@@ -162,6 +163,12 @@ const PostCard = ({ post, onDelete, onUpdate, coords }) => {
                     Details
                 </Button>
 
+                <h1>
+                    {(Math.round(getDistanceFromLatLonInKm(initialData.startLatitude,
+                        initialData.startLongitude,
+                        initialData.endLatitude,
+                        initialData.endLongitude)*100))/100}
+                </h1>
                 {/* Delete Confirmation Dialog */}
                 <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
                     <DialogTrigger asChild>
