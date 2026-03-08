@@ -12,7 +12,6 @@ import {
     DialogTrigger,
 } from '@/components/ui/dialog';
 import SubmitBox from './SubmitBox';
-import RouteMap from './RouteMap';
 
 const PostCard = ({ post, onDelete, onUpdate, coords }) => {
     const { _id, title, description, user, trip, type = 'request', createdAt } = post;
@@ -290,10 +289,15 @@ const PostCard = ({ post, onDelete, onUpdate, coords }) => {
                                     {/* Route map */}
                                     {trip.startLocation?.gps_coordinates?.latitude != null &&
                                      trip.endLocation?.gps_coordinates?.latitude != null && (
-                                        <RouteMap
-                                            start={trip.startLocation.gps_coordinates}
-                                            end={trip.endLocation.gps_coordinates}
-                                        />
+                                        <div className='rounded-lg overflow-hidden border border-gray-200 h-52'>
+                                            <iframe
+                                                title='Route map'
+                                                src={`https://maps.google.com/maps?output=embed&saddr=${trip.startLocation.gps_coordinates.latitude},${trip.startLocation.gps_coordinates.longitude}&daddr=${trip.endLocation.gps_coordinates.latitude},${trip.endLocation.gps_coordinates.longitude}`}
+                                                className='w-full h-full'
+                                                loading='lazy'
+                                                referrerPolicy='no-referrer-when-downgrade'
+                                            />
+                                        </div>
                                     )}
 
                                     {/* Date & Time */}
