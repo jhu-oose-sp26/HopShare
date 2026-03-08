@@ -15,6 +15,33 @@ import SubmitBox from './SubmitBox';
 const PostCard = ({ post, onDelete, onUpdate, coords }) => {
     const { _id, title, description, user, trip, type = 'request' } = post;
     const isOffer = type === 'offer';
+    const startLocationLabel =
+        typeof trip?.startLocation === 'string'
+            ? trip.startLocation
+            : trip?.startLocation?.title || '';
+    const endLocationLabel =
+        typeof trip?.endLocation === 'string'
+            ? trip.endLocation
+            : trip?.endLocation?.title || '';
+    const startLat = Number(trip?.startLocation?.gps_coordinates?.latitude);
+    const startLng = Number(trip?.startLocation?.gps_coordinates?.longitude);
+    const endLat = Number(trip?.endLocation?.gps_coordinates?.latitude);
+    const endLng = Number(trip?.endLocation?.gps_coordinates?.longitude);
+    const hasStartCoords = Number.isFinite(startLat) && Number.isFinite(startLng);
+    const hasEndCoords = Number.isFinite(endLat) && Number.isFinite(endLng);
+    const hasRouteCoords = hasStartCoords && hasEndCoords;
+
+    const mapEmbedUrl = hasRouteCoords
+        ? `https://maps.google.com/maps?output=embed&saddr=${startLat},${startLng}&daddr=${endLat},${endLng}`
+        : hasStartCoords
+          ? `https://maps.google.com/maps?q=${startLat},${startLng}&z=14&output=embed`
+          : hasEndCoords
+            ? `https://maps.google.com/maps?q=${endLat},${endLng}&z=14&output=embed`
+            : '';
+
+    const mapsRouteUrl = hasRouteCoords
+        ? `https://www.google.com/maps/dir/?api=1&origin=${startLat},${startLng}&destination=${endLat},${endLng}`
+        : '';
 
     const [editOpen, setEditOpen] = useState(false);
     const [deleteOpen, setDeleteOpen] = useState(false);
@@ -91,19 +118,19 @@ const PostCard = ({ post, onDelete, onUpdate, coords }) => {
                         Trip Details
                     </h4>
                     <div className='space-y-2'>
-                        {trip.startLocation?.title && (
+                        {startLocationLabel && (
                             <div className='flex items-center gap-2 text-sm'>
                                 <MapPin className='w-4 h-4 text-green-600' />
                                 <span className='text-gray-600'>
-                                    From: {trip.startLocation.title}
+                                    From: {startLocationLabel}
                                 </span>
                             </div>
                         )}
-                        {trip.endLocation?.title && (
+                        {endLocationLabel && (
                             <div className='flex items-center gap-2 text-sm'>
                                 <MapPin className='w-4 h-4 text-red-600' />
                                 <span className='text-gray-600'>
-                                    To: {trip.endLocation.title}
+                                    To: {endLocationLabel}
                                 </span>
                             </div>
                         )}
@@ -158,9 +185,109 @@ const PostCard = ({ post, onDelete, onUpdate, coords }) => {
                     </DialogContent>
                 </Dialog>
 
-                <Button variant='outline' size='sm'>
-                    Details
-                </Button>
+                <Dialog>
+                    <DialogTrigger asChild>
+                        <Button variant='outline' size='sm'>
+                            Details
+                        </Button>
+                    </DialogTrigger>
+
+                    <DialogContent className='sm:max-w-[560px]'>
+                        <DialogHeader>
+                            <DialogTitle>Ride Details</DialogTitle>
+                            <DialogDescription>
+                                Full trip and contact info for this post.
+                            </DialogDescription>
+                        </DialogHeader>
+
+                        <div className='space-y-4 text-sm'>
+                            <div>
+                                <p className='font-medium text-gray-900'>Title</p>
+                                <p className='text-gray-600'>{title}</p>
+                            </div>
+
+                            {description && (
+                                <div>
+                                    <p className='font-medium text-gray-900'>Description</p>
+                                    <p className='text-gray-600'>{description}</p>
+                                </div>
+                            )}
+
+                            <div className='grid gap-3 sm:grid-cols-2'>
+                                <div>
+                                    <p className='font-medium text-gray-900'>Rider</p>
+                                    <p className='text-gray-600'>{user?.name || 'N/A'}</p>
+                                </div>
+                                <div>
+                                    <p className='font-medium text-gray-900'>Email</p>
+                                    <p className='text-gray-600'>{user?.email || 'N/A'}</p>
+                                </div>
+                            </div>
+
+                            <div className='grid gap-3 sm:grid-cols-2'>
+                                <div>
+                                    <p className='font-medium text-gray-900'>From</p>
+                                    <p className='text-gray-600'>
+                                        {startLocationLabel || 'N/A'}
+                                    </p>
+                                </div>
+                                <div>
+                                    <p className='font-medium text-gray-900'>To</p>
+                                    <p className='text-gray-600'>
+                                        {endLocationLabel || 'N/A'}
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div className='grid gap-3 sm:grid-cols-2'>
+                                <div>
+                                    <p className='font-medium text-gray-900'>Date</p>
+                                    <p className='text-gray-600'>{trip?.date || 'N/A'}</p>
+                                </div>
+                                <div>
+                                    <p className='font-medium text-gray-900'>Time</p>
+                                    <p className='text-gray-600'>{trip?.time || 'N/A'}</p>
+                                </div>
+                            </div>
+
+                            <div>
+                                <p className='font-medium text-gray-900'>Post ID</p>
+                                <p className='text-gray-600'>#{_id?.slice(-6) || 'N/A'}</p>
+                            </div>
+
+                            <div>
+                                <p className='font-medium text-gray-900 mb-2'>Map</p>
+                                {mapEmbedUrl ? (
+                                    <div className='space-y-2'>
+                                        <div className='h-56 w-full overflow-hidden rounded-md border border-gray-200'>
+                                            <iframe
+                                                title={`Trip map for post ${_id || 'unknown'}`}
+                                                src={mapEmbedUrl}
+                                                loading='lazy'
+                                                className='h-full w-full'
+                                                referrerPolicy='no-referrer-when-downgrade'
+                                            />
+                                        </div>
+                                        {mapsRouteUrl && (
+                                            <a
+                                                href={mapsRouteUrl}
+                                                target='_blank'
+                                                rel='noreferrer'
+                                                className='text-sm text-blue-600 hover:underline'
+                                            >
+                                                Open route in Google Maps
+                                            </a>
+                                        )}
+                                    </div>
+                                ) : (
+                                    <p className='text-gray-600'>
+                                        Map preview is unavailable because coordinates were not saved for this post.
+                                    </p>
+                                )}
+                            </div>
+                        </div>
+                    </DialogContent>
+                </Dialog>
 
                 {/* Delete Confirmation Dialog */}
                 <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
