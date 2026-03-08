@@ -7,6 +7,7 @@ function LocationAutocomplete({ id, value, onChange, onSelect, placeholder, requ
     const [query, setQuery] = useState(value || '');
     const [suggestions, setSuggestions] = useState([]);
     const [isOpen, setIsOpen] = useState(false);
+    const [isFocused, setIsFocused] = useState(false);
     const containerRef = useRef(null);
 
     // Sync query when parent resets value to empty (e.g. form clear)
@@ -30,16 +31,23 @@ function LocationAutocomplete({ id, value, onChange, onSelect, placeholder, requ
                     params.set('lng', coords.lng);
                 }
                 const res = await fetch(`/api/places/autocomplete?${params}`);
+                if (!res.ok) {
+                    setSuggestions([]);
+                    setIsOpen(false);
+                    return;
+                }
                 const data = await res.json();
-                setSuggestions(data.suggestions || []);
-                setIsOpen(true);
+                const nextSuggestions = data.suggestions || [];
+                setSuggestions(nextSuggestions);
+                setIsOpen(isFocused && nextSuggestions.length > 0);
             } catch {
                 setSuggestions([]);
+                setIsOpen(false);
             }
         }, 300);
 
         return () => clearTimeout(timer);
-    }, [query]);
+    }, [query, isFocused, coords]);
 
     // Close dropdown on outside click
     useEffect(() => {
@@ -61,12 +69,25 @@ function LocationAutocomplete({ id, value, onChange, onSelect, placeholder, requ
         onSelect?.({ label: full, latitude: suggestion.latitude, longitude: suggestion.longitude });
         setSuggestions([]);
         setIsOpen(false);
+        setIsFocused(false);
     }
 
     function handleChange(e) {
         const val = e.target.value;
         setQuery(val);
         onChange(val);
+    }
+
+    function handleFocus() {
+        setIsFocused(true);
+        if (suggestions.length > 0 && query.trim().length >= 2) {
+            setIsOpen(true);
+        }
+    }
+
+    function handleBlur() {
+        setIsFocused(false);
+        setIsOpen(false);
     }
 
     return (
@@ -78,10 +99,12 @@ function LocationAutocomplete({ id, value, onChange, onSelect, placeholder, requ
                 placeholder={placeholder}
                 value={query}
                 onChange={handleChange}
+                onFocus={handleFocus}
+                onBlur={handleBlur}
                 required={required}
                 autoComplete='off'
             />
-            {isOpen && suggestions.length > 0 && (
+            {isFocused && isOpen && suggestions.length > 0 && (
                 <ul className='absolute z-50 mt-1 w-full rounded-md border border-input bg-background shadow-md'>
                     {suggestions.map((s, i) => (
                         <li

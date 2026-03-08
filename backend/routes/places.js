@@ -28,6 +28,12 @@ router.get('/autocomplete', async (req, res) => {
     }
 
     try {
+        if (!process.env.SERP_API_KEY) {
+            return res.status(500).json({
+                error: 'SERP_API_KEY is not configured on the backend',
+            });
+        }
+
         const { lat, lng } = req.query;
         const params = {
             engine: 'google_maps_autocomplete',
@@ -39,6 +45,12 @@ router.get('/autocomplete', async (req, res) => {
         }
 
         const results = await serpApiGet(params);
+
+        if (results?.error) {
+            return res.status(502).json({
+                error: `SerpAPI error: ${results.error}`,
+            });
+        }
 
         const suggestions = (results.suggestions || [])
             .filter((s) => s.type === 'place')
