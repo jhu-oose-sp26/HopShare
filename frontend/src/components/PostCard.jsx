@@ -3,6 +3,7 @@ import { MapPin, Calendar, Clock, MessageCircle, Pencil, Trash2, Info, User, Mai
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
+    DialogClose,
     DialogContent,
     DialogDescription,
     DialogFooter,
@@ -338,7 +339,9 @@ const PostCard = ({ post, onDelete, onUpdate, coords }) => {
                             )}
                         </div>
 
-                        <DialogFooter showCloseButton />
+                        <DialogClose asChild>
+                            <Button variant='outline' className='w-full'>Close</Button>
+                        </DialogClose>
                     </DialogContent>
                 </Dialog>
 
