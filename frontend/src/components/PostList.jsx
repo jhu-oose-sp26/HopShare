@@ -13,11 +13,14 @@ import { getDistanceFromLatLonInKm } from "@/lib/utils";
 
 const PostList = ({ posts, isLoading = false, error = '', onDeletePost, onUpdatePost, coords }) => {
     const [typeFilter, setTypeFilter] = useState("all");
-    const [distanceFilter, setDistanceFilter] = useState("all");
+    const [distanceFilter, setDistanceFilter] = useState(Infinity);
 
     const hasActiveFilters = typeFilter !== "all" || distanceFilter !== "all";
 
+    const locationEnabled = coords !== null;
+
     const distanceOptions = [
+        { value: Infinity, label: "Any" },
         { value: 0.5, label: "500m" },
         { value: 1, label: "1 km" },
         { value: 5, label: "5 km" },
@@ -49,6 +52,12 @@ const PostList = ({ posts, isLoading = false, error = '', onDeletePost, onUpdate
 
     return (
         <div className='container mx-auto px-6 py-8 max-w-6xl'>
+            {!locationEnabled && (
+                <p className="mb-4 text-sm text-red-600">
+                    Location is turned off. Distance filtering will not work. Please enable and reload.
+                </p>
+            )}
+
             <div className='mb-6'>
                 <div className="flex justify-between items-center mb-2">
                     <h2 className='text-xl font-semibold text-gray-900'>
@@ -88,6 +97,7 @@ const PostList = ({ posts, isLoading = false, error = '', onDeletePost, onUpdate
                                 type="single"
                                 value={distanceFilter}
                                 onValueChange={(v) => v && setDistanceFilter(v)}
+                                className={`flex flex-wrap gap-1 ${!locationEnabled ? "opacity-50 pointer-events-none" : ""}`}
                             >
                                 {distanceOptions.map((option) => (
                                         <ToggleGroupItem
