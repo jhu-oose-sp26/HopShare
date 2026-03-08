@@ -2,7 +2,7 @@ import PostList from './components/PostList'
 import SubmitBox from './components/SubmitBox'
 import { usePosts } from './hooks/usePosts'
 import { Button } from './components/ui/button'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
     Dialog,
     DialogContent,
@@ -12,8 +12,18 @@ import {
 } from '@/components/ui/dialog';
 
 function App() {
-    const { posts, addPost, isLoading, error } = usePosts()
+    const { posts, addPost, removePost, updatePost, isLoading, error } = usePosts()
     const [isOpen, setIsOpen] = useState(false)
+    const [coords, setCoords] = useState(null)
+
+    // get user's location on loading (to help with Google Maps autocomplete biasing)
+    useEffect(() => {
+        if (!navigator.geolocation) return;
+        navigator.geolocation.getCurrentPosition(
+            (pos) => setCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+            () => {} // silently ignore if denied
+        );
+    }, [])
 
     return (
         <div className='min-h-screen bg-gray-50'>
@@ -41,6 +51,7 @@ function App() {
                                     await addPost(data)
                                     setIsOpen(false)
                                 }}
+                                coords={coords}
                             />
                         </DialogContent>
                     </Dialog>
@@ -48,7 +59,14 @@ function App() {
             </div>
 
             {/* Post List Section */}
-            <PostList posts={posts} isLoading={isLoading} error={error} />
+            <PostList
+                posts={posts}
+                isLoading={isLoading}
+                error={error}
+                onDeletePost={removePost}
+                onUpdatePost={updatePost}
+                coords={coords}
+            />
         </div>
     );
 }

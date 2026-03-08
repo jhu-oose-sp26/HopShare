@@ -50,7 +50,7 @@ The tech stack will be:
 
 - Frontend: React, TypeScript, Next.js
 - Backend: Node.js, Express
-- Database: SQLite using Django
+- Database: MongoDB
 - Deployment: Vercel
 
 
