@@ -1,16 +1,45 @@
-import React from 'react';
+import React, { useState } from 'react';
 import PostCard from './PostCard';
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 
 const PostList = ({ posts, isLoading = false, error = '', onDeletePost, onUpdatePost, coords }) => {
+    const [filter, setFilter] = useState("all");
+
+    const filteredPosts = posts.filter((post) => {
+        if (filter === "all") return true;
+        return post.type === filter;
+    });
+
     return (
         <div className='container mx-auto px-6 py-8 max-w-6xl'>
             <div className='mb-6'>
                 <h2 className='text-xl font-semibold text-gray-900 mb-2'>
                     Available Rides
                 </h2>
-                <p className='text-gray-600'>
-                    {isLoading ? 'Loading rides...' : `${posts.length} rides available`}
-                </p>
+
+                <div className="flex justify-between items-center">
+                    <p className='text-gray-600'>
+                        {isLoading ? 'Loading rides...' : `${filteredPosts.length} rides available`}
+                    </p>
+
+                    <ToggleGroup
+                        type="single"
+                        value={filter}
+                        onValueChange={(value) => value && setFilter(value)}
+                    >
+                        <ToggleGroupItem value="all" className="data-[state=on]:bg-black data-[state=on]:text-white">
+                            All
+                        </ToggleGroupItem>
+
+                        <ToggleGroupItem value="offer" className="data-[state=on]:bg-black data-[state=on]:text-white">
+                            Offering
+                        </ToggleGroupItem>
+
+                        <ToggleGroupItem value="request" className="data-[state=on]:bg-black data-[state=on]:text-white">
+                            Requesting
+                        </ToggleGroupItem>
+                    </ToggleGroup>
+                </div>
             </div>
 
             {error && (
@@ -32,7 +61,7 @@ const PostList = ({ posts, isLoading = false, error = '', onDeletePost, onUpdate
                 </div>
             ) : (
                 <div className='grid gap-6 md:grid-cols-2 lg:grid-cols-3'>
-                    {posts.map((post) => (
+                    {filteredPosts.map((post) => (
                         <PostCard
                             key={post._id}
                             post={post}
