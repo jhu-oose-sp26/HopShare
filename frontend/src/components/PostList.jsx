@@ -15,8 +15,6 @@ const PostList = ({ posts, isLoading = false, error = '', onDeletePost, onUpdate
     const [typeFilter, setTypeFilter] = useState("all");
     const [distanceFilter, setDistanceFilter] = useState(Infinity);
 
-    const hasActiveFilters = typeFilter !== "all" || distanceFilter !== "all";
-
     const locationEnabled = coords !== null;
 
     const distanceOptions = [
@@ -69,7 +67,7 @@ const PostList = ({ posts, isLoading = false, error = '', onDeletePost, onUpdate
                             <Button variant="outline" size="sm" className="relative">
                                 Filters
 
-                                {hasActiveFilters && (
+                                {(typeFilter !== "all" || distanceFilter !== Infinity) && (
                                     <span className="absolute -top-1 -right-1 h-2.5 w-2.5 rounded-full bg-red-500"></span>
                                 )}
                             </Button>
