@@ -289,7 +289,7 @@ const PostCard = ({ post, onDelete, onUpdate, coords }) => {
                                     {/* Route map */}
                                     {trip.startLocation?.gps_coordinates?.latitude != null &&
                                      trip.endLocation?.gps_coordinates?.latitude != null && (
-                                        <div className='rounded-lg overflow-hidden border border-gray-200 h-52'>
+                                        <div className='rounded-lg overflow-hidden border border-gray-200 h-80'>
                                             <iframe
                                                 title='Route map'
                                                 src={`https://maps.google.com/maps?output=embed&saddr=${trip.startLocation.gps_coordinates.latitude},${trip.startLocation.gps_coordinates.longitude}&daddr=${trip.endLocation.gps_coordinates.latitude},${trip.endLocation.gps_coordinates.longitude}`}
