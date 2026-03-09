@@ -113,7 +113,7 @@ function RouteSearchPanel({
             </div>
 
             <form onSubmit={handleSubmit} className='mt-6 space-y-4'>
-                <div className='grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_160px]'>
+                <div className='grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_160px_auto_auto] xl:items-end'>
                     <div className='space-y-2'>
                         <label
                             htmlFor='route-search-start'
@@ -185,16 +185,24 @@ function RouteSearchPanel({
                             required
                         />
                     </div>
-                </div>
 
-                <div className='flex flex-wrap items-center gap-3'>
-                    <Button type='submit'>
-                        <Search className='mr-2 size-4' />
-                        Search routes
-                    </Button>
-                    <Button type='button' variant='outline' onClick={handleClear}>
-                        Clear
-                    </Button>
+                    <div className='xl:self-end'>
+                        <Button type='submit' className='w-full xl:w-auto'>
+                            <Search className='mr-2 size-4' />
+                            Search routes
+                        </Button>
+                    </div>
+
+                    <div className='xl:self-end'>
+                        <Button
+                            type='button'
+                            variant='outline'
+                            onClick={handleClear}
+                            className='w-full xl:w-auto'
+                        >
+                            Clear
+                        </Button>
+                    </div>
                 </div>
 
                 {formError && (
