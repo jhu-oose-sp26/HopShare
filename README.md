@@ -9,7 +9,6 @@
 
 <div align="center">
   <h3 align="center">HopShare</h3>
-
   <p align="center">
     A community-based ridesharing coordination platform for Johns Hopkins University students.
     <br />
@@ -20,6 +19,7 @@
     ·
     <a href="https://github.com/jhu-oose-sp26/HopShare/issues">Request Feature</a>
   </p>
+
 </div>
 
 

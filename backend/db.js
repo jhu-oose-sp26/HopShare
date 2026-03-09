@@ -19,6 +19,17 @@ async function connectDB() {
   try {
     await client.connect();
     db = client.db("hopshare");
+
+    // Ensure auth-related indexes exist for user upserts.
+    await db.collection('users').createIndex(
+      { googleId: 1 },
+      { unique: true, sparse: true }
+    );
+    await db.collection('users').createIndex(
+      { email: 1 },
+      { unique: true, sparse: true }
+    );
+
     console.log('Connected to MongoDB');
   } catch (err) {
     console.error('Failed to connect to MongoDB', err);

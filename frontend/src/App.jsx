@@ -1,74 +1,68 @@
-import PostList from './components/PostList'
-import SubmitBox from './components/SubmitBox'
-import { usePosts } from './hooks/usePosts'
-import { Button } from './components/ui/button'
-import { useState, useEffect } from 'react'
-import {
-    Dialog,
-    DialogContent,
-    DialogHeader,
-    DialogTitle,
-    DialogTrigger
-} from '@/components/ui/dialog';
+import { useMemo, useState } from 'react';
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
+import HomePage from '@/pages/HomePage';
+import LoginPage from '@/pages/LoginPage';
+
+const USER_STORAGE_KEY = 'hopshare.user';
+
+function readStoredUser() {
+  try {
+    const raw = localStorage.getItem(USER_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === 'object' ? parsed : null;
+  } catch {
+    return null;
+  }
+}
 
 function App() {
-    const { posts, addPost, removePost, updatePost, isLoading, error } = usePosts()
-    const [isOpen, setIsOpen] = useState(false)
-    const [coords, setCoords] = useState(null)
+  const [currentUser, setCurrentUser] = useState(readStoredUser);
 
-    // get user's location on loading (to help with Google Maps autocomplete biasing)
-    useEffect(() => {
-        if (!navigator.geolocation) return;
-        navigator.geolocation.getCurrentPosition(
-            (pos) => setCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-            () => {} // silently ignore if denied
-        );
-    }, [])
+  const authApi = useMemo(
+    () => ({
+      login: (user) => {
+        localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(user));
+        setCurrentUser(user);
+      },
+      logout: () => {
+        localStorage.removeItem(USER_STORAGE_KEY);
+        setCurrentUser(null);
+      },
+    }),
+    []
+  );
 
-    return (
-        <div className='min-h-screen bg-gray-50'>
-            {/* Submit Box Section */}
-            <div className='bg-white border-b border-gray-200'>
-                <div className='container mx-auto px-6 py-8 max-w-4xl'>
-                    <h1 className='text-3xl font-bold text-gray-900 mb-2'>
-                        HopShare
-                    </h1>
-                    <p className='text-gray-600 mb-6'>
-                        Create and find rides with fellow Hopkins students
-                    </p>
-                    <Dialog open={isOpen} onOpenChange={setIsOpen}>
-                        <DialogTrigger asChild>
-                            <Button>Create a Request</Button>
-                        </DialogTrigger>
-
-                        <DialogContent className="w-[90%] max-w-[800px] sm:max-w-[800px] max-h-[80vh] overflow-y-auto">
-                            <DialogHeader>
-                            <DialogTitle>Create a Ride Request</DialogTitle>
-                            </DialogHeader>
-
-                            <SubmitBox
-                                onSubmit={async (data) => {
-                                    await addPost(data)
-                                    setIsOpen(false)
-                                }}
-                                coords={coords}
-                            />
-                        </DialogContent>
-                    </Dialog>
-                </div>
-            </div>
-
-            {/* Post List Section */}
-            <PostList
-                posts={posts}
-                isLoading={isLoading}
-                error={error}
-                onDeletePost={removePost}
-                onUpdatePost={updatePost}
-                coords={coords}
-            />
-        </div>
-    );
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route
+          path='/login'
+          element={
+            currentUser ? (
+              <Navigate to='/' replace />
+            ) : (
+              <LoginPage onLogin={authApi.login} />
+            )
+          }
+        />
+        <Route
+          path='/'
+          element={
+            currentUser ? (
+              <HomePage currentUser={currentUser} onLogout={authApi.logout} />
+            ) : (
+              <Navigate to='/login' replace />
+            )
+          }
+        />
+        <Route
+          path='*'
+          element={<Navigate to={currentUser ? '/' : '/login'} replace />}
+        />
+      </Routes>
+    </BrowserRouter>
+  );
 }
 
 export default App;
