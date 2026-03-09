@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import LocationAutocomplete from './LocationAutocomplete';
 import { format, parse } from 'date-fns';
 import {
@@ -39,6 +39,36 @@ function SubmitBox({ onSubmit, coords, initialData = null }) {
     const [type, setType] = useState(initialData?.type ?? 'request');
     const [submitError, setSubmitError] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
+
+    useEffect(() => {
+        setName(initialData?.name ?? '');
+        setEmail(initialData?.email ?? '');
+        setPhone(initialData?.phone ?? '');
+        setStartTitle(initialData?.startTitle ?? '');
+        setStartLatitude(initialData?.startLatitude ?? '');
+        setStartLongitude(initialData?.startLongitude ?? '');
+        setEndTitle(initialData?.endTitle ?? '');
+        setEndLatitude(initialData?.endLatitude ?? '');
+        setEndLongitude(initialData?.endLongitude ?? '');
+        setDate(initialData?.date ?? '');
+        setTime(initialData?.time ?? '');
+        setDescription(initialData?.description ?? '');
+        setType(initialData?.type ?? 'request');
+        setSubmitError('');
+        setIsSubmitting(false);
+    }, [initialData]);
+
+    const handleStartChange = (nextValue) => {
+        setStartTitle(nextValue);
+        setStartLatitude('');
+        setStartLongitude('');
+    };
+
+    const handleEndChange = (nextValue) => {
+        setEndTitle(nextValue);
+        setEndLatitude('');
+        setEndLongitude('');
+    };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -191,7 +221,7 @@ function SubmitBox({ onSubmit, coords, initialData = null }) {
                     <LocationAutocomplete
                         id='submit-start'
                         value={startTitle}
-                        onChange={setStartTitle}
+                        onChange={handleStartChange}
                         onSelect={(s) => { setStartLatitude(s.latitude); setStartLongitude(s.longitude); }}
                         placeholder='e.g. Homewood Campus, Baltimore'
                         coords={coords}
@@ -210,7 +240,7 @@ function SubmitBox({ onSubmit, coords, initialData = null }) {
                     <LocationAutocomplete
                         id='submit-end'
                         value={endTitle}
-                        onChange={setEndTitle}
+                        onChange={handleEndChange}
                         onSelect={(s) => { setEndLatitude(s.latitude); setEndLongitude(s.longitude); }}
                         placeholder='e.g. BWI Airport'
                         coords={coords}

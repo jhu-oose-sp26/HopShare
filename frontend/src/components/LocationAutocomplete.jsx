@@ -10,14 +10,14 @@ function LocationAutocomplete({ id, value, onChange, onSelect, placeholder, requ
     const [isFocused, setIsFocused] = useState(false);
     const containerRef = useRef(null);
 
-    // Sync query when parent resets value to empty (e.g. form clear)
+    // Keep the visible query aligned with parent-driven values.
     useEffect(() => {
-        if (value === '') setQuery('');
+        setQuery(value || '');
     }, [value]);
 
-    // Debounced fetch
+    // Debounced fetch while the user is actively interacting with the field.
     useEffect(() => {
-        if (query.trim().length < 2) {
+        if (!isFocused || query.trim().length < 2) {
             setSuggestions([]);
             setIsOpen(false);
             return;
