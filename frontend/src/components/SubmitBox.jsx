@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import LocationAutocomplete from './LocationAutocomplete';
 import { format, parse } from 'date-fns';
 import {
@@ -39,6 +39,14 @@ function SubmitBox({ onSubmit, coords, initialData = null }) {
     const [type, setType] = useState(initialData?.type ?? 'request');
     const [submitError, setSubmitError] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
+
+    useEffect(() => {
+        if (!initialData) return;
+
+        if (initialData.name) setName((prev) => prev || initialData.name);
+        if (initialData.email) setEmail((prev) => prev || initialData.email);
+        if (initialData.phone) setPhone((prev) => prev || initialData.phone);
+    }, [initialData]);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
