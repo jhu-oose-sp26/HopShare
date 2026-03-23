@@ -1,20 +1,24 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import PostList from '@/components/PostList';
+import RouteSearchPanel from '@/components/RouteSearchPanel';
 import SubmitBox from '@/components/SubmitBox';
 import { usePosts } from '@/hooks/usePosts';
+import { filterPostsByRouteRadius } from '@/lib/utils';
 
 function HomePage({ currentUser, onLogout }) {
   const { posts, addPost, removePost, updatePost, isLoading, error } = usePosts();
   const [isOpen, setIsOpen] = useState(false);
   const [coords, setCoords] = useState(null);
+  const [routeSearch, setRouteSearch] = useState(null);
+  const [hasSearched, setHasSearched] = useState(false);
+  const [submitInitialData, setSubmitInitialData] = useState(null);
 
   // Get user's location on load to bias autocomplete results.
   useEffect(() => {
@@ -26,11 +30,56 @@ function HomePage({ currentUser, onLogout }) {
     );
   }, []);
 
+  const visiblePosts = useMemo(() => {
+    if (!routeSearch) return posts;
+    return filterPostsByRouteRadius(posts, routeSearch, routeSearch.radiusKm);
+  }, [posts, routeSearch]);
+
+  const handleDialogOpenChange = (open) => {
+    setIsOpen(open);
+    if (!open) setSubmitInitialData(null);
+  };
+
+  const openCreateRequest = () => {
+    setSubmitInitialData({
+      name: currentUser?.name || '',
+      email: currentUser?.email || '',
+      phone: currentUser?.phone || '',
+    });
+    setIsOpen(true);
+  };
+
+  const routeFizzySearch = (criteria) => {
+    setRouteSearch(criteria);
+    setHasSearched(true);
+  };
+
+  const clearRouteSearch = () => {
+    setRouteSearch(null);
+    setHasSearched(false);
+  };
+
+  const requestRide = (routeData) => {
+    setSubmitInitialData({
+      name: currentUser?.name || '',
+      email: currentUser?.email || '',
+      phone: currentUser?.phone || '',
+      ...routeData,
+    });
+    setIsOpen(true);
+  };
+
+  const isShowingSearchResults = routeSearch !== null;
+  const dialogTitle =
+    submitInitialData?.startTitle && submitInitialData?.endTitle
+      ? 'Request a Ride'
+      : 'Create a Ride Request';
+
   return (
     <div className='min-h-screen bg-gray-50'>
       <div className='bg-white border-b border-gray-200'>
-        <div className='container mx-auto px-6 py-8 max-w-4xl'>
-          <div className='flex flex-wrap items-start justify-between gap-3'>
+        <div className='container mx-auto px-6 py-8 max-w-6xl space-y-6'>
+          <div className='flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between'>
             <div>
               <h1 className='text-3xl font-bold text-gray-900 mb-2'>HopShare</h1>
               <p className='text-gray-600'>
@@ -38,36 +87,44 @@ function HomePage({ currentUser, onLogout }) {
               </p>
             </div>
 
-            <div className='text-right'>
-              <p className='text-sm text-gray-700'>{currentUser?.name}</p>
-              <p className='text-xs text-gray-500'>{currentUser?.email}</p>
-              <Button className='mt-2' variant='outline' size='sm' onClick={onLogout}>
-                Log out
-              </Button>
+            <div className='flex flex-col items-end gap-2'>
+              <div className='text-right'>
+                <p className='text-sm text-gray-700'>{currentUser?.name}</p>
+                <p className='text-xs text-gray-500'>{currentUser?.email}</p>
+              </div>
+              <div className='flex gap-2'>
+                <Button variant='outline' size='sm' onClick={onLogout}>
+                  Log out
+                </Button>
+                <Button onClick={openCreateRequest}>Create a Request</Button>
+              </div>
             </div>
           </div>
 
-          <Dialog open={isOpen} onOpenChange={setIsOpen}>
-            <DialogTrigger asChild>
-              <Button className='mt-6'>Create a Request</Button>
-            </DialogTrigger>
+          <RouteSearchPanel
+            coords={coords}
+            hasSearched={hasSearched}
+            matchCount={visiblePosts.length}
+            searchRadiusKm={routeSearch?.radiusKm ?? ''}
+            onClearSearch={clearRouteSearch}
+            onRequestRide={requestRide}
+            onSearch={routeFizzySearch}
+          />
 
+          <Dialog open={isOpen} onOpenChange={handleDialogOpenChange}>
             <DialogContent className='w-[90%] max-w-[800px] sm:max-w-[800px] max-h-[80vh] overflow-y-auto'>
               <DialogHeader>
-                <DialogTitle>Create a Ride Request</DialogTitle>
+                <DialogTitle>{dialogTitle}</DialogTitle>
               </DialogHeader>
 
               <SubmitBox
                 onSubmit={async (data) => {
                   await addPost(data);
                   setIsOpen(false);
+                  setSubmitInitialData(null);
                 }}
                 coords={coords}
-                initialData={{
-                  name: currentUser?.name || '',
-                  email: currentUser?.email || '',
-                  phone: currentUser?.phone || '',
-                }}
+                initialData={submitInitialData}
               />
             </DialogContent>
           </Dialog>
@@ -75,12 +132,23 @@ function HomePage({ currentUser, onLogout }) {
       </div>
 
       <PostList
-        posts={posts}
+        posts={visiblePosts}
         isLoading={isLoading}
         error={error}
         onDeletePost={removePost}
         onUpdatePost={updatePost}
         coords={coords}
+        heading={isShowingSearchResults ? 'Matching Routes' : 'Available Rides'}
+        subheading={
+          isShowingSearchResults
+            ? `${visiblePosts.length} route${visiblePosts.length === 1 ? '' : 's'} within ${routeSearch.radiusKm} km of the selected route center`
+            : ''
+        }
+        emptyTitle={
+          isShowingSearchResults
+            ? `No routes found within ${routeSearch.radiusKm} km.`
+            : 'No rides available yet.'
+        }
       />
     </div>
   );

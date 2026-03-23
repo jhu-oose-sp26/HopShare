@@ -41,12 +41,35 @@ function SubmitBox({ onSubmit, coords, initialData = null }) {
     const [isSubmitting, setIsSubmitting] = useState(false);
 
     useEffect(() => {
-        if (!initialData) return;
-
-        if (initialData.name) setName((prev) => prev || initialData.name);
-        if (initialData.email) setEmail((prev) => prev || initialData.email);
-        if (initialData.phone) setPhone((prev) => prev || initialData.phone);
+        setName(initialData?.name ?? '');
+        setEmail(initialData?.email ?? '');
+        setPhone(initialData?.phone ?? '');
+        setStartTitle(initialData?.startTitle ?? '');
+        setStartLatitude(initialData?.startLatitude ?? '');
+        setStartLongitude(initialData?.startLongitude ?? '');
+        setEndTitle(initialData?.endTitle ?? '');
+        setEndLatitude(initialData?.endLatitude ?? '');
+        setEndLongitude(initialData?.endLongitude ?? '');
+        setDate(initialData?.date ?? '');
+        setTime(initialData?.time ?? '');
+        setDescription(initialData?.description ?? '');
+        setType(initialData?.type ?? 'request');
+        setSubmitError('');
+        setIsSubmitting(false);
     }, [initialData]);
+
+    const handleStartChange = (nextValue) => {
+        setStartTitle(nextValue);
+        setStartLatitude('');
+        setStartLongitude('');
+    };
+
+    const handleEndChange = (nextValue) => {
+        setEndTitle(nextValue);
+        setEndLatitude('');
+        setEndLongitude('');
+    };
+
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -199,7 +222,7 @@ function SubmitBox({ onSubmit, coords, initialData = null }) {
                     <LocationAutocomplete
                         id='submit-start'
                         value={startTitle}
-                        onChange={setStartTitle}
+                        onChange={handleStartChange}
                         onSelect={(s) => { setStartLatitude(s.latitude); setStartLongitude(s.longitude); }}
                         placeholder='e.g. Homewood Campus, Baltimore'
                         coords={coords}
@@ -218,7 +241,7 @@ function SubmitBox({ onSubmit, coords, initialData = null }) {
                     <LocationAutocomplete
                         id='submit-end'
                         value={endTitle}
-                        onChange={setEndTitle}
+                        onChange={handleEndChange}
                         onSelect={(s) => { setEndLatitude(s.latitude); setEndLongitude(s.longitude); }}
                         placeholder='e.g. BWI Airport'
                         coords={coords}

@@ -11,7 +11,18 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { getDistanceFromLatLonInKm } from "@/lib/utils";
 
-const PostList = ({ posts, isLoading = false, error = '', onDeletePost, onUpdatePost, coords }) => {
+const PostList = ({
+    posts,
+    isLoading = false,
+    error = '',
+    onDeletePost,
+    onUpdatePost,
+    coords,
+    heading = 'Available Rides',
+    subheading = '',
+    emptyTitle = 'No rides available yet.',
+    emptyDescription = 'Try to create a ride with the above button!',
+}) => {
     const [typeFilter, setTypeFilter] = useState("all");
     const [distanceFilter, setDistanceFilter] = useState(Infinity);
 
@@ -59,7 +70,7 @@ const PostList = ({ posts, isLoading = false, error = '', onDeletePost, onUpdate
             <div className='mb-6'>
                 <div className="flex justify-between items-center mb-2">
                     <h2 className='text-xl font-semibold text-gray-900'>
-                        Available Rides
+                        {heading}
                     </h2>
                    {/*Filters Menu*/}
                     <DropdownMenu>
@@ -112,9 +123,14 @@ const PostList = ({ posts, isLoading = false, error = '', onDeletePost, onUpdate
                     </DropdownMenu>
                 </div>
 
-                 <p className="text-gray-600">
-                        {isLoading ? "Loading rides..." : `${filteredPosts.length} rides available`}
-                    </p>
+                <p className="text-gray-600">
+                    {subheading ||
+                        (isLoading
+                            ? 'Loading rides...'
+                            : `${filteredPosts.length} ride${
+                                  filteredPosts.length === 1 ? '' : 's'
+                              } available`)}
+                </p>
             </div>
 
             {error && (
@@ -127,11 +143,17 @@ const PostList = ({ posts, isLoading = false, error = '', onDeletePost, onUpdate
                 </div>
             ) : posts.length === 0 ? (
                 <div className='text-center py-12'>
+                    <p className='text-gray-500 text-lg'>{emptyTitle}</p>
+                    <p className='text-gray-400'>{emptyDescription}</p>
+                </div>
+            ) : filteredPosts.length === 0 ? (
+                <div className='text-center py-12'>
                     <p className='text-gray-500 text-lg'>
-                        No rides available yet.
+                        No rides match the current filters.
                     </p>
                     <p className='text-gray-400'>
-                        Be the first to create a ride above!
+                        Adjust the ride type or distance filter to see more
+                        results.
                     </p>
                 </div>
             ) : (
