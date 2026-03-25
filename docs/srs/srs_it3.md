@@ -54,14 +54,17 @@ In general, we create a shared app specifically for JHU students to find availab
 
 This will primarily be a web app
 
-The tech stack will be: 
+The tech stack will be:
 
-- Frontend: React, TypeScript, Next.js
+- Frontend: React, TypeScript, Vite
 - Backend: Node.js, Express
 - Database: MongoDB
 - Deployment: Vercel
 
-The reason why we chose React and Express for frontend and backend is that they are suit well with the web app, and it starts quickly.
+We chose React with TypeScript and Vite for the frontend because React's component model suits our reusable UI elements, TypeScript catches bugs early across a multi-developer team, and Vite provides a fast development experience with minimal configuration. 
+On the backend, Node.js and Express let us use JavaScript across the full stack, reducing context-switching and keeping the codebase consistent.
+We use MongoDB because its flexible document model accommodates the variable fields in ride posts, and its JSON-native API integrates naturally with our JavaScript stack. 
+Finally, Vercel handles deployment with zero configuration and a free tier suitable for a student project.
 
 
 ## Similar Apps
