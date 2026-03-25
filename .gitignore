@@ -7,5 +7,5 @@ dist/
 build/
 logs/
 .claude
-$diagram.drawio.bkp
+.$diagram.drawio.bkp
 diagram.drawio
