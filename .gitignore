@@ -7,3 +7,4 @@ dist/
 build/
 logs/
 .claude
+.diagram.drawio.bkp

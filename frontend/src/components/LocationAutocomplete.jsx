@@ -8,16 +8,17 @@ function LocationAutocomplete({ id, value, onChange, onSelect, placeholder, requ
     const [suggestions, setSuggestions] = useState([]);
     const [isOpen, setIsOpen] = useState(false);
     const [isFocused, setIsFocused] = useState(false);
+    const [locating, setLocating] = useState(false);
     const containerRef = useRef(null);
 
-    // Sync query when parent resets value to empty (e.g. form clear)
+    // Keep the visible query aligned with parent-driven values.
     useEffect(() => {
-        if (value === '') setQuery('');
+        setQuery(value || '');
     }, [value]);
 
-    // Debounced fetch
+    // Debounced fetch while the user is actively interacting with the field.
     useEffect(() => {
-        if (query.trim().length < 2) {
+        if (!isFocused || query.trim().length < 2) {
             setSuggestions([]);
             setIsOpen(false);
             return;
@@ -92,8 +93,49 @@ function LocationAutocomplete({ id, value, onChange, onSelect, placeholder, requ
         setIsOpen(false);
     }
 
+    async function handleUseCurrentLocation() {
+        if (!navigator.geolocation) return;
+        setLocating(true);
+        navigator.geolocation.getCurrentPosition(
+            async (pos) => {
+                const { latitude, longitude } = pos.coords;
+                try {
+                    const res = await fetch(
+                        `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json`,
+                        { headers: { 'Accept-Language': 'en' } }
+                    );
+                    const data = await res.json();
+                    const label = data.display_name || `${latitude}, ${longitude}`;
+                    setQuery(label);
+                    onChange(label);
+                    onSelect?.({ label, latitude, longitude });
+                } catch {
+                    const label = `${latitude}, ${longitude}`;
+                    setQuery(label);
+                    onChange(label);
+                    onSelect?.({ label, latitude, longitude });
+                } finally {
+                    setLocating(false);
+                }
+            },
+            () => setLocating(false)
+        );
+    }
+
     return (
         <div ref={containerRef} className='relative'>
+            <button
+                type='button'
+                onClick={handleUseCurrentLocation}
+                disabled={locating}
+                className='mb-1 flex items-center gap-1 text-xs text-primary hover:underline disabled:opacity-50'
+            >
+                <svg xmlns='http://www.w3.org/2000/svg' className='h-3.5 w-3.5' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2' strokeLinecap='round' strokeLinejoin='round'>
+                    <circle cx='12' cy='12' r='3' />
+                    <path d='M12 2v3M12 19v3M2 12h3M19 12h3' />
+                </svg>
+                {locating ? 'Locating…' : 'Use current location'}
+            </button>
             <input
                 id={id}
                 type='text'
