@@ -10,7 +10,7 @@ function toObjectId(id) {
 
 // Generates a 6-digits code.
 function generateConfirmationCode() {
-  const chars = '0123456789'; // omit 0/O/1/I to avoid confusion
+  const chars = '0123456789';
   let code = '';
   for (let i = 0; i < 6; i++) {
     code += chars[Math.floor(Math.random() * chars.length)];
