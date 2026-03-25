@@ -8,6 +8,16 @@ function toObjectId(id) {
   return new ObjectId(id);
 }
 
+// Generates a 6-digits code.
+function generateConfirmationCode() {
+  const chars = '0123456789'; // omit 0/O/1/I to avoid confusion
+  let code = '';
+  for (let i = 0; i < 6; i++) {
+    code += chars[Math.floor(Math.random() * chars.length)];
+  }
+  return code;
+}
+
 
 // READ ALL POSTS
 router.get('/', async (req, res) => { 
@@ -42,6 +52,7 @@ router.post('/', async (req, res) => {
     const postsCollection = db.collection('posts');
     const tripsCollection = db.collection('trips');
 
+    postInfo.confirmationCode = generateConfirmationCode();
     const postResult = await postsCollection.insertOne(postInfo);
     let tripId = null;
 
