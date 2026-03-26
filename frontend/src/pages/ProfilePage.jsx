@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
-import { User, Mail, Phone, BookOpen, Calendar, MapPin, Edit3, Save, X, Camera, Upload } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { User, Mail, Phone, BookOpen, Calendar, MapPin, Edit3, Save, X, Camera, Upload, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 const API_ROOT = (import.meta.env.VITE_API_BASE_URL || '/api').replace(/\/$/, '');
@@ -7,6 +8,7 @@ const API_ROOT = (import.meta.env.VITE_API_BASE_URL || '/api').replace(/\/$/, ''
 const inputBase = 'flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50';
 
 function ProfilePage({ currentUser, onUserUpdate }) {
+  const navigate = useNavigate();
   const [isEditing, setIsEditing] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
@@ -145,6 +147,15 @@ function ProfilePage({ currentUser, onUserUpdate }) {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="container mx-auto px-6 py-8 max-w-4xl">
+        <Button
+          variant="outline"
+          onClick={() => navigate('/')}
+          className="mb-4"
+        >
+          <ArrowLeft className="w-4 h-4 mr-2" />
+          Back to Home
+        </Button>
+
         <div className="bg-white rounded-lg shadow-sm border border-gray-200">
           <div className="px-6 py-8">
             {/* Header */}
