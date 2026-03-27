@@ -120,7 +120,7 @@ const PostCard = ({ post, onDelete, onUpdate, coords }) => {
                 </div>
                 <span className='text-xs text-gray-400 shrink-0 ml-2'>#{_id?.slice(-6)}</span>
             </div>
-            <p className='text-sm text-gray-500 mb-4'>{user.name} · {user.email}</p>
+            <p className='text-sm text-gray-500 mb-4 break-words'>{user.name} · {user.email}</p>
 
             {/* Post content */}
             <p className='text-gray-700 mb-4 break-words'>
@@ -139,7 +139,7 @@ const PostCard = ({ post, onDelete, onUpdate, coords }) => {
                         {trip.startLocation?.title && (
                             <div className='flex items-center gap-2 text-sm'>
                                 <MapPin className='w-4 h-4 text-green-600' />
-                                <span className='text-gray-600'>
+                                <span className='text-gray-600 break-words'>
                                     From: {trip.startLocation.title}
                                 </span>
                             </div>
@@ -147,7 +147,7 @@ const PostCard = ({ post, onDelete, onUpdate, coords }) => {
                         {trip.endLocation?.title && (
                             <div className='flex items-center gap-2 text-sm'>
                                 <MapPin className='w-4 h-4 text-red-600' />
-                                <span className='text-gray-600'>
+                                <span className='text-gray-600 break-words'>
                                     To: {trip.endLocation.title}
                                 </span>
                             </div>
