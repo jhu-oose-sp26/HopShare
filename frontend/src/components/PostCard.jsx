@@ -123,7 +123,11 @@ const PostCard = ({ post, onDelete, onUpdate, coords }) => {
             <p className='text-sm text-gray-500 mb-4'>{user.name} · {user.email}</p>
 
             {/* Post content */}
-            <p className='text-gray-700 mb-4'>{description}</p>
+            <p className='text-gray-700 mb-4'>
+                {description.length > 100
+                ? `${description.slice(0, 100)}...`
+                : description}
+            </p>
 
             {/* Trip details (if exists) */}
             {trip && (
@@ -219,6 +223,14 @@ const PostCard = ({ post, onDelete, onUpdate, coords }) => {
                                     <span>{user?.phone || '—'}</span>
                                 </div>
                             </div>
+
+                            {/* Description */}
+                            {description && (
+                                <div className='bg-gray-50 rounded-lg p-3 space-y-2'>
+                                    <p className='text-xs font-semibold uppercase tracking-wide text-gray-400'>Description</p>
+                                    <p className='text-gray-700 break-words whitespace-pre-wrap'>{description}</p>
+                                </div>
+                            )}
 
                             {/* Trip details */}
                             {trip && (
