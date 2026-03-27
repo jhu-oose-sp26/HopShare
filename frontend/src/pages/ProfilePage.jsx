@@ -7,12 +7,48 @@ const API_ROOT = (import.meta.env.VITE_API_BASE_URL || '/api').replace(/\/$/, ''
 
 const inputBase = 'flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50';
 
+function normalizeUSPhoneDigits(phone) {
+  const digits = String(phone || '').replace(/[^\d]/g, '');
+  if (digits.length === 11 && digits.startsWith('1')) {
+    return digits.slice(1);
+  }
+  return digits;
+}
+
+function isValidUSPhoneNumber(phone) {
+  return normalizeUSPhoneDigits(phone).length === 10;
+}
+
+function formatUSPhoneNumber(phone) {
+  const digits = normalizeUSPhoneDigits(phone);
+  if (digits.length !== 10) {
+    return String(phone || '').trim();
+  }
+
+  return `(${digits.slice(0, 3)})-${digits.slice(3, 6)}-${digits.slice(6)}`;
+}
+
+async function parseApiResponse(response) {
+  const contentType = response.headers.get('content-type') || '';
+  if (!contentType.includes('application/json')) {
+    const bodyText = await response.text();
+    const looksLikeHtml = bodyText.trim().startsWith('<!DOCTYPE') || bodyText.trim().startsWith('<html');
+    if (looksLikeHtml) {
+      throw new Error('Server returned HTML instead of JSON. Check that backend API is running and API base URL/proxy is configured.');
+    }
+    throw new Error('Server returned an unexpected response format.');
+  }
+
+  return response.json();
+}
+
 function ProfilePage({ currentUser, onUserUpdate }) {
   const navigate = useNavigate();
   const [isEditing, setIsEditing] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [phoneWarning, setPhoneWarning] = useState('');
   const fileInputRef = useRef(null);
   
   // Form state
@@ -39,10 +75,44 @@ function ProfilePage({ currentUser, onUserUpdate }) {
       avatar: currentUser?.avatar || '',
     });
     setAvatarPreview(null);
+    setPhoneWarning('');
   }, [currentUser, isEditing]);
 
   const handleInputChange = (field, value) => {
     setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handlePhoneChange = (value) => {
+    setFormData(prev => ({ ...prev, phone: value }));
+
+    const trimmed = value.trim();
+    if (!trimmed) {
+      setPhoneWarning('');
+      return;
+    }
+
+    if (isValidUSPhoneNumber(trimmed)) {
+      setPhoneWarning('');
+    } else {
+      setPhoneWarning('Enter a valid US phone number (10 digits).');
+    }
+  };
+
+  const handlePhoneBlur = () => {
+    const trimmed = formData.phone.trim();
+    if (!trimmed) {
+      setPhoneWarning('');
+      return;
+    }
+
+    if (isValidUSPhoneNumber(trimmed)) {
+      const formattedPhone = formatUSPhoneNumber(trimmed);
+      setFormData(prev => ({ ...prev, phone: formattedPhone }));
+      setPhoneWarning('');
+      return;
+    }
+
+    setPhoneWarning('Enter a valid US phone number (10 digits).');
   };
 
   const handleAvatarUpload = (event) => {
@@ -85,6 +155,14 @@ function ProfilePage({ currentUser, onUserUpdate }) {
 
   const handleSave = async () => {
     if (!currentUser?._id) return;
+
+    const trimmedPhone = formData.phone.trim();
+    if (trimmedPhone && !isValidUSPhoneNumber(trimmedPhone)) {
+      setPhoneWarning('Enter a valid US phone number (10 digits).');
+      setError('Please enter a valid US phone number.');
+      return;
+    }
+    const formattedPhone = trimmedPhone ? formatUSPhoneNumber(trimmedPhone) : '';
     
     setIsLoading(true);
     setError('');
@@ -96,7 +174,7 @@ function ProfilePage({ currentUser, onUserUpdate }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: formData.name.trim(),
-          phone: formData.phone.trim(),
+          phone: formattedPhone,
           bio: formData.bio.trim(),
           major: formData.major.trim(),
           graduationYear: formData.graduationYear ? parseInt(formData.graduationYear) : undefined,
@@ -104,12 +182,13 @@ function ProfilePage({ currentUser, onUserUpdate }) {
         }),
       });
 
+      const payload = await parseApiResponse(response);
+
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to update profile');
+        throw new Error(payload.error || 'Failed to update profile');
       }
 
-      const { user } = await response.json();
+      const { user } = payload;
       
       // Update the user in app state and localStorage
       onUserUpdate(user);
@@ -298,12 +377,17 @@ function ProfilePage({ currentUser, onUserUpdate }) {
                     <input
                       type="tel"
                       value={formData.phone}
-                      onChange={(e) => handleInputChange('phone', e.target.value)}
-                      className={inputBase}
+                      onChange={(e) => handlePhoneChange(e.target.value)}
+                      onBlur={handlePhoneBlur}
+                      className={`${inputBase} ${phoneWarning ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
                       placeholder="(123) 456-7890"
+                      title="Enter a valid US phone number in the format (xxx)-xxx-xxxx"
                     />
                   ) : (
                     <p className="text-gray-900">{currentUser?.phone || '—'}</p>
+                  )}
+                  {isEditing && phoneWarning && (
+                    <p className="text-xs text-red-600">{phoneWarning}</p>
                   )}
                 </div>
 

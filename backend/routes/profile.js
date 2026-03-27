@@ -4,6 +4,27 @@ const { ObjectId } = require('mongodb');
 
 const router = express.Router();
 
+function normalizeUSPhoneDigits(phone) {
+  const digits = String(phone || '').replace(/[^\d]/g, '');
+  if (digits.length === 11 && digits.startsWith('1')) {
+    return digits.slice(1);
+  }
+  return digits;
+}
+
+function isValidUSPhoneNumber(phone) {
+  return normalizeUSPhoneDigits(phone).length === 10;
+}
+
+function formatUSPhoneNumber(phone) {
+  const digits = normalizeUSPhoneDigits(phone);
+  if (digits.length !== 10) {
+    return String(phone || '').trim();
+  }
+
+  return `(${digits.slice(0, 3)})-${digits.slice(3, 6)}-${digits.slice(6)}`;
+}
+
 // Get user profile by ID
 router.get('/:userId', async (req, res) => {
   try {
@@ -63,6 +84,12 @@ router.put('/:userId', async (req, res) => {
       return res.status(400).json({ error: 'Phone must be a non-empty string' });
     }
 
+    if (phone && !isValidUSPhoneNumber(phone.trim())) {
+      return res.status(400).json({
+        error: 'Phone number must be a valid US number',
+      });
+    }
+
     if (bio && typeof bio !== 'string') {
       return res.status(400).json({ error: 'Bio must be a string' });
     }
@@ -90,7 +117,10 @@ router.put('/:userId', async (req, res) => {
 
     // Only update provided fields
     if (name !== undefined) updateData.name = name.trim();
-    if (phone !== undefined) updateData.phone = phone.trim();
+    if (phone !== undefined) {
+      const trimmedPhone = phone.trim();
+      updateData.phone = trimmedPhone ? formatUSPhoneNumber(trimmedPhone) : '';
+    }
     if (bio !== undefined) updateData.bio = bio.trim();
     if (major !== undefined) updateData.major = major.trim();
     if (graduationYear !== undefined) updateData.graduationYear = graduationYear;
