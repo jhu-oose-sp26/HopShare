@@ -333,8 +333,12 @@ function SubmitBox({ onSubmit, coords, initialData = null }) {
                         placeholder='Describe your trip'
                         value={description}
                         onChange={(e) => setDescription(e.target.value)}
+                        maxLength={500}
                         required
                     />
+                    <p className='text-xs text-muted-foreground text-right'>
+                        {description.length}/500
+                    </p>
                 </div>
                 {submitError && (
                     <p className='text-sm text-red-600'>{submitError}</p>
