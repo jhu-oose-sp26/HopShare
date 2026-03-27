@@ -120,7 +120,7 @@ const PostCard = ({ post, onDelete, onUpdate, coords }) => {
                 </div>
                 <span className='text-xs text-gray-400 shrink-0 ml-2'>#{_id?.slice(-6)}</span>
             </div>
-            <p className='text-sm text-gray-500 mb-4 break-words'>{user.name} · {user.email}</p>
+            <p className='text-sm text-gray-500 mb-4 truncate'>{user.name} · {user.email}</p>
 
             {/* Post content */}
             <p className='text-gray-700 mb-4 break-words'>
