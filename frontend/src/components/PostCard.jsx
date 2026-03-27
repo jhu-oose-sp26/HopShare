@@ -1,4 +1,14 @@
 import React, { useMemo, useState } from 'react';
+
+function formatTime(time) {
+    if (!time) return time;
+    const [hourStr, minute] = time.split(':');
+    const hour = parseInt(hourStr, 10);
+    if (isNaN(hour)) return time;
+    const period = hour >= 12 ? 'PM' : 'AM';
+    const hour12 = hour % 12 || 12;
+    return `${hour12}:${minute} ${period}`;
+}
 import { MapPin, Calendar, Clock, MessageCircle, Pencil, Trash2, Info, User, Mail, Phone, Navigation, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -161,7 +171,7 @@ const PostCard = ({ post, onDelete, onUpdate, coords }) => {
                                 <div className='flex items-center gap-1 text-sm'>
                                     <Clock className='w-4 h-4 text-gray-500' />
                                     <span className='text-gray-600'>
-                                        {trip.time}
+                                        {formatTime(trip.time)}
                                     </span>
                                 </div>
                             )}
@@ -312,7 +322,7 @@ const PostCard = ({ post, onDelete, onUpdate, coords }) => {
                                             {trip.time && (
                                                 <div className='flex items-center gap-2 text-gray-700'>
                                                     <Clock className='w-4 h-4 text-gray-400 shrink-0' />
-                                                    <span>{trip.time}</span>
+                                                    <span>{formatTime(trip.time)}</span>
                                                 </div>
                                             )}
                                         </div>
