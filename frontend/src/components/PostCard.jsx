@@ -238,7 +238,7 @@ const PostCard = ({ post, onDelete, onUpdate, coords, currentUser }) => {
                                     message,
                                     postId: _id,
                                 });
-                                
+                                console.log(post.user)
                                 await fetch(NOTIFICATIONS_ENDPOINT, {
                                     method: 'POST',
                                     headers: {

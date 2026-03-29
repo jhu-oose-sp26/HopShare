@@ -7,24 +7,40 @@ const router = express.Router();
 // CREATE notification (send message)
 router.post('/', async (req, res) => {
   try {
-    const { recipientEmail, senderName, senderId, message, postId } = req.body;
+    const { recipientId, recipientEmail, senderName, senderId, message, postId } = req.body;
 
-    if (!recipientEmail || !message) {
-      return res.status(400).json({ error: 'Missing fields' });
+    // Validate required fields
+    if (!message) {
+      return res.status(400).json({ error: 'Missing message' });
     }
 
-    // Find the recipient by email
-    const user = await getDB().collection('users').findOne({ email: recipientEmail });
-    if (!user) {
+    let recipientUser;
+
+    if (recipientId) {
+      if (!ObjectId.isValid(recipientId)) {
+        return res.status(400).json({ error: 'Invalid recipientId' });
+      }
+      recipientUser = await getDB()
+        .collection('users')
+        .findOne({ _id: new ObjectId(recipientId) });
+    } else if (recipientEmail) {
+      recipientUser = await getDB()
+        .collection('users')
+        .findOne({ email: recipientEmail });
+    } else {
+      return res.status(400).json({ error: 'Must provide recipientId or recipientEmail' });
+    }
+
+    if (!recipientUser) {
       return res.status(404).json({ error: 'Recipient not found' });
     }
 
     const notification = {
-      recipientId: user._id,
+      recipientId: recipientUser._id,
       senderName: senderName || 'Anonymous',
-      senderId: senderId ? new ObjectId(senderId) : null,
+      senderId: senderId && ObjectId.isValid(senderId) ? new ObjectId(senderId) : null,
       message,
-      postId: postId ? new ObjectId(postId) : null,
+      postId: postId && ObjectId.isValid(postId) ? new ObjectId(postId) : null,
       read: false,
       createdAt: new Date(),
     };
@@ -39,6 +55,7 @@ router.post('/', async (req, res) => {
     res.status(500).json({ error: 'Failed to create notification' });
   }
 });
+
 
 // GET notifications for a user
 router.get('/:userId', async (req, res) => {
@@ -71,6 +88,8 @@ router.get('/:userId', async (req, res) => {
             message: 1,
             read: 1,
             createdAt: 1,
+            senderId: 1,
+            recipientId: 1,
             senderName: '$sender.name',
           }
         }
@@ -84,7 +103,7 @@ router.get('/:userId', async (req, res) => {
   }
 });
 
-// mark as read (optional but useful)
+// mark as read
 router.patch('/:id/read', async (req, res) => {
   try {
     const id = req.params.id;
