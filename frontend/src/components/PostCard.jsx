@@ -328,28 +328,22 @@ const PostCard = ({ post, onDelete, onUpdate, coords, routeSearch, distanceFilte
 
                             <Button
                                 onClick={async () => {
-                                console.log('Send message:', {
-                                    to: user?.email,
-                                    message,
-                                    postId: _id,
-                                });
-                                console.log(post.user)
-                                await fetch(NOTIFICATIONS_ENDPOINT, {
-                                    method: 'POST',
-                                    headers: {
-                                        'Content-Type': 'application/json',
-                                    },
-                                    body: JSON.stringify({
-                                        recipientEmail: post.user.email,
-                                        senderName: currentUser.name,
-                                        senderId: currentUser._id,
-                                        message,
-                                        postId: post._id,
-                                    }),
-                                });
+                                    await fetch(NOTIFICATIONS_ENDPOINT, {
+                                        method: 'POST',
+                                        headers: {
+                                            'Content-Type': 'application/json',
+                                        },
+                                        body: JSON.stringify({
+                                            recipientEmail: post.user.email,
+                                            senderName: currentUser.name,
+                                            senderId: currentUser._id,
+                                            message,
+                                            postId: post._id,
+                                        }),
+                                    });
 
-                                setContactOpen(false);
-                                setMessage('');
+                                    setContactOpen(false);
+                                    setMessage('');
                                 }}
                                 disabled={!message.trim()}
                             >
