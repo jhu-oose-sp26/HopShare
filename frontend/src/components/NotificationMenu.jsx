@@ -55,6 +55,7 @@ function NotificationMenu({ currentUser }) {
         senderId: currentUser._id,
         message: replyMessage,
         postId: notif.postId,
+        replyToMessage: notif.message,
       }),
     });
 
@@ -130,6 +131,11 @@ function NotificationMenu({ currentUser }) {
                 <p className="text-sm font-medium">
                   {notif.senderName || "Someone"}
                 </p>
+                {notif.replyToMessage && (
+                  <p className="text-xs text-gray-400 mt-1 italic">
+                    Replying to: "{notif.replyToMessage}"
+                  </p>
+                )}
                 <p className="text-sm text-gray-700">
                   {notif.message}
                 </p>

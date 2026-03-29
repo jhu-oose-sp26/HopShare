@@ -7,7 +7,7 @@ const router = express.Router();
 // CREATE notification (send message)
 router.post('/', async (req, res) => {
   try {
-    const { recipientId, recipientEmail, senderName, senderId, message, postId } = req.body;
+    const { recipientId, recipientEmail, senderName, senderId, message, postId, replyToMessage } = req.body;
 
     // Validate required fields
     if (!message) {
@@ -41,6 +41,7 @@ router.post('/', async (req, res) => {
       senderId: senderId && ObjectId.isValid(senderId) ? new ObjectId(senderId) : null,
       message,
       postId: postId && ObjectId.isValid(postId) ? new ObjectId(postId) : null,
+      replyToMessage: replyToMessage || null,
       read: false,
       createdAt: new Date(),
     };
@@ -68,32 +69,9 @@ router.get('/:userId', async (req, res) => {
 
     const notifications = await getDB()
       .collection('notifications')
-      .aggregate([
-        { $match: { recipientId: new ObjectId(userId) } },
-        { $sort: { createdAt: -1 } },
-        { $limit: 50 },
-        {
-          $lookup: {
-            from: 'users',
-            localField: 'senderId',
-            foreignField: '_id',
-            as: 'sender',
-          },
-        },
-        {
-          $unwind: { path: '$sender', preserveNullAndEmptyArrays: true }
-        },
-        {
-          $project: {
-            message: 1,
-            read: 1,
-            createdAt: 1,
-            senderId: 1,
-            recipientId: 1,
-            senderName: '$sender.name',
-          }
-        }
-      ])
+      .find({ recipientId: new ObjectId(userId) })
+      .sort({ createdAt: -1 })
+      .limit(50)
       .toArray();
 
     res.json(notifications);
