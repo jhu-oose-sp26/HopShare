@@ -7,6 +7,7 @@ const postsRoutes = require('./routes/posts');
 const placesRoutes = require('./routes/places');
 const authRoutes = require('./routes/auth');
 const profileRoutes = require('./routes/profile');
+const notificationsRoutes = require('./routes/notifications');
 
 const app = express();
 const PORT = 3000;
@@ -18,6 +19,7 @@ app.use('/posts', postsRoutes);
 app.use('/places', placesRoutes);
 app.use('/auth', authRoutes);
 app.use('/profile', profileRoutes);
+app.use('/notifications', notificationsRoutes);
 
 // Return JSON for body-size errors so frontend does not receive HTML pages.
 app.use((err, req, res, next) => {

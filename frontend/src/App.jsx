@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import HomePage from '@/pages/HomePage';
+import LandingPage from '@/pages/LandingPage';
 import LoginPage from '@/pages/LoginPage';
 import ProfilePage from '@/pages/ProfilePage';
 import UserProfile from '@/pages/UserProfile';
@@ -53,12 +54,16 @@ function App() {
           }
         />
         <Route
+          path='/landing'
+          element={currentUser ? <Navigate to='/' replace /> : <LandingPage />}
+        />
+        <Route
           path='/'
           element={
             currentUser ? (
               <HomePage currentUser={currentUser} onLogout={authApi.logout} />
             ) : (
-              <Navigate to='/login' replace />
+              <Navigate to='/landing' replace />
             )
           }
         />
@@ -84,7 +89,7 @@ function App() {
         />
         <Route
           path='*'
-          element={<Navigate to={currentUser ? '/' : '/login'} replace />}
+          element={<Navigate to={currentUser ? '/' : '/landing'} replace />}
         />
       </Routes>
     </BrowserRouter>
