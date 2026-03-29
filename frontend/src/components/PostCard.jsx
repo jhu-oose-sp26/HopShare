@@ -30,6 +30,8 @@ const PostCard = ({ post, onDelete, onUpdate, coords }) => {
     const [editOpen, setEditOpen] = useState(false);
     const [detailsOpen, setDetailsOpen] = useState(false);
     const [deleteOpen, setDeleteOpen] = useState(false);
+    const [contactOpen, setContactOpen] = useState(false);
+    const [message, setMessage] = useState('');
     const [isDeleting, setIsDeleting] = useState(false);
     const [deleteError, setDeleteError] = useState('');
 
@@ -186,10 +188,66 @@ const PostCard = ({ post, onDelete, onUpdate, coords }) => {
 
             {/* Action buttons */}
             <div className='flex flex-wrap gap-2'>
-                <Button variant='default' size='sm' className='flex-1'>
-                    <MessageCircle className='w-4 h-4 mr-1' />
-                    Contact
-                </Button>
+                {/* Contact Dialog */}
+
+                <Dialog open={contactOpen} onOpenChange={setContactOpen}>
+                    <DialogTrigger asChild>
+                        <Button variant='default' size='sm' className='flex-1'>
+                            <MessageCircle className='w-4 h-4 mr-1' />
+                            Contact
+                        </Button>
+                    </DialogTrigger>
+
+                    <DialogContent className="sm:max-w-md">
+                        <DialogHeader>
+                            <DialogTitle className="truncate max-w-[20rem]">
+                                Contact {user?.name}
+                            </DialogTitle>
+                            <DialogDescription>
+                                Send a message about this ride.
+                            </DialogDescription>
+                        </DialogHeader>
+
+                        <div className="space-y-3">
+                        <textarea
+                            value={message}
+                            onChange={(e) => setMessage(e.target.value)}
+                            placeholder="Write your message..."
+                            className="w-full min-h-[100px] rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                        </div>
+
+                        <DialogFooter>
+                            <Button
+                                variant="outline"
+                                onClick={() => {
+                                setContactOpen(false);
+                                setMessage('');
+                                }}
+                            >
+                                Cancel
+                            </Button>
+
+                            <Button
+                                onClick={() => {
+                                console.log('Send message:', {
+                                    to: user?.email,
+                                    message,
+                                    postId: _id,
+                                });
+
+                                // stub for backend
+
+                                setContactOpen(false);
+                                setMessage('');
+                                }}
+                                disabled={!message.trim()}
+                            >
+                                Send Message
+                            </Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
 
                 {/* Details Dialog */}
                 <Dialog open={detailsOpen} onOpenChange={setDetailsOpen}>
