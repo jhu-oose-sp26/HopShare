@@ -30,7 +30,7 @@ import SubmitBox from './SubmitBox';
 const API_ROOT = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '');
 const NOTIFICATIONS_ENDPOINT = `${API_ROOT}/notifications`;
 
-const PostCard = ({ post, onDelete, onUpdate, coords, routeSearch, distanceFilter, currentUser }) => {
+const PostCard = ({ post, onDelete, onUpdate, coords, routeSearch, distanceFilter,  currentUser }) => {
     const { _id, title, description, user, trip, type = 'request', createdAt } = post;
     const navigate = useNavigate();
     const isOffer = type === 'offer';
