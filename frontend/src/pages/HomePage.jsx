@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Dialog,
   DialogContent,
@@ -15,6 +16,7 @@ import { filterPostsByRouteRadius } from '@/lib/utils';
 import { Bell } from 'lucide-react';
 
 function HomePage({ currentUser, onLogout }) {
+  const navigate = useNavigate();
   const { posts, addPost, removePost, updatePost, isLoading, error } = usePosts();
   const [isOpen, setIsOpen] = useState(false);
   const [coords, setCoords] = useState(null);
@@ -99,6 +101,9 @@ function HomePage({ currentUser, onLogout }) {
                     <p className='text-xs text-gray-500'>{currentUser?.email}</p>
                   </div>
                   <div className='flex gap-2'>
+                    <Button variant='outline' size='sm' onClick={() => navigate('/profile')}>
+                      My Profile
+                    </Button>
                     <Button variant='outline' size='sm' onClick={onLogout}>
                       Log out
                     </Button>

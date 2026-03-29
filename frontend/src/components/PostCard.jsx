@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 function formatTime(time) {
     if (!time) return time;
@@ -28,6 +29,7 @@ const NOTIFICATIONS_ENDPOINT = `${API_ROOT}/notifications`;
 
 const PostCard = ({ post, onDelete, onUpdate, coords, currentUser }) => {
     const { _id, title, description, user, trip, type = 'request', createdAt } = post;
+    const navigate = useNavigate();
     const isOffer = type === 'offer';
 
     const [editOpen, setEditOpen] = useState(false);
@@ -135,7 +137,16 @@ const PostCard = ({ post, onDelete, onUpdate, coords, currentUser }) => {
                 </div>
                 <span className='text-xs text-gray-400 shrink-0 ml-2'>#{_id?.slice(-6)}</span>
             </div>
-            <p className='text-sm text-gray-500 mb-4 truncate'>{user.name} · {user.email}</p>
+            <p className='text-sm text-gray-500 mb-4'>
+                <button
+                    onClick={() => navigate(`/user/${user._id || user.id}`)}
+                    className='text-blue-600 hover:text-blue-800 hover:underline font-medium'
+                >
+                    {user.name}
+                </button>
+                {' · '}
+                {user.email}
+            </p>
 
             {/* Post content */}
             <p className='text-gray-700 mb-4 break-words'>
@@ -293,17 +304,28 @@ const PostCard = ({ post, onDelete, onUpdate, coords, currentUser }) => {
                             {/* Poster info */}
                             <div className='bg-gray-50 rounded-lg p-3 space-y-2'>
                                 <p className='text-xs font-semibold uppercase tracking-wide text-gray-400'>Contact</p>
-                                <div className='flex items-center gap-2 text-gray-700'>
-                                    <User className='w-4 h-4 text-gray-400 shrink-0' />
-                                    <span>{user?.name || '—'}</span>
-                                </div>
-                                <div className='flex items-center gap-2 text-gray-700'>
-                                    <Mail className='w-4 h-4 text-gray-400 shrink-0' />
-                                    <span>{user?.email || '—'}</span>
+                                <div className='flex items-center gap-3'>
+                                    <img
+                                        src={user?.avatar || user?.picture || `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.name || 'User')}&background=e5e7eb&color=374151&size=64`}
+                                        alt={user?.name || 'User'}
+                                        className="w-10 h-10 rounded-full border border-gray-200 object-cover"
+                                        onError={(e) => {
+                                            e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.name || 'User')}&background=e5e7eb&color=374151&size=64`;
+                                        }}
+                                    />
+                                    <div className="flex-1 min-w-0">
+                                        <button
+                                            onClick={() => navigate(`/user/${user._id || user.id}`)}
+                                            className='text-blue-600 hover:text-blue-800 hover:underline font-medium text-sm'
+                                        >
+                                            {user?.name || '—'}
+                                        </button>
+                                        <div className='text-xs text-gray-500'>{user?.email || '—'}</div>
+                                    </div>
                                 </div>
                                 <div className='flex items-center gap-2 text-gray-700'>
                                     <Phone className='w-4 h-4 text-gray-400 shrink-0' />
-                                    <span>{user?.phone || '—'}</span>
+                                    <span className="text-sm">{user?.phone || '—'}</span>
                                 </div>
                             </div>
 

@@ -3,6 +3,8 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import HomePage from '@/pages/HomePage';
 import LandingPage from '@/pages/LandingPage';
 import LoginPage from '@/pages/LoginPage';
+import ProfilePage from '@/pages/ProfilePage';
+import UserProfile from '@/pages/UserProfile';
 
 const USER_STORAGE_KEY = 'hopshare.user';
 
@@ -29,6 +31,10 @@ function App() {
       logout: () => {
         localStorage.removeItem(USER_STORAGE_KEY);
         setCurrentUser(null);
+      },
+      updateUser: (updatedUser) => {
+        localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(updatedUser));
+        setCurrentUser(updatedUser);
       },
     }),
     []
@@ -58,6 +64,26 @@ function App() {
               <HomePage currentUser={currentUser} onLogout={authApi.logout} />
             ) : (
               <Navigate to='/landing' replace />
+            )
+          }
+        />
+        <Route
+          path='/profile'
+          element={
+            currentUser ? (
+              <ProfilePage currentUser={currentUser} onUserUpdate={authApi.updateUser} />
+            ) : (
+              <Navigate to='/login' replace />
+            )
+          }
+        />
+        <Route
+          path='/user/:userId'
+          element={
+            currentUser ? (
+              <UserProfile currentUser={currentUser} />
+            ) : (
+              <Navigate to='/login' replace />
             )
           }
         />
