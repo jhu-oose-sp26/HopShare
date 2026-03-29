@@ -23,6 +23,7 @@ const PostList = ({
     subheading = '',
     emptyTitle = 'No rides available yet.',
     emptyDescription = 'Try to create a ride with the above button!',
+    currentUser
 }) => {
     const [typeFilter, setTypeFilter] = useState("all");
     const [distanceFilter, setDistanceFilter] = useState(Infinity);
@@ -189,6 +190,7 @@ const PostList = ({
                             onDelete={() => onDeletePost?.(post._id)}
                             onUpdate={(formData) => onUpdatePost?.(post._id, formData)}
                             coords={coords}
+                            currentUser={currentUser}
                             routeSearch={routeSearch}
                             distanceFilter={distanceFilter}
                         />
