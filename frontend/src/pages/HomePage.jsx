@@ -13,7 +13,6 @@ import SubmitBox from '@/components/SubmitBox';
 import NotificationMenu from '@/components/NotificationMenu';
 import { usePosts } from '@/hooks/usePosts';
 import { filterPostsByRouteRadius } from '@/lib/utils';
-import { Bell } from 'lucide-react';
 
 function HomePage({ currentUser, onLogout }) {
   const navigate = useNavigate();
@@ -80,8 +79,8 @@ function HomePage({ currentUser, onLogout }) {
       : 'Create a Ride Request';
 
   return (
-    <div className='min-h-screen bg-gray-50'>
-      <div className='bg-white border-b border-gray-200'>
+    <div className='min-h-screen bg-white'>
+      <div className='bg-white'>
         <div className="relative">
             <div className="absolute top-6 right-6">
               <NotificationMenu currentUser={currentUser}/>
@@ -112,41 +111,46 @@ function HomePage({ currentUser, onLogout }) {
                 </div>
               </div>
 
-              <RouteSearchPanel
-                coords={coords}
-                hasSearched={hasSearched}
-                matchCount={visiblePosts.length}
-                searchRadiusKm={routeSearch?.radiusKm ?? ''}
-                onClearSearch={clearRouteSearch}
-                onRequestRide={requestRide}
-                onSearch={routeFizzySearch}
-              />
-
-              <Dialog open={isOpen} onOpenChange={handleDialogOpenChange}>
-                <DialogContent className='w-[90%] max-w-[800px] sm:max-w-[800px] max-h-[80vh] overflow-y-auto'>
-                  <DialogHeader>
-                    <DialogTitle>{dialogTitle}</DialogTitle>
-                  </DialogHeader>
-
-                  <SubmitBox
-                    onSubmit={async (data) => {
-                      await addPost(data);
-                      setIsOpen(false);
-                      setSubmitInitialData(null);
-                    }}
-                    coords={coords}
-                    initialData={submitInitialData}
-                  />
-                </DialogContent>
-              </Dialog>
             </div>
           </div>
-      </div>
+
+          <div className='container mx-auto px-6 max-w-6xl'>
+            <RouteSearchPanel
+              coords={coords}
+              hasSearched={hasSearched}
+              matchCount={visiblePosts.length}
+              searchRadiusKm={routeSearch?.radiusKm ?? ''}
+              posts={visiblePosts}
+              onClearSearch={clearRouteSearch}
+              onRequestRide={requestRide}
+              onSearch={routeFizzySearch}
+            />
+          </div>
+
+          <Dialog open={isOpen} onOpenChange={handleDialogOpenChange}>
+            <DialogContent className='w-[90%] max-w-[800px] sm:max-w-[800px] max-h-[80vh] overflow-y-auto'>
+              <DialogHeader>
+                <DialogTitle>{dialogTitle}</DialogTitle>
+              </DialogHeader>
+
+              <SubmitBox
+                onSubmit={async (data) => {
+                  await addPost(data);
+                  setIsOpen(false);
+                  setSubmitInitialData(null);
+                }}
+                coords={coords}
+                initialData={submitInitialData}
+              />
+            </DialogContent>
+          </Dialog>
+        </div>
 
       <PostList
         posts={visiblePosts}
         isLoading={isLoading}
         error={error}
+        routeSearch={routeSearch}
         onDeletePost={removePost}
         onUpdatePost={updatePost}
         coords={coords}

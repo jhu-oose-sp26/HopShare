@@ -1,3 +1,5 @@
+import { calculateDistance } from './RouteMap';
+import RouteMap from './RouteMap';
 import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
@@ -12,6 +14,7 @@ function formatTime(time) {
 }
 import { MapPin, Calendar, Clock, MessageCircle, Pencil, Trash2, Info, User, Mail, Phone, Navigation, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
     Dialog,
     DialogClose,
@@ -27,7 +30,7 @@ import SubmitBox from './SubmitBox';
 const API_ROOT = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '');
 const NOTIFICATIONS_ENDPOINT = `${API_ROOT}/notifications`;
 
-const PostCard = ({ post, onDelete, onUpdate, coords, currentUser }) => {
+const PostCard = ({ post, onDelete, onUpdate, coords, routeSearch, distanceFilter, currentUser }) => {
     const { _id, title, description, user, trip, type = 'request', createdAt } = post;
     const navigate = useNavigate();
     const isOffer = type === 'offer';
@@ -39,6 +42,84 @@ const PostCard = ({ post, onDelete, onUpdate, coords, currentUser }) => {
     const [message, setMessage] = useState('');
     const [isDeleting, setIsDeleting] = useState(false);
     const [deleteError, setDeleteError] = useState('');
+    const [activeMapTab, setActiveMapTab] = useState("route"); // "route" or "distance"
+
+    // Calculate distances from user's route to post's locations
+    const getDistanceToPost = () => {
+        if (!routeSearch || !trip) return null;
+        
+        const distances = {};
+        
+        // Distance from user's start to post's start
+        if (routeSearch.start && trip.startLocation?.gps_coordinates) {
+            const startLat = Number(routeSearch.start.latitude);
+            const startLng = Number(routeSearch.start.longitude);
+            const postStartLat = Number(trip.startLocation.gps_coordinates.latitude);
+            const postStartLng = Number(trip.startLocation.gps_coordinates.longitude);
+            
+            if (isFinite(startLat) && isFinite(startLng) && isFinite(postStartLat) && isFinite(postStartLng)) {
+                distances.startToStart = calculateDistance(startLat, startLng, postStartLat, postStartLng);
+            }
+        }
+        
+        // Distance from user's end to post's end
+        if (routeSearch.end && trip.endLocation?.gps_coordinates) {
+            const endLat = Number(routeSearch.end.latitude);
+            const endLng = Number(routeSearch.end.longitude);
+            const postEndLat = Number(trip.endLocation.gps_coordinates.latitude);
+            const postEndLng = Number(trip.endLocation.gps_coordinates.longitude);
+            
+            if (isFinite(endLat) && isFinite(endLng) && isFinite(postEndLat) && isFinite(postEndLng)) {
+                distances.endToEnd = calculateDistance(endLat, endLng, postEndLat, postEndLng);
+            }
+        }
+        
+        return distances;
+    };
+
+    const distances = getDistanceToPost();
+    
+    // Prepare route data for the map
+    const getPostRoute = () => {
+        if (!trip?.startLocation?.gps_coordinates || !trip?.endLocation?.gps_coordinates) {
+            return null;
+        }
+        
+        return {
+            start: {
+                lat: Number(trip.startLocation.gps_coordinates.latitude),
+                lng: Number(trip.startLocation.gps_coordinates.longitude),
+                title: trip.startLocation.title || 'Start Location'
+            },
+            end: {
+                lat: Number(trip.endLocation.gps_coordinates.latitude),
+                lng: Number(trip.endLocation.gps_coordinates.longitude),
+                title: trip.endLocation.title || 'End Location'
+            }
+        };
+    };
+    
+    const postRoute = getPostRoute();
+    
+    // Prepare user route for map if routeSearch is available
+    const getUserRouteForMap = () => {
+        if (!routeSearch) return null;
+        
+        return {
+            start: routeSearch.start ? {
+                lat: Number(routeSearch.start.latitude),
+                lng: Number(routeSearch.start.longitude),
+                title: routeSearch.start.title || 'Your Start'
+            } : null,
+            end: routeSearch.end ? {
+                lat: Number(routeSearch.end.latitude),
+                lng: Number(routeSearch.end.longitude),
+                title: routeSearch.end.title || 'Your Destination'
+            } : null
+        };
+    };
+    
+    const userRouteForMap = getUserRouteForMap();
 
     // Build initialData for SubmitBox from existing post
     const initialData = useMemo(() => ({
@@ -88,6 +169,9 @@ const PostCard = ({ post, onDelete, onUpdate, coords, currentUser }) => {
                     </button>
                 </DialogTrigger>
                 <DialogContent className="w-[90%] max-w-[800px] sm:max-w-[800px] max-h-[80vh] overflow-y-auto">
+                    <DialogDescription className="sr-only">
+                        Edit ride post form
+                    </DialogDescription>
                     <DialogHeader>
                         <DialogTitle>Edit Ride</DialogTitle>
                     </DialogHeader>
@@ -137,15 +221,15 @@ const PostCard = ({ post, onDelete, onUpdate, coords, currentUser }) => {
                 </div>
                 <span className='text-xs text-gray-400 shrink-0 ml-2'>#{_id?.slice(-6)}</span>
             </div>
-            <p className='text-sm text-gray-500 mb-4'>
+            <p className='text-sm text-gray-500 mb-4 wrap-break-word'>
                 <button
                     onClick={() => navigate(`/user/${user._id || user.id}`)}
-                    className='text-blue-600 hover:text-blue-800 hover:underline font-medium'
+                    className='text-blue-600 hover:text-blue-800 hover:underline font-medium break-all'
                 >
                     {user.name}
                 </button>
                 {' · '}
-                {user.email}
+                <span className='break-all'>{user.email}</span>
             </p>
 
             {/* Post content */}
@@ -285,6 +369,9 @@ const PostCard = ({ post, onDelete, onUpdate, coords, currentUser }) => {
                     </DialogTrigger>
 
                     <DialogContent className='sm:max-w-2xl max-h-[85vh] overflow-y-auto'>
+                        <DialogDescription className="sr-only">
+                            Detailed view of ride post
+                        </DialogDescription>
                         <DialogHeader>
                             <div className='flex items-center gap-3'>
                                 <DialogTitle className='text-lg font-bold'>{title}</DialogTitle>
@@ -316,11 +403,11 @@ const PostCard = ({ post, onDelete, onUpdate, coords, currentUser }) => {
                                     <div className="flex-1 min-w-0">
                                         <button
                                             onClick={() => navigate(`/user/${user._id || user.id}`)}
-                                            className='text-blue-600 hover:text-blue-800 hover:underline font-medium text-sm'
+                                            className='text-blue-600 hover:text-blue-800 hover:underline font-medium text-sm break-all'
                                         >
                                             {user?.name || '—'}
                                         </button>
-                                        <div className='text-xs text-gray-500'>{user?.email || '—'}</div>
+                                        <div className='text-xs text-gray-500 break-all'>{user?.email || '—'}</div>
                                     </div>
                                 </div>
                                 <div className='flex items-center gap-2 text-gray-700'>
@@ -371,6 +458,11 @@ const PostCard = ({ post, onDelete, onUpdate, coords, currentUser }) => {
                                                         {trip.startLocation.gps_coordinates.latitude}, {trip.startLocation.gps_coordinates.longitude}
                                                     </p>
                                                 )}
+                                                {distances?.startToStart !== undefined && (
+                                                    <p className='text-xs text-blue-600 font-medium mt-1'>
+                                                        📍 {distances.startToStart.toFixed(2)} km from your start
+                                                    </p>
+                                                )}
                                             </div>
                                         </div>
 
@@ -399,21 +491,96 @@ const PostCard = ({ post, onDelete, onUpdate, coords, currentUser }) => {
                                                         {trip.endLocation.gps_coordinates.latitude}, {trip.endLocation.gps_coordinates.longitude}
                                                     </p>
                                                 )}
+                                                {distances?.endToEnd !== undefined && (
+                                                    <p className='text-xs text-blue-600 font-medium mt-1'>
+                                                        🎯 {distances.endToEnd.toFixed(2)} km from your destination
+                                                    </p>
+                                                )}
                                             </div>
                                         </div>
                                     </div>
 
-                                    {/* Route map */}
-                                    {trip.startLocation?.gps_coordinates?.latitude != null &&
-                                     trip.endLocation?.gps_coordinates?.latitude != null && (
-                                        <div className='rounded-lg overflow-hidden border border-gray-200 h-80'>
-                                            <iframe
-                                                title='Route map'
-                                                src={`https://maps.google.com/maps?output=embed&saddr=${trip.startLocation.gps_coordinates.latitude},${trip.startLocation.gps_coordinates.longitude}&daddr=${trip.endLocation.gps_coordinates.latitude},${trip.endLocation.gps_coordinates.longitude}`}
-                                                className='w-full h-full'
-                                                loading='lazy'
-                                                referrerPolicy='no-referrer-when-downgrade'
-                                            />
+                                    {/* Map Tabs */}
+                                    {((trip.startLocation?.gps_coordinates?.latitude != null &&
+                                      trip.endLocation?.gps_coordinates?.latitude != null) || postRoute) && (
+                                        <div className='bg-gray-50 rounded-lg p-3'>
+                                            <div className="flex items-center justify-between mb-3">
+                                                <p className='text-xs font-semibold uppercase tracking-wide text-gray-400'>Maps</p>
+                                                <ToggleGroup
+                                                    type="single"
+                                                    value={activeMapTab}
+                                                    onValueChange={(value) => value && setActiveMapTab(value)}
+                                                    size="sm"
+                                                >
+                                                    <ToggleGroupItem value="route" className="text-xs">Route</ToggleGroupItem>
+                                                    <ToggleGroupItem value="distance" className="text-xs">Distance</ToggleGroupItem>
+                                                </ToggleGroup>
+                                            </div>
+
+                                            {/* Route Tab Content */}
+                                            {activeMapTab === "route" && (
+                                                trip.startLocation?.gps_coordinates?.latitude != null &&
+                                                trip.endLocation?.gps_coordinates?.latitude != null && (
+                                                    <div className='rounded-lg overflow-hidden border border-gray-200 h-80'>
+                                                        <iframe
+                                                            title='Route map'
+                                                            src={`https://maps.google.com/maps?output=embed&saddr=${trip.startLocation.gps_coordinates.latitude},${trip.startLocation.gps_coordinates.longitude}&daddr=${trip.endLocation.gps_coordinates.latitude},${trip.endLocation.gps_coordinates.longitude}`}
+                                                            className='w-full h-full'
+                                                            loading='lazy'
+                                                            referrerPolicy='no-referrer-when-downgrade'
+                                                        />
+                                                    </div>
+                                                )
+                                            )}
+
+                                            {/* Distance Tab Content */}
+                                            {activeMapTab === "distance" && postRoute && (
+                                                <div className="space-y-3">
+                                                    <RouteMap
+                                                        userRoute={userRouteForMap}
+                                                        posts={[post]}
+                                                        searchRadius={distanceFilter !== Infinity ? distanceFilter : 10}
+                                                        className="h-80"
+                                                        showZoomControls={true}
+                                                    />
+                                                    
+                                                    {/* Walking Navigation Buttons */}
+                                                    <div className="flex gap-2 flex-wrap">
+                                                        {trip.startLocation?.gps_coordinates && userRouteForMap?.start && (
+                                                            <Button
+                                                                variant="outline"
+                                                                size="sm"
+                                                                className="flex items-center gap-1 text-xs"
+                                                                disabled={!distances?.startToStart || distances.startToStart < 0.01}
+                                                                onClick={() => {
+                                                                    const walkingUrl = `https://maps.google.com/maps?saddr=${userRouteForMap.start.lat},${userRouteForMap.start.lng}&daddr=${trip.startLocation.gps_coordinates.latitude},${trip.startLocation.gps_coordinates.longitude}&dirflg=w`;
+                                                                    window.open(walkingUrl, '_blank');
+                                                                }}
+                                                            >
+                                                                <Navigation className="w-3 h-3" />
+                                                                Walk to pickup
+                                                                {distances?.startToStart !== undefined && ` (${distances.startToStart.toFixed(2)}km)`}
+                                                            </Button>
+                                                        )}
+                                                        {trip.endLocation?.gps_coordinates && userRouteForMap?.end && (
+                                                            <Button
+                                                                variant="outline"
+                                                                size="sm"
+                                                                className="flex items-center gap-1 text-xs"
+                                                                disabled={!distances?.endToEnd || distances.endToEnd < 0.01}
+                                                                onClick={() => {
+                                                                    const walkingUrl = `https://maps.google.com/maps?saddr=${trip.endLocation.gps_coordinates.latitude},${trip.endLocation.gps_coordinates.longitude}&daddr=${userRouteForMap.end.lat},${userRouteForMap.end.lng}&dirflg=w`;
+                                                                    window.open(walkingUrl, '_blank');
+                                                                }}
+                                                            >
+                                                                <MapPin className="w-3 h-3" />
+                                                                Walk from dropoff
+                                                                {distances?.endToEnd !== undefined && ` (${distances.endToEnd.toFixed(2)}km)`}
+                                                            </Button>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            )}
                                         </div>
                                     )}
 
