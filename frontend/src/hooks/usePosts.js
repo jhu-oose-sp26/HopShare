@@ -17,7 +17,7 @@ function createPostPayload(formData) {
     const endShort = toShortPlaceName(formData.endTitle);
 
     return {
-        title: `${startShort || formData.startTitle} -> ${
+        title: `${startShort || formData.startTitle} → ${
             endShort || formData.endTitle
         }`,
         description: formData.description,
