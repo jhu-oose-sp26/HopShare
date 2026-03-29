@@ -11,16 +11,19 @@
         "class-variance-authority": "^0.7.1",
         "clsx": "^2.1.1",
         "date-fns": "^4.1.0",
+        "leaflet": "^1.9.4",
         "lucide-react": "^0.574.0",
+        "motion": "^12.38.0",
         "radix-ui": "^1.4.3",
         "react": "^19.2.4",
         "react-day-picker": "^9.13.2",
         "react-dom": "^19.2.4",
+        "react-leaflet": "^5.0.0",
+        "react-router-dom": "^7.9.1",
         "serpapi": "^2.2.1",
         "tailwind-merge": "^3.4.1",
         "tailwindcss-animate": "^1.0.7",
-        "web-vitals": "^2.1.4",
-        "react-router-dom": "^7.9.1"
+        "web-vitals": "^2.1.4"
     },
     "scripts": {
         "dev": "npx vite",
