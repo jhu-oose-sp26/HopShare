@@ -23,7 +23,10 @@ import {
 } from '@/components/ui/dialog';
 import SubmitBox from './SubmitBox';
 
-const PostCard = ({ post, onDelete, onUpdate, coords }) => {
+const API_ROOT = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '');
+const NOTIFICATIONS_ENDPOINT = `${API_ROOT}/notifications`;
+
+const PostCard = ({ post, onDelete, onUpdate, coords, currentUser }) => {
     const { _id, title, description, user, trip, type = 'request', createdAt } = post;
     const isOffer = type === 'offer';
 
@@ -229,14 +232,26 @@ const PostCard = ({ post, onDelete, onUpdate, coords }) => {
                             </Button>
 
                             <Button
-                                onClick={() => {
+                                onClick={async () => {
                                 console.log('Send message:', {
                                     to: user?.email,
                                     message,
                                     postId: _id,
                                 });
-
-                                // stub for backend
+                                
+                                await fetch(NOTIFICATIONS_ENDPOINT, {
+                                    method: 'POST',
+                                    headers: {
+                                        'Content-Type': 'application/json',
+                                    },
+                                    body: JSON.stringify({
+                                        recipientEmail: post.user.email,
+                                        senderName: currentUser.name,
+                                        senderId: currentUser._id,
+                                        message,
+                                        postId: post._id,
+                                    }),
+                                });
 
                                 setContactOpen(false);
                                 setMessage('');

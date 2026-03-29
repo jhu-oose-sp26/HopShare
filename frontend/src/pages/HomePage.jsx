@@ -145,6 +145,7 @@ function HomePage({ currentUser, onLogout }) {
         onDeletePost={removePost}
         onUpdatePost={updatePost}
         coords={coords}
+        currentUser={currentUser}
         heading={isShowingSearchResults ? 'Matching Routes' : 'Available Rides'}
         subheading={
           isShowingSearchResults
