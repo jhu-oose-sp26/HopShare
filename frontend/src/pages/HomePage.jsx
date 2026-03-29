@@ -106,6 +106,7 @@ function HomePage({ currentUser, onLogout }) {
             hasSearched={hasSearched}
             matchCount={visiblePosts.length}
             searchRadiusKm={routeSearch?.radiusKm ?? ''}
+            posts={visiblePosts}
             onClearSearch={clearRouteSearch}
             onRequestRide={requestRide}
             onSearch={routeFizzySearch}
@@ -135,6 +136,7 @@ function HomePage({ currentUser, onLogout }) {
         posts={visiblePosts}
         isLoading={isLoading}
         error={error}
+        routeSearch={routeSearch}
         onDeletePost={removePost}
         onUpdatePost={updatePost}
         coords={coords}
