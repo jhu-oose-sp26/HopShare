@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import PostList from '@/components/PostList';
 import RouteSearchPanel from '@/components/RouteSearchPanel';
 import SubmitBox from '@/components/SubmitBox';
+import NotificationMenu from '@/components/NotificationMenu';
 import { usePosts } from '@/hooks/usePosts';
 import { filterPostsByRouteRadius } from '@/lib/utils';
 import { Bell } from 'lucide-react';
@@ -81,10 +82,7 @@ function HomePage({ currentUser, onLogout }) {
       <div className='bg-white border-b border-gray-200'>
         <div className="relative">
             <div className="absolute top-6 right-6">
-              <button className='relative p-2 rounded-full hover:bg-gray-100 transition'>
-                <Bell className='w-6 h-6 text-gray-700' />
-                <span className='absolute top-0.5 right-0.5 w-2 h-2 bg-red-500 rounded-full ring-2 ring-white'></span>
-              </button>
+              <NotificationMenu />
             </div>
             <div className='container mx-auto px-6 py-8 max-w-6xl space-y-6'>
               <div className='flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between'>
