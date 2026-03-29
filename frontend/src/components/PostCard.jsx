@@ -1,6 +1,7 @@
 import { calculateDistance } from './RouteMap';
 import RouteMap from './RouteMap';
 import React, { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 function formatTime(time) {
     if (!time) return time;
@@ -26,13 +27,19 @@ import {
 } from '@/components/ui/dialog';
 import SubmitBox from './SubmitBox';
 
-const PostCard = ({ post, onDelete, onUpdate, coords, routeSearch, distanceFilter }) => {
+const API_ROOT = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '');
+const NOTIFICATIONS_ENDPOINT = `${API_ROOT}/notifications`;
+
+const PostCard = ({ post, onDelete, onUpdate, coords, routeSearch, distanceFilter,  currentUser }) => {
     const { _id, title, description, user, trip, type = 'request', createdAt } = post;
+    const navigate = useNavigate();
     const isOffer = type === 'offer';
 
     const [editOpen, setEditOpen] = useState(false);
     const [detailsOpen, setDetailsOpen] = useState(false);
     const [deleteOpen, setDeleteOpen] = useState(false);
+    const [contactOpen, setContactOpen] = useState(false);
+    const [message, setMessage] = useState('');
     const [isDeleting, setIsDeleting] = useState(false);
     const [deleteError, setDeleteError] = useState('');
     const [activeMapTab, setActiveMapTab] = useState("route"); // "route" or "distance"
@@ -214,7 +221,16 @@ const PostCard = ({ post, onDelete, onUpdate, coords, routeSearch, distanceFilte
                 </div>
                 <span className='text-xs text-gray-400 shrink-0 ml-2'>#{_id?.slice(-6)}</span>
             </div>
-            <p className='text-sm text-gray-500 mb-4 truncate'>{user.name} · {user.email}</p>
+            <p className='text-sm text-gray-500 mb-4 wrap-break-word'>
+                <button
+                    onClick={() => navigate(`/user/${user._id || user.id}`)}
+                    className='text-blue-600 hover:text-blue-800 hover:underline font-medium break-all'
+                >
+                    {user.name}
+                </button>
+                {' · '}
+                <span className='break-all'>{user.email}</span>
+            </p>
 
             {/* Post content */}
             <p className='text-gray-700 mb-4 break-words'>
@@ -270,10 +286,72 @@ const PostCard = ({ post, onDelete, onUpdate, coords, routeSearch, distanceFilte
 
             {/* Action buttons */}
             <div className='flex flex-wrap gap-2'>
-                <Button variant='default' size='sm' className='flex-1'>
-                    <MessageCircle className='w-4 h-4 mr-1' />
-                    Contact
-                </Button>
+                {/* Contact Dialog */}
+
+                <Dialog open={contactOpen} onOpenChange={setContactOpen}>
+                    <DialogTrigger asChild>
+                        <Button variant='default' size='sm' className='flex-1'>
+                            <MessageCircle className='w-4 h-4 mr-1' />
+                            Contact
+                        </Button>
+                    </DialogTrigger>
+
+                    <DialogContent className="sm:max-w-md">
+                        <DialogHeader>
+                            <DialogTitle className="truncate max-w-[20rem]">
+                                Contact {user?.name}
+                            </DialogTitle>
+                            <DialogDescription>
+                                Send a message about this ride.
+                            </DialogDescription>
+                        </DialogHeader>
+
+                        <div className="space-y-3">
+                        <textarea
+                            value={message}
+                            onChange={(e) => setMessage(e.target.value)}
+                            placeholder="Write your message..."
+                            className="w-full min-h-[100px] rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                        </div>
+
+                        <DialogFooter>
+                            <Button
+                                variant="outline"
+                                onClick={() => {
+                                setContactOpen(false);
+                                setMessage('');
+                                }}
+                            >
+                                Cancel
+                            </Button>
+
+                            <Button
+                                onClick={async () => {
+                                    await fetch(NOTIFICATIONS_ENDPOINT, {
+                                        method: 'POST',
+                                        headers: {
+                                            'Content-Type': 'application/json',
+                                        },
+                                        body: JSON.stringify({
+                                            recipientEmail: post.user.email,
+                                            senderName: currentUser.name,
+                                            senderId: currentUser._id,
+                                            message,
+                                            postId: post._id,
+                                        }),
+                                    });
+
+                                    setContactOpen(false);
+                                    setMessage('');
+                                }}
+                                disabled={!message.trim()}
+                            >
+                                Send Message
+                            </Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
 
                 {/* Details Dialog */}
                 <Dialog open={detailsOpen} onOpenChange={setDetailsOpen}>
@@ -307,17 +385,28 @@ const PostCard = ({ post, onDelete, onUpdate, coords, routeSearch, distanceFilte
                             {/* Poster info */}
                             <div className='bg-gray-50 rounded-lg p-3 space-y-2'>
                                 <p className='text-xs font-semibold uppercase tracking-wide text-gray-400'>Contact</p>
-                                <div className='flex items-center gap-2 text-gray-700'>
-                                    <User className='w-4 h-4 text-gray-400 shrink-0' />
-                                    <span>{user?.name || '—'}</span>
-                                </div>
-                                <div className='flex items-center gap-2 text-gray-700'>
-                                    <Mail className='w-4 h-4 text-gray-400 shrink-0' />
-                                    <span>{user?.email || '—'}</span>
+                                <div className='flex items-center gap-3'>
+                                    <img
+                                        src={user?.avatar || user?.picture || `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.name || 'User')}&background=e5e7eb&color=374151&size=64`}
+                                        alt={user?.name || 'User'}
+                                        className="w-10 h-10 rounded-full border border-gray-200 object-cover"
+                                        onError={(e) => {
+                                            e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.name || 'User')}&background=e5e7eb&color=374151&size=64`;
+                                        }}
+                                    />
+                                    <div className="flex-1 min-w-0">
+                                        <button
+                                            onClick={() => navigate(`/user/${user._id || user.id}`)}
+                                            className='text-blue-600 hover:text-blue-800 hover:underline font-medium text-sm break-all'
+                                        >
+                                            {user?.name || '—'}
+                                        </button>
+                                        <div className='text-xs text-gray-500 break-all'>{user?.email || '—'}</div>
+                                    </div>
                                 </div>
                                 <div className='flex items-center gap-2 text-gray-700'>
                                     <Phone className='w-4 h-4 text-gray-400 shrink-0' />
-                                    <span>{user?.phone || '—'}</span>
+                                    <span className="text-sm">{user?.phone || '—'}</span>
                                 </div>
                             </div>
 
