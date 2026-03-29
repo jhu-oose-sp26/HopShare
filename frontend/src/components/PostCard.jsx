@@ -1,4 +1,14 @@
 import React, { useMemo, useState } from 'react';
+
+function formatTime(time) {
+    if (!time) return time;
+    const [hourStr, minute] = time.split(':');
+    const hour = parseInt(hourStr, 10);
+    if (isNaN(hour)) return time;
+    const period = hour >= 12 ? 'PM' : 'AM';
+    const hour12 = hour % 12 || 12;
+    return `${hour12}:${minute} ${period}`;
+}
 import { MapPin, Calendar, Clock, MessageCircle, Pencil, Trash2, Info, User, Mail, Phone, Navigation, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -116,14 +126,18 @@ const PostCard = ({ post, onDelete, onUpdate, coords }) => {
                     <span className={`text-xs font-medium px-2.5 py-0.5 rounded-full ${isOffer ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}`}>
                         {isOffer ? 'Offering' : 'Requesting'}
                     </span>
-                    <h3 className='font-semibold text-gray-900'>{title}</h3>
+                    <h3 className='font-semibold text-gray-900 break-words'>{title}</h3>
                 </div>
                 <span className='text-xs text-gray-400 shrink-0 ml-2'>#{_id?.slice(-6)}</span>
             </div>
-            <p className='text-sm text-gray-500 mb-4'>{user.name} · {user.email}</p>
+            <p className='text-sm text-gray-500 mb-4 truncate'>{user.name} · {user.email}</p>
 
             {/* Post content */}
-            <p className='text-gray-700 mb-4'>{description}</p>
+            <p className='text-gray-700 mb-4 break-words'>
+                {description.length > 100
+                ? `${description.slice(0, 100)}...`
+                : description}
+            </p>
 
             {/* Trip details (if exists) */}
             {trip && (
@@ -135,7 +149,7 @@ const PostCard = ({ post, onDelete, onUpdate, coords }) => {
                         {trip.startLocation?.title && (
                             <div className='flex items-center gap-2 text-sm'>
                                 <MapPin className='w-4 h-4 text-green-600' />
-                                <span className='text-gray-600'>
+                                <span className='text-gray-600 break-words'>
                                     From: {trip.startLocation.title}
                                 </span>
                             </div>
@@ -143,7 +157,7 @@ const PostCard = ({ post, onDelete, onUpdate, coords }) => {
                         {trip.endLocation?.title && (
                             <div className='flex items-center gap-2 text-sm'>
                                 <MapPin className='w-4 h-4 text-red-600' />
-                                <span className='text-gray-600'>
+                                <span className='text-gray-600 break-words'>
                                     To: {trip.endLocation.title}
                                 </span>
                             </div>
@@ -161,7 +175,7 @@ const PostCard = ({ post, onDelete, onUpdate, coords }) => {
                                 <div className='flex items-center gap-1 text-sm'>
                                     <Clock className='w-4 h-4 text-gray-500' />
                                     <span className='text-gray-600'>
-                                        {trip.time}
+                                        {formatTime(trip.time)}
                                     </span>
                                 </div>
                             )}
@@ -219,6 +233,14 @@ const PostCard = ({ post, onDelete, onUpdate, coords }) => {
                                     <span>{user?.phone || '—'}</span>
                                 </div>
                             </div>
+
+                            {/* Description */}
+                            {description && (
+                                <div className='bg-gray-50 rounded-lg p-3 space-y-2'>
+                                    <p className='text-xs font-semibold uppercase tracking-wide text-gray-400'>Description</p>
+                                    <p className='text-gray-700 break-words whitespace-pre-wrap'>{description}</p>
+                                </div>
+                            )}
 
                             {/* Trip details */}
                             {trip && (
@@ -312,7 +334,7 @@ const PostCard = ({ post, onDelete, onUpdate, coords }) => {
                                             {trip.time && (
                                                 <div className='flex items-center gap-2 text-gray-700'>
                                                     <Clock className='w-4 h-4 text-gray-400 shrink-0' />
-                                                    <span>{trip.time}</span>
+                                                    <span>{formatTime(trip.time)}</span>
                                                 </div>
                                             )}
                                         </div>
