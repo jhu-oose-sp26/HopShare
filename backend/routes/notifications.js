@@ -51,9 +51,30 @@ router.get('/:userId', async (req, res) => {
 
     const notifications = await getDB()
       .collection('notifications')
-      .find({ recipientId: new ObjectId(userId) })
-      .sort({ createdAt: -1 })
-      .limit(50)
+      .aggregate([
+        { $match: { recipientId: new ObjectId(userId) } },
+        { $sort: { createdAt: -1 } },
+        { $limit: 50 },
+        {
+          $lookup: {
+            from: 'users',
+            localField: 'senderId',
+            foreignField: '_id',
+            as: 'sender',
+          },
+        },
+        {
+          $unwind: { path: '$sender', preserveNullAndEmptyArrays: true }
+        },
+        {
+          $project: {
+            message: 1,
+            read: 1,
+            createdAt: 1,
+            senderName: '$sender.name',
+          }
+        }
+      ])
       .toArray();
 
     res.json(notifications);

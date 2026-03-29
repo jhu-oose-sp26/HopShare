@@ -82,7 +82,7 @@ function HomePage({ currentUser, onLogout }) {
       <div className='bg-white border-b border-gray-200'>
         <div className="relative">
             <div className="absolute top-6 right-6">
-              <NotificationMenu />
+              <NotificationMenu currentUser={currentUser}/>
             </div>
             <div className='container mx-auto px-6 py-8 max-w-6xl space-y-6'>
               <div className='flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between'>
