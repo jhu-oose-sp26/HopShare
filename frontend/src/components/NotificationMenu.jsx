@@ -1,37 +1,46 @@
 import {
-  DropdownMenu,
-  DropdownMenuTrigger,
-  DropdownMenuContent,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuItem,
-} from "@/components/ui/dropdown-menu";
+  Sheet,
+  SheetTrigger,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+} from "@/components/ui/sheet";
 import { Bell } from "lucide-react";
 
 function NotificationMenu() {
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
+    <Sheet>
+      <SheetTrigger asChild>
         <button className='relative p-3 rounded-full hover:bg-gray-100 transition'>
           <Bell className='w-7 h-7 text-gray-700' />
           <span className='absolute top-1 right-1 w-2.5 h-2.5 bg-red-500 rounded-full ring-2 ring-white'></span>
         </button>
-      </DropdownMenuTrigger>
+      </SheetTrigger>
 
-      <DropdownMenuContent align="end" className="w-72">
-        <DropdownMenuLabel>Notifications</DropdownMenuLabel>
-        <DropdownMenuSeparator />
+      <SheetContent side="right" className="w-[350px] sm:w-[400px]">
+        <SheetHeader>
+          <SheetTitle>Notifications</SheetTitle>
+          <SheetDescription>
+            View your ride updates and activity.
+          </SheetDescription>
+        </SheetHeader>
 
-        <DropdownMenuItem>🚗 New ride request near you</DropdownMenuItem>
-        <DropdownMenuItem>✅ Your ride was accepted</DropdownMenuItem>
-        <DropdownMenuItem>❌ A request was canceled</DropdownMenuItem>
+        <div className="mt-4 space-y-3">
+          <div className="p-3 rounded-lg border bg-gray-50 hover:bg-gray-100 transition cursor-pointer">
+            🚗 New ride request near you
+          </div>
 
-        <DropdownMenuSeparator />
-        <DropdownMenuItem className="text-center text-sm text-gray-500">
-          View all notifications
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+          <div className="p-3 rounded-lg border bg-gray-50 hover:bg-gray-100 transition cursor-pointer">
+            ✅ Your ride was accepted
+          </div>
+
+          <div className="p-3 rounded-lg border bg-gray-50 hover:bg-gray-100 transition cursor-pointer">
+            ❌ A request was canceled
+          </div>
+        </div>
+      </SheetContent>
+    </Sheet>
   );
 }
 
