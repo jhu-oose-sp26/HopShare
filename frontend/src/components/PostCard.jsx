@@ -1,5 +1,7 @@
 import { calculateDistance } from './RouteMap';
 import RouteMap from './RouteMap';
+import WeatherDisplay from './WeatherDisplay';
+import WeatherForecastDialog from './WeatherForecastDialog';
 import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
@@ -39,10 +41,18 @@ const PostCard = ({ post, onDelete, onUpdate, coords, routeSearch, distanceFilte
     const [detailsOpen, setDetailsOpen] = useState(false);
     const [deleteOpen, setDeleteOpen] = useState(false);
     const [contactOpen, setContactOpen] = useState(false);
+    const [weatherForecastOpen, setWeatherForecastOpen] = useState(false);
+    const [selectedWeatherLocation, setSelectedWeatherLocation] = useState(null);
     const [message, setMessage] = useState('');
     const [isDeleting, setIsDeleting] = useState(false);
     const [deleteError, setDeleteError] = useState('');
     const [activeMapTab, setActiveMapTab] = useState("route"); // "route" or "distance"
+
+    // Function to handle weather forecast dialog opening
+    const openWeatherForecast = (location) => {
+        setSelectedWeatherLocation(location);
+        setWeatherForecastOpen(true);
+    };
 
     // Calculate distances from user's route to post's locations
     const getDistanceToPost = () => {
@@ -120,6 +130,23 @@ const PostCard = ({ post, onDelete, onUpdate, coords, routeSearch, distanceFilte
     };
     
     const userRouteForMap = getUserRouteForMap();
+
+    // Check if weather should be displayed (within 14 days and not in the past)
+    const shouldShowWeather = () => {
+        if (!trip?.date) return false;
+        
+        const targetDate = new Date(trip.date);
+        const today = new Date();
+        
+        // Reset time to start of day for accurate day comparison
+        today.setHours(0, 0, 0, 0);
+        targetDate.setHours(0, 0, 0, 0);
+        
+        const diffDays = Math.ceil((targetDate - today) / (1000 * 60 * 60 * 24));
+        
+        // Only show weather for dates that are today or in the future, and within 14 days
+        return diffDays >= 0 && diffDays <= 14;
+    };
 
     // Build initialData for SubmitBox from existing post
     const initialData = useMemo(() => ({
@@ -262,7 +289,38 @@ const PostCard = ({ post, onDelete, onUpdate, coords, routeSearch, distanceFilte
                                 </span>
                             </div>
                         )}
-                        <div className='flex items-center gap-4'>
+                        
+                        {/* Weather forecast for start location - only for dates within 14 days */}
+                        {trip.startLocation?.gps_coordinates && trip.date && shouldShowWeather() && (
+                            <div className='mt-3'>
+                                <div className='text-xs font-medium text-gray-700 mb-2'>Weather at departure:</div>
+                                <WeatherDisplay 
+                                    latitude={trip.startLocation.gps_coordinates.latitude}
+                                    longitude={trip.startLocation.gps_coordinates.longitude}
+                                    date={trip.date}
+                                    time={trip.time || '12:00'}
+                                    location={trip.startLocation.title}
+                                    compact={true}
+                                />
+                            </div>
+                        )}
+                        
+                        {/* Weather forecast for end location - only for dates within 14 days */}
+                        {trip.endLocation?.gps_coordinates && trip.date && shouldShowWeather() && (
+                            <div className='mt-2'>
+                                <div className='text-xs font-medium text-gray-700 mb-2'>Weather at destination:</div>
+                                <WeatherDisplay 
+                                    latitude={trip.endLocation.gps_coordinates.latitude}
+                                    longitude={trip.endLocation.gps_coordinates.longitude}
+                                    date={trip.date}
+                                    time={trip.time || '12:00'}
+                                    location={trip.endLocation.title}
+                                    compact={true}
+                                />
+                            </div>
+                        )}
+                        
+                        <div className='flex items-center gap-4 mt-3'>
                             {trip.date && (
                                 <div className='flex items-center gap-1 text-sm'>
                                     <Calendar className='w-4 h-4 text-gray-500' />
@@ -457,6 +515,28 @@ const PostCard = ({ post, onDelete, onUpdate, coords, routeSearch, distanceFilte
                                                         📍 {distances.startToStart.toFixed(2)} km from your start
                                                     </p>
                                                 )}
+                                                {/* Weather for start location */}
+                                                {shouldShowWeather() && trip.startLocation?.gps_coordinates?.latitude != null && (
+                                                    <div 
+                                                        className="mt-2 cursor-pointer hover:bg-gray-100 rounded p-2 transition-colors"
+                                                        onClick={() => openWeatherForecast({
+                                                            lat: trip.startLocation.gps_coordinates.latitude,
+                                                            lng: trip.startLocation.gps_coordinates.longitude,
+                                                            title: trip.startLocation.title,
+                                                            date: trip.date,
+                                                            time: trip.time
+                                                        })}
+                                                    >
+                                                        <WeatherDisplay
+                                                            latitude={trip.startLocation.gps_coordinates.latitude}
+                                                            longitude={trip.startLocation.gps_coordinates.longitude}
+                                                            date={trip.date}
+                                                            time={trip.time}
+                                                            location={trip.startLocation.title}
+                                                            compact={true}
+                                                        />
+                                                    </div>
+                                                )}
                                             </div>
                                         </div>
 
@@ -489,6 +569,28 @@ const PostCard = ({ post, onDelete, onUpdate, coords, routeSearch, distanceFilte
                                                     <p className='text-xs text-blue-600 font-medium mt-1'>
                                                         🎯 {distances.endToEnd.toFixed(2)} km from your destination
                                                     </p>
+                                                )}
+                                                {/* Weather for end location */}
+                                                {shouldShowWeather() && trip.endLocation?.gps_coordinates?.latitude != null && (
+                                                    <div 
+                                                        className="mt-2 cursor-pointer hover:bg-gray-100 rounded p-2 transition-colors"
+                                                        onClick={() => openWeatherForecast({
+                                                            lat: trip.endLocation.gps_coordinates.latitude,
+                                                            lng: trip.endLocation.gps_coordinates.longitude,
+                                                            title: trip.endLocation.title,
+                                                            date: trip.date,
+                                                            time: trip.time
+                                                        })}
+                                                    >
+                                                        <WeatherDisplay
+                                                            latitude={trip.endLocation.gps_coordinates.latitude}
+                                                            longitude={trip.endLocation.gps_coordinates.longitude}
+                                                            date={trip.date}
+                                                            time={trip.time}
+                                                            location={trip.endLocation.title}
+                                                            compact={true}
+                                                        />
+                                                    </div>
                                                 )}
                                             </div>
                                         </div>
@@ -626,6 +728,16 @@ const PostCard = ({ post, onDelete, onUpdate, coords, routeSearch, distanceFilte
                         </DialogClose>
                     </DialogContent>
                 </Dialog>
+
+                {/* Weather Forecast Dialog */}
+                <WeatherForecastDialog
+                    open={weatherForecastOpen}
+                    onOpenChange={setWeatherForecastOpen}
+                    latitude={selectedWeatherLocation?.lat}
+                    longitude={selectedWeatherLocation?.lng}
+                    location={selectedWeatherLocation?.title}
+                    currentDate={selectedWeatherLocation?.date}
+                />
 
             </div>
         </div>
