@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import LocationAutocomplete from './LocationAutocomplete';
 import { format, parse } from 'date-fns';
 import {
     MapPin,
@@ -8,6 +9,7 @@ import {
     Mail,
     Phone,
     MessageCircle,
+    CarFront,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -21,17 +23,53 @@ import {
 const inputBase =
     'flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50';
 
-function SubmitBox({ onSubmit }) {
-    const [name, setName] = useState('');
-    const [email, setEmail] = useState('');
-    const [phone, setPhone] = useState('');
-    const [startLocation, setStartLocation] = useState('');
-    const [endLocation, setEndLocation] = useState('');
-    const [date, setDate] = useState('');
-    const [time, setTime] = useState('');
-    const [description, setDescription] = useState('');
+function SubmitBox({ onSubmit, coords, initialData = null }) {
+    const [name, setName] = useState(initialData?.name ?? '');
+    const [email, setEmail] = useState(initialData?.email ?? '');
+    const [phone, setPhone] = useState(initialData?.phone ?? '');
+    const [startTitle, setStartTitle] = useState(initialData?.startTitle ?? '');
+    const [startLatitude, setStartLatitude] = useState(initialData?.startLatitude ?? '');
+    const [startLongitude, setStartLongitude] = useState(initialData?.startLongitude ?? '');
+    const [endTitle, setEndTitle] = useState(initialData?.endTitle ?? '');
+    const [endLatitude, setEndLatitude] = useState(initialData?.endLatitude ?? '');
+    const [endLongitude, setEndLongitude] = useState(initialData?.endLongitude ?? '');
+    const [date, setDate] = useState(initialData?.date ?? '');
+    const [time, setTime] = useState(initialData?.time ?? '');
+    const [description, setDescription] = useState(initialData?.description ?? '');
+    const [type, setType] = useState(initialData?.type ?? 'request');
     const [submitError, setSubmitError] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
+
+    useEffect(() => {
+        setName(initialData?.name ?? '');
+        setEmail(initialData?.email ?? '');
+        setPhone(initialData?.phone ?? '');
+        setStartTitle(initialData?.startTitle ?? '');
+        setStartLatitude(initialData?.startLatitude ?? '');
+        setStartLongitude(initialData?.startLongitude ?? '');
+        setEndTitle(initialData?.endTitle ?? '');
+        setEndLatitude(initialData?.endLatitude ?? '');
+        setEndLongitude(initialData?.endLongitude ?? '');
+        setDate(initialData?.date ?? '');
+        setTime(initialData?.time ?? '');
+        setDescription(initialData?.description ?? '');
+        setType(initialData?.type ?? 'request');
+        setSubmitError('');
+        setIsSubmitting(false);
+    }, [initialData]);
+
+    const handleStartChange = (nextValue) => {
+        setStartTitle(nextValue);
+        setStartLatitude('');
+        setStartLongitude('');
+    };
+
+    const handleEndChange = (nextValue) => {
+        setEndTitle(nextValue);
+        setEndLatitude('');
+        setEndLongitude('');
+    };
+
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -44,11 +82,16 @@ function SubmitBox({ onSubmit }) {
             name,
             email,
             phone,
-            startLocation,
-            endLocation,
+            startTitle,
+            startLatitude,
+            startLongitude,
+            endTitle,
+            endLatitude,
+            endLongitude,
             date,
             time,
             description,
+            type,
         };
 
         setSubmitError('');
@@ -57,15 +100,22 @@ function SubmitBox({ onSubmit }) {
         try {
             await onSubmit?.(formData);
 
-            // Clear form after successful submit.
-            setName('');
-            setEmail('');
-            setPhone('');
-            setStartLocation('');
-            setEndLocation('');
-            setDate('');
-            setTime('');
-            setDescription('');
+            // Clear form after successful submit (only for new posts, not edits)
+            if (!initialData) {
+                setName('');
+                setEmail('');
+                setPhone('');
+                setStartTitle('');
+                setStartLatitude('');
+                setStartLongitude('');
+                setEndTitle('');
+                setEndLatitude('');
+                setEndLongitude('');
+                setDate('');
+                setTime('');
+                setDescription('');
+                setType('request');
+            }
         } catch (err) {
             setSubmitError(
                 err instanceof Error ? err.message : 'Failed to submit ride'
@@ -85,6 +135,25 @@ function SubmitBox({ onSubmit }) {
             </p>
 
             <form onSubmit={handleSubmit} className='mt-6 space-y-4'>
+                <div className='space-y-2'>
+                    <label
+                        htmlFor='submit-ride-type'
+                        className='flex items-center gap-2 text-sm font-medium text-foreground'
+                    >
+                        <CarFront className='size-4 text-muted-foreground' />
+                        Ride type
+                    </label>
+                    <select
+                        id='submit-ride-type'
+                        className={inputBase}
+                        value={type}
+                        onChange={(e) => setType(e.target.value)}
+                    >
+                        <option value='request'>Requesting a rideshare split</option>
+                        <option value='offer'>Offering a ride</option>
+                    </select>
+                </div>
+
                 <div className='space-y-2'>
                     <label
                         htmlFor='submit-name'
@@ -150,13 +219,13 @@ function SubmitBox({ onSubmit }) {
                         <MapPin className='size-4 text-muted-foreground' />
                         Start location
                     </label>
-                    <input
+                    <LocationAutocomplete
                         id='submit-start'
-                        type='text'
-                        className={inputBase}
+                        value={startTitle}
+                        onChange={handleStartChange}
+                        onSelect={(s) => { setStartLatitude(s.latitude); setStartLongitude(s.longitude); }}
                         placeholder='e.g. Homewood Campus, Baltimore'
-                        value={startLocation}
-                        onChange={(e) => setStartLocation(e.target.value)}
+                        coords={coords}
                         required
                     />
                 </div>
@@ -169,13 +238,13 @@ function SubmitBox({ onSubmit }) {
                         <MapPin className='size-4 text-muted-foreground' />
                         End location
                     </label>
-                    <input
+                    <LocationAutocomplete
                         id='submit-end'
-                        type='text'
-                        className={inputBase}
+                        value={endTitle}
+                        onChange={handleEndChange}
+                        onSelect={(s) => { setEndLatitude(s.latitude); setEndLongitude(s.longitude); }}
                         placeholder='e.g. BWI Airport'
-                        value={endLocation}
-                        onChange={(e) => setEndLocation(e.target.value)}
+                        coords={coords}
                         required
                     />
                 </div>
@@ -264,8 +333,12 @@ function SubmitBox({ onSubmit }) {
                         placeholder='Describe your trip'
                         value={description}
                         onChange={(e) => setDescription(e.target.value)}
+                        maxLength={500}
                         required
                     />
+                    <p className='text-xs text-muted-foreground text-right'>
+                        {description.length}/500
+                    </p>
                 </div>
                 {submitError && (
                     <p className='text-sm text-red-600'>{submitError}</p>

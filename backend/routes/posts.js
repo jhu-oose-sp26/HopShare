@@ -8,10 +8,54 @@ function toObjectId(id) {
   return new ObjectId(id);
 }
 
+// Generates a 6-digits code.
+function generateConfirmationCode() {
+  const chars = '0123456789';
+  let code = '';
+  for (let i = 0; i < 6; i++) {
+    code += chars[Math.floor(Math.random() * chars.length)];
+  }
+  return code;
+}
 
-// READ ALL POSTS
-router.get('/', async (req, res) => { 
-  const posts = await getDB().collection('posts').find().toArray();
+// Get today's date in YYYY-MM-DD format
+function getTodayDateString() {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, '0');
+  const day = String(today.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+// Archive all posts where trip.date is in the past
+async function archivePastRides() {
+  const today = getTodayDateString();
+  const result = await getDB().collection('posts').updateMany(
+    {
+      'trip.date': { $lt: today },
+      archived: { $ne: true }
+    },
+    {
+      $set: { archived: true, archivedAt: new Date().toISOString() }
+    }
+  );
+  return result.modifiedCount;
+}
+
+
+// READ ALL POSTS (non-archived only)
+router.get('/', async (req, res) => {
+  // Archive past rides first
+  await archivePastRides();
+
+  // Return only non-archived posts
+  const posts = await getDB().collection('posts').find({ archived: { $ne: true } }).toArray();
+  res.json(posts);
+});
+
+// READ ARCHIVED POSTS (for future profile feature)
+router.get('/archived', async (req, res) => {
+  const posts = await getDB().collection('posts').find({ archived: true }).toArray();
   res.json(posts);
 });
 
@@ -32,35 +76,45 @@ router.get('/:id', async (req, res) => {
 
 // CREATE
 router.post('/', async (req, res) => { 
-  const postInfo = req.body;
-
-  // validate the post info
+  try {
+    const postInfo = req.body || {};
+      // validate the post info
   if (postInfo.title===null || postInfo.description===null) {
     return res.status(400).json({ error: 'Title and description are required' });
   }
+    const db = getDB();
+    const postsCollection = db.collection('posts');
+    const tripsCollection = db.collection('trips');
 
-  const db = getDB();
-  const result = await db.collection('posts').insertOne(postInfo);
-  const tripsCollection = db.collection('trips');
+    postInfo.confirmationCode = generateConfirmationCode();
+    postInfo.archived = false; // New posts are not archived
+    const postResult = await postsCollection.insertOne(postInfo);
+    let tripId = null;
 
-  let tripId = null;
-  // if there has trip info, insert it into the trips collection
-  if (postInfo.trip) {
-    const tripResult = await tripsCollection.insertOne({
+    if (postInfo.trip) {
+      // insert the trip and get the tripId
+      const tripResult = await tripsCollection.insertOne({
         ...postInfo.trip,
-        postId: result.insertedId,
+        postId: postResult.insertedId,
       });
+
       tripId = tripResult.insertedId;
-  }
 
-  if (tripId) {
-    await db.collection('posts').updateOne(
-      { _id: result.insertedId },
-      { $set: { tripId } }
-    );
-  }
+      await postsCollection.updateOne(
+        { _id: postResult.insertedId },
+        { $set: { tripId } }
+      );
+    }
 
-    res.status(201).json({ ...result, postId: result.insertedId, tripId: tripId || null });
+    res.status(201).json({
+      acknowledged: postResult.acknowledged,
+      postId: postResult.insertedId,
+      tripId,
+    });
+  } catch (error) {
+    console.error('Failed to create post:', error);
+    res.status(500).json({ error: 'Failed to create post' });
+  }
 });
 
 
@@ -84,24 +138,87 @@ router.delete('/:id', async (req, res) => {
 // UPDATE
 router.put('/:id', async (req, res) => { 
   try {
-    const { ObjectId } = require('mongodb');
+    const postId = toObjectId(req.params.id);
+    if (!postId) {
+      return res.status(400).json({ error: 'Invalid post id' });
+    }
 
-    const { id } = req.params;
-    const updateData = req.body;
+    // get the update data
+    const updateData = { ...(req.body || {}) };
+    delete updateData._id;
 
-    // update the post data
-    const result = await db
-      .collection('posts')
-      .updateOne(
-        { _id: new ObjectId(id) },
-        { $set: updateData }
-      );
+    // If trip.date is updated, check if it should be unarchived
+    if (updateData.trip?.date) {
+      const today = getTodayDateString();
+      if (updateData.trip.date >= today) {
+        updateData.archived = false;
+        updateData.archivedAt = null;
+      }
+    }
+
+    const db = getDB();
+    const postsCollection = db.collection('posts');
+    const tripsCollection = db.collection('trips');
+
+    const result = await postsCollection.updateOne(
+      { _id: postId },
+      { $set: updateData }
+    );
 
     if (result.matchedCount === 0) {
       return res.status(404).json({ error: 'Post not found' });
     }
 
-    res.json({ success: true, updatedCount: result.modifiedCount });
+    let tripId = null;
+
+    // update the trip
+    if (Object.prototype.hasOwnProperty.call(updateData, 'trip')) {
+      // check if trip field has content (not null/empty object)
+      const hasTripValue =
+        updateData.trip &&(typeof updateData.trip !== 'object' || Object.keys(updateData.trip).length > 0);
+
+      // create/update trip only when trip has content
+      if (hasTripValue) {
+        // get the existing trip by postID
+        const existingTrip = await tripsCollection.findOne({ postId });
+
+        if (existingTrip) {
+          // update the trip
+          await tripsCollection.updateOne(
+            { _id: existingTrip._id },
+            { $set: { ...updateData.trip, postId } }
+          );
+          tripId = existingTrip._id;
+        } else {
+          const tripResult = await tripsCollection.insertOne({
+            ...updateData.trip,
+            postId,
+          });
+          tripId = tripResult.insertedId;
+        }
+
+        await postsCollection.updateOne(
+          { _id: postId },
+          { $set: { tripId } }
+        );
+      } else {
+        // trip is null/empty object, delete related trip and remove trip fields from post
+        await tripsCollection.deleteMany({ postId });
+        await postsCollection.updateOne(
+          { _id: postId },
+          { $unset: { tripId: '', trip: '' } }
+        );
+      }
+    } else {
+      // no trip field in update data, keep the existing tripId
+      const post = await postsCollection.findOne(
+        { _id: postId },
+        { projection: { tripId: 1 } }
+      );
+      tripId = post?.tripId || null;
+    }
+
+    res.json({ success: true, updatedCount: result.modifiedCount, postId, tripId });
   } catch (err) {
     res.status(500).json({ error: 'Failed to update post' });
   }

@@ -64,6 +64,7 @@
     "router": "^2.2.0",
     "safer-buffer": "^2.1.2",
     "send": "^1.2.1",
+    "serpapi": "^2.2.1",
     "serve-static": "^2.2.1",
     "setprototypeof": "^1.2.0",
     "side-channel": "^1.1.0",
@@ -79,7 +80,8 @@
     "vary": "^1.1.2",
     "webidl-conversions": "^7.0.0",
     "whatwg-url": "^14.2.0",
-    "wrappy": "^1.0.2"
+    "wrappy": "^1.0.2",
+    "google-auth-library": "^10.5.0"
   },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",

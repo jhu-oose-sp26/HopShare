@@ -6,18 +6,42 @@ const API_ROOT = (import.meta.env.VITE_API_BASE_URL || '/api').replace(
 );
 const POSTS_ENDPOINT = `${API_ROOT}/posts`;
 
+function toShortPlaceName(value) {
+    const raw = typeof value === 'string' ? value.trim() : '';
+    if (!raw) return '';
+    return raw.replace(/\s*,.*$/, '').trim();
+}
+
 function createPostPayload(formData) {
+    const startShort = toShortPlaceName(formData.startTitle);
+    const endShort = toShortPlaceName(formData.endTitle);
+
     return {
-        title: `${formData.startLocation} → ${formData.endLocation}`,
+        title: `${startShort || formData.startTitle} → ${
+            endShort || formData.endTitle
+        }`,
         description: formData.description,
+        type: formData.type,
         user: {
             name: formData.name,
             email: formData.email,
             phone: formData.phone,
         },
         trip: {
-            startLocation: formData.startLocation,
-            endLocation: formData.endLocation,
+            startLocation: {
+                title: formData.startTitle,
+                gps_coordinates: {
+                    latitude: formData.startLatitude,
+                    longitude: formData.startLongitude,
+                }
+            },
+            endLocation: {
+                title: formData.endTitle,
+                gps_coordinates: {
+                    latitude: formData.endLatitude,
+                    longitude: formData.endLongitude,
+                }
+            },
             date: formData.date,
             time: formData.time,
         },
@@ -138,10 +162,35 @@ export const usePosts = () => {
         );
     }, []);
 
+    const updatePost = useCallback(async (postId, formData) => {
+        const postPayload = createPostPayload(formData);
+        const response = await fetch(`${POSTS_ENDPOINT}/${postId}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(postPayload),
+        });
+
+        if (!response.ok) {
+            throw new Error(await readErrorMessage(response));
+        }
+
+        // Update local state with the new data
+        setPosts((prevPosts) =>
+            prevPosts.map((post) =>
+                String(post._id) === String(postId)
+                    ? { ...post, ...postPayload }
+                    : post
+            )
+        );
+    }, []);
+
     return {
         posts,
         addPost,
         removePost,
+        updatePost,
         postCount: posts.length,
         isLoading,
         error,
