@@ -1,7 +1,10 @@
 import { useMemo, useState } from 'react';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import HomePage from '@/pages/HomePage';
+import LandingPage from '@/pages/LandingPage';
 import LoginPage from '@/pages/LoginPage';
+import ProfilePage from '@/pages/ProfilePage';
+import UserProfile from '@/pages/UserProfile';
 
 const USER_STORAGE_KEY = 'hopshare.user';
 
@@ -29,6 +32,10 @@ function App() {
         localStorage.removeItem(USER_STORAGE_KEY);
         setCurrentUser(null);
       },
+      updateUser: (updatedUser) => {
+        localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(updatedUser));
+        setCurrentUser(updatedUser);
+      },
     }),
     []
   );
@@ -47,10 +54,34 @@ function App() {
           }
         />
         <Route
+          path='/landing'
+          element={currentUser ? <Navigate to='/' replace /> : <LandingPage />}
+        />
+        <Route
           path='/'
           element={
             currentUser ? (
               <HomePage currentUser={currentUser} onLogout={authApi.logout} />
+            ) : (
+              <Navigate to='/landing' replace />
+            )
+          }
+        />
+        <Route
+          path='/profile'
+          element={
+            currentUser ? (
+              <ProfilePage currentUser={currentUser} onUserUpdate={authApi.updateUser} />
+            ) : (
+              <Navigate to='/login' replace />
+            )
+          }
+        />
+        <Route
+          path='/user/:userId'
+          element={
+            currentUser ? (
+              <UserProfile currentUser={currentUser} />
             ) : (
               <Navigate to='/login' replace />
             )
@@ -58,7 +89,7 @@ function App() {
         />
         <Route
           path='*'
-          element={<Navigate to={currentUser ? '/' : '/login'} replace />}
+          element={<Navigate to={currentUser ? '/' : '/landing'} replace />}
         />
       </Routes>
     </BrowserRouter>

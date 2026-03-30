@@ -8,10 +8,54 @@ function toObjectId(id) {
   return new ObjectId(id);
 }
 
+// Generates a 6-digits code.
+function generateConfirmationCode() {
+  const chars = '0123456789';
+  let code = '';
+  for (let i = 0; i < 6; i++) {
+    code += chars[Math.floor(Math.random() * chars.length)];
+  }
+  return code;
+}
 
-// READ ALL POSTS
-router.get('/', async (req, res) => { 
-  const posts = await getDB().collection('posts').find().toArray();
+// Get today's date in YYYY-MM-DD format
+function getTodayDateString() {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, '0');
+  const day = String(today.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+// Archive all posts where trip.date is in the past
+async function archivePastRides() {
+  const today = getTodayDateString();
+  const result = await getDB().collection('posts').updateMany(
+    {
+      'trip.date': { $lt: today },
+      archived: { $ne: true }
+    },
+    {
+      $set: { archived: true, archivedAt: new Date().toISOString() }
+    }
+  );
+  return result.modifiedCount;
+}
+
+
+// READ ALL POSTS (non-archived only)
+router.get('/', async (req, res) => {
+  // Archive past rides first
+  await archivePastRides();
+
+  // Return only non-archived posts
+  const posts = await getDB().collection('posts').find({ archived: { $ne: true } }).toArray();
+  res.json(posts);
+});
+
+// READ ARCHIVED POSTS (for future profile feature)
+router.get('/archived', async (req, res) => {
+  const posts = await getDB().collection('posts').find({ archived: true }).toArray();
   res.json(posts);
 });
 
@@ -42,6 +86,8 @@ router.post('/', async (req, res) => {
     const postsCollection = db.collection('posts');
     const tripsCollection = db.collection('trips');
 
+    postInfo.confirmationCode = generateConfirmationCode();
+    postInfo.archived = false; // New posts are not archived
     const postResult = await postsCollection.insertOne(postInfo);
     let tripId = null;
 
@@ -100,6 +146,15 @@ router.put('/:id', async (req, res) => {
     // get the update data
     const updateData = { ...(req.body || {}) };
     delete updateData._id;
+
+    // If trip.date is updated, check if it should be unarchived
+    if (updateData.trip?.date) {
+      const today = getTodayDateString();
+      if (updateData.trip.date >= today) {
+        updateData.archived = false;
+        updateData.archivedAt = null;
+      }
+    }
 
     const db = getDB();
     const postsCollection = db.collection('posts');

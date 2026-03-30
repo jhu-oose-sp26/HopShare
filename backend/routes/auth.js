@@ -37,18 +37,29 @@ router.post('/google', async (req, res) => {
     const users = getDB().collection('users');
     const now = new Date();
 
+    // Check if user already exists and has a custom avatar
+    const existingUser = await users.findOne({ googleId: payload.sub });
+    const hasCustomAvatar = existingUser?.avatar && existingUser.avatar.trim().length > 0;
+
+    // Prepare update data - only update picture if no custom avatar exists
+    const updateData = {
+      name: payload.name || '',
+      email: payload.email,
+      emailVerified: Boolean(payload.email_verified),
+      provider: 'google',
+      lastLoginAt: now,
+      updatedAt: now,
+    };
+
+    // Only update picture from Google if user doesn't have a custom avatar
+    if (!hasCustomAvatar) {
+      updateData.picture = payload.picture || '';
+    }
+
     await users.updateOne(
       { googleId: payload.sub },
       {
-        $set: {
-          name: payload.name || '',
-          email: payload.email,
-          picture: payload.picture || '',
-          emailVerified: Boolean(payload.email_verified),
-          provider: 'google',
-          lastLoginAt: now,
-          updatedAt: now,
-        },
+        $set: updateData,
         $setOnInsert: {
           googleId: payload.sub,
           createdAt: now,
@@ -71,6 +82,7 @@ router.post('/google', async (req, res) => {
           name: 1,
           email: 1,
           picture: 1,
+          avatar: 1,
           phone: 1,
           createdAt: 1,
           lastLoginAt: 1,
