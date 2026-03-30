@@ -13,7 +13,7 @@ import {
 } from '@/components/ui/dialog';
 import SubmitBox from './SubmitBox';
 
-const PostCard = ({ post, onDelete, onUpdate, coords }) => {
+const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false }) => {
     const { _id, title, description, user, trip, type = 'request', createdAt } = post;
     const isOffer = type === 'offer';
 
@@ -62,53 +62,57 @@ const PostCard = ({ post, onDelete, onUpdate, coords }) => {
     };
 
     return (
-        <div className='relative rounded-xl border border-gray-200 bg-white px-6 pt-10 pb-6 shadow-sm hover:shadow-md transition-shadow'>
-            {/* Edit button — top left */}
-            <Dialog open={editOpen} onOpenChange={setEditOpen}>
-                <DialogTrigger asChild>
-                    <button className='absolute top-3 left-3 p-1.5 rounded-md text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors'>
-                        <Pencil className='w-4 h-4' />
-                    </button>
-                </DialogTrigger>
-                <DialogContent className="w-[90%] max-w-[800px] sm:max-w-[800px] max-h-[80vh] overflow-y-auto">
-                    <DialogHeader>
-                        <DialogTitle>Edit Ride</DialogTitle>
-                    </DialogHeader>
-                    <SubmitBox
-                        onSubmit={handleEditSubmit}
-                        coords={coords}
-                        initialData={initialData}
-                    />
-                </DialogContent>
-            </Dialog>
+        <div className={`relative rounded-xl border border-gray-200 bg-white px-6 pb-6 shadow-sm hover:shadow-md transition-shadow ${showActions ? 'pt-10' : 'pt-6'}`}>
+            {showActions && (
+                <>
+                    {/* Edit button — top left */}
+                    <Dialog open={editOpen} onOpenChange={setEditOpen}>
+                        <DialogTrigger asChild>
+                            <button className='absolute top-3 left-3 p-1.5 rounded-md text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors'>
+                                <Pencil className='w-4 h-4' />
+                            </button>
+                        </DialogTrigger>
+                        <DialogContent className="w-[90%] max-w-[800px] sm:max-w-[800px] max-h-[80vh] overflow-y-auto">
+                            <DialogHeader>
+                                <DialogTitle>Edit Ride</DialogTitle>
+                            </DialogHeader>
+                            <SubmitBox
+                                onSubmit={handleEditSubmit}
+                                coords={coords}
+                                initialData={initialData}
+                            />
+                        </DialogContent>
+                    </Dialog>
 
-            {/* Delete button — top right */}
-            <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
-                <DialogTrigger asChild>
-                    <button className='absolute top-3 right-3 p-1.5 rounded-md text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors'>
-                        <Trash2 className='w-4 h-4' />
-                    </button>
-                </DialogTrigger>
-                <DialogContent className="sm:max-w-[425px]">
-                    <DialogHeader>
-                        <DialogTitle>Delete Ride</DialogTitle>
-                        <DialogDescription>
-                            Are you sure you want to delete this ride? This action cannot be undone.
-                        </DialogDescription>
-                    </DialogHeader>
-                    {deleteError && (
-                        <p className='text-sm text-red-600'>{deleteError}</p>
-                    )}
-                    <DialogFooter>
-                        <Button variant='outline' onClick={() => setDeleteOpen(false)} disabled={isDeleting}>
-                            Cancel
-                        </Button>
-                        <Button variant='destructive' onClick={handleDelete} disabled={isDeleting}>
-                            {isDeleting ? 'Deleting...' : 'Delete'}
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
+                    {/* Delete button — top right */}
+                    <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+                        <DialogTrigger asChild>
+                            <button className='absolute top-3 right-3 p-1.5 rounded-md text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors'>
+                                <Trash2 className='w-4 h-4' />
+                            </button>
+                        </DialogTrigger>
+                        <DialogContent className="sm:max-w-[425px]">
+                            <DialogHeader>
+                                <DialogTitle>Delete Ride</DialogTitle>
+                                <DialogDescription>
+                                    Are you sure you want to delete this ride? This action cannot be undone.
+                                </DialogDescription>
+                            </DialogHeader>
+                            {deleteError && (
+                                <p className='text-sm text-red-600'>{deleteError}</p>
+                            )}
+                            <DialogFooter>
+                                <Button variant='outline' onClick={() => setDeleteOpen(false)} disabled={isDeleting}>
+                                    Cancel
+                                </Button>
+                                <Button variant='destructive' onClick={handleDelete} disabled={isDeleting}>
+                                    {isDeleting ? 'Deleting...' : 'Delete'}
+                                </Button>
+                            </DialogFooter>
+                        </DialogContent>
+                    </Dialog>
+                </>
+            )}
 
             {/* Header: badge + title + ID */}
             <div className='flex items-start justify-between mb-3'>
