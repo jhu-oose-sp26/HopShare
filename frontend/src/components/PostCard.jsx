@@ -249,12 +249,18 @@ const PostCard = ({ post, onDelete, onUpdate, coords, routeSearch, distanceFilte
                 <span className='text-xs text-gray-400 shrink-0 ml-2'>#{_id?.slice(-6)}</span>
             </div>
             <p className='text-sm text-gray-500 mb-4 wrap-break-word'>
-                <button
-                    onClick={() => navigate(`/user/${user._id || user.id}`)}
-                    className='text-blue-600 hover:text-blue-800 hover:underline font-medium break-all'
-                >
-                    {user.name}
-                </button>
+                {user.googleId ? (
+                    <button
+                        onClick={() => navigate(`/user/${user.googleId}`)}
+                        className='text-blue-600 hover:text-blue-800 hover:underline font-medium break-all'
+                    >
+                        {user.name}
+                    </button>
+                ) : (
+                    <span className='text-gray-700 font-medium break-all cursor-not-allowed'>
+                        {user.name}
+                    </span>
+                )}
                 {' · '}
                 <span className='break-all'>{user.email}</span>
             </p>
@@ -453,12 +459,18 @@ const PostCard = ({ post, onDelete, onUpdate, coords, routeSearch, distanceFilte
                                         }}
                                     />
                                     <div className="flex-1 min-w-0">
-                                        <button
-                                            onClick={() => navigate(`/user/${user._id || user.id}`)}
-                                            className='text-blue-600 hover:text-blue-800 hover:underline font-medium text-sm break-all'
-                                        >
-                                            {user?.name || '—'}
-                                        </button>
+                                        {user.googleId ? (
+                                            <button
+                                                onClick={() => navigate(`/user/${user.googleId}`)}
+                                                className='text-blue-600 hover:text-blue-800 hover:underline font-medium text-sm break-all'
+                                            >
+                                                {user?.name || '—'}
+                                            </button>
+                                        ) : (
+                                            <span className='text-gray-700 font-medium text-sm break-all cursor-not-allowed'>
+                                                {user?.name || '—'}
+                                            </span>
+                                        )}
                                         <div className='text-xs text-gray-500 break-all'>{user?.email || '—'}</div>
                                     </div>
                                 </div>
