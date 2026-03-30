@@ -31,7 +31,6 @@ function NotificationMenu({ currentUser }) {
         );
         const data = await res.json();
         setNotifications(data);
-        console.log(data)
       } catch (err) {
         console.error("Failed to fetch notifications", err);
       }
