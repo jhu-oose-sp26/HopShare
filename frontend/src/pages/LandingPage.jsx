@@ -264,17 +264,6 @@ export default function LandingPage({ onLogin }) {
                   </div>
                 </div>
               </div>
-
-              <div className="flex flex-col items-center lg:items-start gap-3">
-                <div ref={heroButtonRef} />
-                {isLoading && (
-                  <p className="text-sm text-slate-400">Loading sign-in...</p>
-                )}
-                {error && (
-                  <p className="text-sm text-red-600">{error}</p>
-                )}
-              </div>
-
             </motion.div>
 
             {/* Right Content: Floating Card */}
