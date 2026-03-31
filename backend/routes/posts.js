@@ -42,6 +42,36 @@ async function archivePastRides() {
   return result.modifiedCount;
 }
 
+// Enrich posts with Google IDs for user navigation
+async function enrichPostsWithGoogleIds(posts) {
+  if (!posts || posts.length === 0) return posts;
+
+  const usersCollection = getDB().collection('users');
+  
+  for (const post of posts) {
+    // Check if the post has a user object but missing googleId
+    if (post.user && post.user.email && !post.user.googleId) {
+      try {
+        // Look up the user by email to get their googleId
+        const userDoc = await usersCollection.findOne(
+          { email: post.user.email },
+          { projection: { googleId: 1 } }
+        );
+        
+        // Add googleId to the embedded user data if found
+        if (userDoc && userDoc.googleId) {
+          post.user.googleId = userDoc.googleId;
+        }
+      } catch (error) {
+        console.error('Error enriching post with googleId:', error);
+        // Continue processing other posts even if one fails
+      }
+    }
+  }
+  
+  return posts;
+}
+
 
 // READ ALL POSTS (non-archived only)
 router.get('/', async (req, res) => {
@@ -50,13 +80,21 @@ router.get('/', async (req, res) => {
 
   // Return only non-archived posts
   const posts = await getDB().collection('posts').find({ archived: { $ne: true } }).toArray();
-  res.json(posts);
+  
+  // Enrich posts with Google IDs for user navigation
+  const enrichedPosts = await enrichPostsWithGoogleIds(posts);
+  
+  res.json(enrichedPosts);
 });
 
 // READ ARCHIVED POSTS (for future profile feature)
 router.get('/archived', async (req, res) => {
   const posts = await getDB().collection('posts').find({ archived: true }).toArray();
-  res.json(posts);
+  
+  // Enrich posts with Google IDs for user navigation
+  const enrichedPosts = await enrichPostsWithGoogleIds(posts);
+  
+  res.json(enrichedPosts);
 });
 
 // GET ONE POST
@@ -71,7 +109,11 @@ router.get('/:id', async (req, res) => {
   if (!post) {
     return res.status(404).json({ error: 'Post not found' });
   }
-  res.json(post);
+  
+  // Enrich single post with Google ID for user navigation
+  const enrichedPosts = await enrichPostsWithGoogleIds([post]);
+  
+  res.json(enrichedPosts[0]);
 });
 
 // CREATE
