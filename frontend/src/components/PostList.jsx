@@ -23,6 +23,7 @@ const PostList = ({
     subheading = '',
     emptyTitle = 'No rides available yet.',
     emptyDescription = 'Try to create a ride with the above button!',
+    showActions = false,
     currentUser
 }) => {
     const [typeFilter, setTypeFilter] = useState("all");
@@ -190,6 +191,7 @@ const PostList = ({
                             onDelete={() => onDeletePost?.(post._id)}
                             onUpdate={(formData) => onUpdatePost?.(post._id, formData)}
                             coords={coords}
+                            showActions={showActions}
                             currentUser={currentUser}
                             routeSearch={routeSearch}
                             distanceFilter={distanceFilter}
