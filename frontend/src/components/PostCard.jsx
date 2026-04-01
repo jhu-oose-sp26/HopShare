@@ -253,7 +253,7 @@ const PostCard = ({ post, onDelete, onUpdate, coords, routeSearch, distanceFilte
                     onClick={() => navigate(`/user/${user._id || user.id}`)}
                     className='text-blue-600 hover:text-blue-800 hover:underline font-medium break-all'
                 >
-                    {user.name.length > 40 ? `${user.name.slice(0, 40)}...` : user.name}
+                    {user.name}
                 </button>
                 {' · '}
                 <span className='break-all'>
@@ -455,12 +455,18 @@ const PostCard = ({ post, onDelete, onUpdate, coords, routeSearch, distanceFilte
                                         }}
                                     />
                                     <div className="flex-1 min-w-0">
-                                        <button
-                                            onClick={() => navigate(`/user/${user._id || user.id}`)}
-                                            className='text-blue-600 hover:text-blue-800 hover:underline font-medium text-sm break-all'
-                                        >
-                                            {user?.name || '—'}
-                                        </button>
+                                        {user.googleId ? (
+                                            <button
+                                                onClick={() => navigate(`/user/${user.googleId}`)}
+                                                className='text-blue-600 hover:text-blue-800 hover:underline font-medium text-sm break-all'
+                                            >
+                                                {user?.name || '—'}
+                                            </button>
+                                        ) : (
+                                            <span className='text-gray-700 font-medium text-sm break-all cursor-not-allowed'>
+                                                {user?.name || '—'}
+                                            </span>
+                                        )}
                                         <div className='text-xs text-gray-500 break-all'>{user?.email || '—'}</div>
                                     </div>
                                 </div>

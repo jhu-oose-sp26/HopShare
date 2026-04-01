@@ -245,7 +245,6 @@ export default function LandingPage({ onLogin }) {
                   </div>
                 </div>
               </div>
-
             </motion.div>
 
             {/* Right Content: Floating Card */}
