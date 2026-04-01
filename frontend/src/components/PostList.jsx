@@ -18,11 +18,13 @@ const PostList = ({
     onDeletePost,
     onUpdatePost,
     coords,
+    routeSearch,
     heading = 'Available Rides',
     subheading = '',
     emptyTitle = 'No rides available yet.',
     emptyDescription = 'Try to create a ride with the above button!',
     showActions = false,
+    currentUser
 }) => {
     const [typeFilter, setTypeFilter] = useState("all");
     const [distanceFilter, setDistanceFilter] = useState(Infinity);
@@ -42,16 +44,39 @@ const PostList = ({
             return false;
         }
 
-        if (distanceFilter !== "all" && coords && post.trip?.startLocation?.gps_coordinates) {
-            const distance = getDistanceFromLatLonInKm(
-                coords.lat,
-                coords.lng,
-                post.trip.startLocation.gps_coordinates.latitude,
-                post.trip.startLocation.gps_coordinates.longitude
-            );
+        if (distanceFilter !== Infinity) {
+            // If route search is active, use route-based walking distances
+            if (routeSearch?.start && routeSearch?.end && post.trip?.startLocation?.gps_coordinates && post.trip?.endLocation?.gps_coordinates) {
+                const startWalkDistance = getDistanceFromLatLonInKm(
+                    routeSearch.start.latitude,
+                    routeSearch.start.longitude,
+                    post.trip.startLocation.gps_coordinates.latitude,
+                    post.trip.startLocation.gps_coordinates.longitude
+                );
+                const endWalkDistance = getDistanceFromLatLonInKm(
+                    routeSearch.end.latitude,
+                    routeSearch.end.longitude,
+                    post.trip.endLocation.gps_coordinates.latitude,
+                    post.trip.endLocation.gps_coordinates.longitude
+                );
+                
+                // Filter out if either walking distance exceeds the selected filter
+                if (startWalkDistance > distanceFilter || endWalkDistance > distanceFilter) {
+                    return false;
+                }
+            }
+            // Fallback to current location filtering if no route search
+            else if (coords && post.trip?.startLocation?.gps_coordinates) {
+                const distance = getDistanceFromLatLonInKm(
+                    coords.lat,
+                    coords.lng,
+                    post.trip.startLocation.gps_coordinates.latitude,
+                    post.trip.startLocation.gps_coordinates.longitude
+                );
 
-            if (distance > distanceFilter) {
-                return false;
+                if (distance > distanceFilter) {
+                    return false;
+                }
             }
         }
 
@@ -167,6 +192,9 @@ const PostList = ({
                             onUpdate={(formData) => onUpdatePost?.(post._id, formData)}
                             coords={coords}
                             showActions={showActions}
+                            currentUser={currentUser}
+                            routeSearch={routeSearch}
+                            distanceFilter={distanceFilter}
                         />
                     ))}
                 </div>

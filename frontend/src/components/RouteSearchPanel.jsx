@@ -11,6 +11,7 @@ function RouteSearchPanel({
     hasSearched,
     matchCount,
     searchRadiusKm,
+    posts = [],
     onClearSearch,
     onRequestRide,
     onSearch,
@@ -97,6 +98,36 @@ function RouteSearchPanel({
         setFormError('');
         onClearSearch?.();
     };
+
+    // Prepare user route data for map
+    const getUserRoute = () => {
+        if (!startLatitude || !startLongitude || !endLatitude || !endLongitude) {
+            return null;
+        }
+
+        const start = {
+            lat: Number(startLatitude),
+            lng: Number(startLongitude),
+            title: startTitle
+        };
+
+        const end = {
+            lat: Number(endLatitude),
+            lng: Number(endLongitude),
+            title: endTitle
+        };
+
+        // Calculate center point for map
+        const center = {
+            lat: (start.lat + end.lat) / 2,
+            lng: (start.lng + end.lng) / 2
+        };
+
+        return { start, end, center };
+    };
+
+    const userRoute = getUserRoute();
+    const canShowMap = userRoute !== null;
 
     return (
         <section className='rounded-2xl border border-slate-200 bg-white p-6 shadow-sm'>
