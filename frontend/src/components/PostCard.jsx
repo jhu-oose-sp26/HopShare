@@ -254,7 +254,7 @@ const PostCard = ({ post, onDelete, onUpdate, coords, routeSearch, distanceFilte
                         onClick={() => navigate(`/user/${user.googleId}`)}
                         className='text-blue-600 hover:text-blue-800 hover:underline font-medium break-all'
                     >
-                        {user.name}
+                        {user.name.length > 40 ? `${user.name.slice(0, 40)}...` : user.name}
                     </button>
                 ) : (
                     <span className='text-gray-700 font-medium break-all cursor-not-allowed'>
@@ -262,7 +262,9 @@ const PostCard = ({ post, onDelete, onUpdate, coords, routeSearch, distanceFilte
                     </span>
                 )}
                 {' · '}
-                <span className='break-all'>{user.email}</span>
+                <span className='break-all'>
+                    {user.email.length > 40 ? `${user.email.slice(0, 40)}...` : user.email}
+                </span>
             </p>
 
             {/* Post content */}
