@@ -249,20 +249,16 @@ const PostCard = ({ post, onDelete, onUpdate, coords, routeSearch, distanceFilte
                 <span className='text-xs text-gray-400 shrink-0 ml-2'>#{_id?.slice(-6)}</span>
             </div>
             <p className='text-sm text-gray-500 mb-4 wrap-break-word'>
-                {user.googleId ? (
-                    <button
-                        onClick={() => navigate(`/user/${user.googleId}`)}
-                        className='text-blue-600 hover:text-blue-800 hover:underline font-medium break-all'
-                    >
-                        {user.name}
-                    </button>
-                ) : (
-                    <span className='text-gray-700 font-medium break-all cursor-not-allowed'>
-                        {user.name}
-                    </span>
-                )}
+                <button
+                    onClick={() => navigate(`/user/${user._id || user.id}`)}
+                    className='text-blue-600 hover:text-blue-800 hover:underline font-medium break-all'
+                >
+                    {user.name}
+                </button>
                 {' · '}
-                <span className='break-all'>{user.email}</span>
+                <span className='break-all'>
+                    {user.email.length > 40 ? `${user.email.slice(0, 40)}...` : user.email}
+                </span>
             </p>
 
             {/* Post content */}
