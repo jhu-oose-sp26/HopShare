@@ -67,7 +67,7 @@ function App() {
           }
         />
         <Route
-          path='/user/:userId'
+          path='/user/:googleId'
           element={
             currentUser ? (
               <UserProfile currentUser={currentUser} />

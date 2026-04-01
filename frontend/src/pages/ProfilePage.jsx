@@ -370,6 +370,17 @@ function ProfilePage({ currentUser, onUserUpdate }) {
 
                 <div className="space-y-2">
                   <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
+                    <User className="w-4 h-4" />
+                    Google ID
+                  </label>
+                  <p className="text-gray-500 text-sm font-mono break-all">
+                    {currentUser?.googleId || '—'}
+                    <span className="ml-2 text-xs">(for user navigation)</span>
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
                     <Phone className="w-4 h-4" />
                     Phone Number
                   </label>
