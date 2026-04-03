@@ -22,6 +22,7 @@ function HomePage({ currentUser, onLogout }) {
   const [routeSearch, setRouteSearch] = useState(null);
   const [hasSearched, setHasSearched] = useState(false);
   const [submitInitialData, setSubmitInitialData] = useState(null);
+  const [activeView, setActiveView] = useState('available');
 
   // Get user's location on load to bias autocomplete results.
   useEffect(() => {
@@ -72,6 +73,11 @@ function HomePage({ currentUser, onLogout }) {
     setIsOpen(true);
   };
 
+  const myPosts = useMemo(
+    () => visiblePosts.filter((p) => p.user?.email === currentUser?.email),
+    [visiblePosts, currentUser]
+  );
+
   const isShowingSearchResults = routeSearch !== null;
   const dialogTitle =
     submitInitialData?.startTitle && submitInitialData?.endTitle
@@ -114,13 +120,37 @@ function HomePage({ currentUser, onLogout }) {
             <RouteSearchPanel
               coords={coords}
               hasSearched={hasSearched}
-              matchCount={visiblePosts.length}
+              matchCount={activeView === 'my-rides' ? myPosts.length : visiblePosts.length}
               searchRadiusKm={routeSearch?.radiusKm ?? ''}
               posts={visiblePosts}
               onClearSearch={clearRouteSearch}
               onRequestRide={requestRide}
               onSearch={routeFizzySearch}
             />
+
+            {/* View tabs */}
+            <div className='flex gap-1 border-b border-gray-200 -mb-6'>
+              <button
+                onClick={() => setActiveView('available')}
+                className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px ${
+                  activeView === 'available'
+                    ? 'border-black text-gray-900'
+                    : 'border-transparent text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                Available Rides
+              </button>
+              <button
+                onClick={() => setActiveView('my-rides')}
+                className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px ${
+                  activeView === 'my-rides'
+                    ? 'border-black text-gray-900'
+                    : 'border-transparent text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                My Rides
+              </button>
+            </div>
 
             <Dialog open={isOpen} onOpenChange={handleDialogOpenChange}>
               <DialogContent className='w-[90%] max-w-[800px] sm:max-w-[800px] max-h-[80vh] overflow-y-auto'>
@@ -143,27 +173,41 @@ function HomePage({ currentUser, onLogout }) {
         </div>
       </div>
 
-      <PostList
-        posts={visiblePosts}
-        isLoading={isLoading}
-        error={error}
-        routeSearch={routeSearch}
-        onDeletePost={removePost}
-        onUpdatePost={updatePost}
-        coords={coords}
-        currentUser={currentUser}
-        heading={isShowingSearchResults ? 'Matching Routes' : 'Available Rides'}
-        subheading={
-          isShowingSearchResults
-            ? `${visiblePosts.length} route${visiblePosts.length === 1 ? '' : 's'} within ${routeSearch.radiusKm} km of the selected route center`
-            : ''
-        }
-        emptyTitle={
-          isShowingSearchResults
-            ? `No routes found within ${routeSearch.radiusKm} km.`
-            : 'No rides available yet.'
-        }
-      />
+      {activeView === 'available' ? (
+        <PostList
+          posts={visiblePosts}
+          isLoading={isLoading}
+          error={error}
+          routeSearch={routeSearch}
+          coords={coords}
+          currentUser={currentUser}
+          heading={isShowingSearchResults ? 'Matching Routes' : 'Available Rides'}
+          subheading={
+            isShowingSearchResults
+              ? `${visiblePosts.length} route${visiblePosts.length === 1 ? '' : 's'} within ${routeSearch.radiusKm} km of the selected route center`
+              : ''
+          }
+          emptyTitle={
+            isShowingSearchResults
+              ? `No routes found within ${routeSearch.radiusKm} km.`
+              : 'No rides available yet.'
+          }
+        />
+      ) : (
+        <PostList
+          posts={myPosts}
+          isLoading={isLoading}
+          error={error}
+          onDeletePost={removePost}
+          onUpdatePost={updatePost}
+          coords={coords}
+          currentUser={currentUser}
+          showActions
+          heading='My Rides'
+          emptyTitle='You have no rides yet.'
+          emptyDescription='Use the "Create a Request" button above to post your first ride!'
+        />
+      )}
     </div>
   );
 }
