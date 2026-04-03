@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import PostCard from './PostCard';
 
 
@@ -16,8 +16,20 @@ const PostList = ({
     emptyDescription = 'Try to create a ride with the above button!',
     currentUser
 }) => {
+    const [dateOrder, setDateOrder] = useState('asc');
+    const [timeOrder, setTimeOrder] = useState('asc');
     const locationEnabled = coords !== null;
-    const filteredPosts = posts;
+
+    const filteredPosts = [...posts].sort((a, b) => {
+        const dateA = a.trip?.date || '';
+        const dateB = b.trip?.date || '';
+        if (dateA !== dateB) {
+            return dateOrder === 'asc' ? dateA.localeCompare(dateB) : dateB.localeCompare(dateA);
+        }
+        const timeA = a.trip?.time || '00:00';
+        const timeB = b.trip?.time || '00:00';
+        return timeOrder === 'asc' ? timeA.localeCompare(timeB) : timeB.localeCompare(timeA);
+    });
 
     return (
         <div className='container mx-auto px-6 py-8 max-w-6xl'>
@@ -32,6 +44,20 @@ const PostList = ({
                     <h2 className='text-xl font-semibold text-gray-900'>
                         {heading}
                     </h2>
+                    <div className="flex items-center gap-2 text-sm">
+                        <button
+                            onClick={() => setDateOrder(o => o === 'asc' ? 'desc' : 'asc')}
+                            className="px-2 py-1 rounded border border-gray-300 text-gray-600 hover:text-gray-800 hover:border-gray-500"
+                        >
+                            Date {dateOrder === 'asc' ? '↑' : '↓'}
+                        </button>
+                        <button
+                            onClick={() => setTimeOrder(o => o === 'asc' ? 'desc' : 'asc')}
+                            className="px-2 py-1 rounded border border-gray-300 text-gray-600 hover:text-gray-800 hover:border-gray-500"
+                        >
+                            Time {timeOrder === 'asc' ? '↑' : '↓'}
+                        </button>
+                    </div>
                 </div>
 
                 <p className="text-gray-600">
