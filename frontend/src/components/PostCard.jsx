@@ -36,7 +36,9 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
     const { _id, title, description, user, trip, type = 'request', createdAt } = post;
     const navigate = useNavigate();
     const isOffer = type === 'offer';
-
+    const truncatedDescription = description 
+    ? (description.length > 50 ? `${description.slice(0, 50)}...` : description)
+    : '';
     const [editOpen, setEditOpen] = useState(false);
     const [detailsOpen, setDetailsOpen] = useState(false);
     const [deleteOpen, setDeleteOpen] = useState(false);
@@ -243,40 +245,42 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
             )}
 
             {/* Header: badge + title + ID */}
-            <div className='flex items-start justify-between mb-3'>
-                <div className='flex items-center gap-2 flex-wrap'>
-                    <span className={`text-xs font-medium px-2.5 py-0.5 rounded-full ${isOffer ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}`}>
+            <div className='flex items-start justify-between mb-3 min-w-0'>
+                <div className='flex items-center gap-2 flex-wrap min-w-0 flex-1'>
+                    <span className={`text-xs font-medium px-2.5 py-0.5 rounded-full shrink-0 ${isOffer ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}`}>
                         {isOffer ? 'Offering' : 'Requesting'}
                     </span>
-                    <h3 className='font-semibold text-gray-900 break-words'>{title}</h3>
+                    <h3 className='font-semibold text-gray-900 truncate max-w-[200px]'>
+                        {(title || '').length > 30 ? `${(title || '').slice(0, 30)}...` : (title || 'Untitled')}
+                    </h3>
                 </div>
                 <span className='text-xs text-gray-400 shrink-0 ml-2'>#{_id?.slice(-6)}</span>
             </div>
-            <p className='text-sm text-gray-500 mb-4 wrap-break-word'>
+            <p className='text-sm text-gray-500 mb-4'>
                 {user.googleId ? (
                     <button
                         onClick={() => navigate(`/user/${user.googleId}`)}
-                        className='text-blue-600 hover:text-blue-800 hover:underline font-medium break-all'
+                        className='text-blue-600 hover:text-blue-800 hover:underline font-medium'
                     >
-                        {user.name.length > 40 ? `${user.name.slice(0, 40)}...` : user.name}
+                        {(user.name || '').length > 25 ? `${user.name.slice(0, 25)}...` : user.name}
                     </button>
                 ) : (
-                    <span className='text-gray-700 font-medium break-all cursor-not-allowed'>
-                        {user.name}
+                    <span className='text-gray-700 font-medium'>
+                        {(user.name || '').length > 25 ? `${user.name.slice(0, 25)}...` : user.name}
                     </span>
                 )}
                 {' · '}
-                <span className='break-all'>
-                    {user.email.length > 40 ? `${user.email.slice(0, 40)}...` : user.email}
+                <span>
+                    {(user.email || '').length > 25 ? `${user.email.slice(0, 25)}...` : user.email}
                 </span>
             </p>
 
             {/* Post content */}
-            <p className='text-gray-700 mb-4 break-words'>
-                {description.length > 100
-                ? `${description.slice(0, 100)}...`
-                : description}
-            </p>
+            {truncatedDescription && (
+                <p className='text-gray-700 mb-4 break-all'>
+                    {truncatedDescription}
+                </p>
+            )}
 
             {/* Trip details (if exists) */}
             {trip && (
