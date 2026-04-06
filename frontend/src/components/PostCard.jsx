@@ -494,7 +494,7 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
                             {description && (
                                 <div className='bg-gray-50 rounded-lg p-3 space-y-2'>
                                     <p className='text-xs font-semibold uppercase tracking-wide text-gray-400'>Description</p>
-                                    <p className='text-gray-700 break-words whitespace-pre-wrap'>{description}</p>
+                                    <p className='text-gray-700 break-all whitespace-pre-wrap'>{description}</p>
                                 </div>
                             )}
 
