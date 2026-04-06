@@ -65,6 +65,21 @@ function NotificationMenu({ currentUser }) {
   }
 };
 
+  const respondToRideRequest = async (notif, response) => {
+    try {
+      await fetch(`${API_ROOT}/notifications/${notif._id}/respond`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ response, responderName: currentUser.name }),
+      });
+      setNotifications((prev) =>
+        prev.map((n) => n._id === notif._id ? { ...n, response } : n)
+      );
+    } catch (err) {
+      console.error("Failed to respond to ride request", err);
+    }
+  };
+
   // mark all as read when sheet opens
   useEffect(() => {
     if (!open) return;
@@ -125,11 +140,23 @@ function NotificationMenu({ currentUser }) {
             notifications.map((notif) => (
               <div
                 key={notif._id}
-                className="p-3 rounded-lg border bg-gray-50"
+                className={`p-3 rounded-lg border ${notif.type === 'ride_request' ? 'bg-blue-50 border-blue-200' : 'bg-gray-50'}`}
               >
-                <p className="text-sm font-medium">
-                  {notif.senderName || "Someone"}
-                </p>
+                <div className="flex items-center gap-2 mb-1">
+                  <p className="text-sm font-medium">
+                    {notif.senderName || "Someone"}
+                  </p>
+                  {notif.type === 'ride_request' && (
+                    <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">
+                      Ride Request
+                    </span>
+                  )}
+                  {notif.type === 'ride_request_response' && (
+                    <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${notif.message?.includes('accepted') ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                      {notif.message?.includes('accepted') ? 'Accepted' : 'Declined'}
+                    </span>
+                  )}
+                </div>
                 {notif.replyToMessage && (
                   <p className="text-xs text-gray-400 mt-1 italic">
                     Replying to: "{notif.replyToMessage}"
@@ -142,28 +169,58 @@ function NotificationMenu({ currentUser }) {
                   {new Date(notif.createdAt).toLocaleString()}
                 </p>
 
-                <button
-                onClick={() => handleReply(notif)}
-                className="mt-2 text-xs text-blue-600 hover:underline">
-                  Reply
-                </button>
-
-                {replyingTo?._id === notif._id && (
-                  <div className="mt-2 space-y-2">
-                    <textarea
-                      value={replyMessage}
-                      onChange={(e) => setReplyMessage(e.target.value)}
-                      className="w-full border rounded-md p-2 text-sm"
-                      placeholder="Write a reply..."
-                    />
-
+                {/* Accept/Decline buttons for unresponded ride requests */}
+                {notif.type === 'ride_request' && !notif.response && (
+                  <div className="mt-2 flex gap-2">
                     <button
-                      onClick={() => sendReply(notif)}
-                      className="text-sm bg-blue-600 text-white px-3 py-1 rounded-md"
+                      onClick={() => respondToRideRequest(notif, 'accepted')}
+                      className="text-sm bg-green-600 text-white px-3 py-1 rounded-md hover:bg-green-700"
                     >
-                      Send
+                      Accept
+                    </button>
+                    <button
+                      onClick={() => respondToRideRequest(notif, 'declined')}
+                      className="text-sm bg-red-500 text-white px-3 py-1 rounded-md hover:bg-red-600"
+                    >
+                      Decline
                     </button>
                   </div>
+                )}
+
+                {/* Show response status for already-responded requests */}
+                {notif.type === 'ride_request' && notif.response && (
+                  <p className={`mt-2 text-xs font-medium ${notif.response === 'accepted' ? 'text-green-600' : 'text-red-500'}`}>
+                    You {notif.response} this request.
+                  </p>
+                )}
+
+                {/* Reply button — only for regular messages and ride_request_response */}
+                {notif.type !== 'ride_request' && (
+                  <>
+                    <button
+                    onClick={() => handleReply(notif)}
+                    className="mt-2 text-xs text-blue-600 hover:underline">
+                      Reply
+                    </button>
+
+                    {replyingTo?._id === notif._id && (
+                      <div className="mt-2 space-y-2">
+                        <textarea
+                          value={replyMessage}
+                          onChange={(e) => setReplyMessage(e.target.value)}
+                          className="w-full border rounded-md p-2 text-sm"
+                          placeholder="Write a reply..."
+                        />
+
+                        <button
+                          onClick={() => sendReply(notif)}
+                          className="text-sm bg-blue-600 text-white px-3 py-1 rounded-md"
+                        >
+                          Send
+                        </button>
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
             ))

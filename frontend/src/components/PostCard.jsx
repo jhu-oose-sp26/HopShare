@@ -14,7 +14,7 @@ function formatTime(time) {
     const hour12 = hour % 12 || 12;
     return `${hour12}:${minute} ${period}`;
 }
-import { MapPin, Calendar, Clock, MessageCircle, Pencil, Trash2, Info, User, Mail, Phone, Navigation, ExternalLink } from 'lucide-react';
+import { MapPin, Calendar, Clock, MessageCircle, Pencil, Trash2, Info, User, Mail, Phone, Navigation, ExternalLink, UserPlus, Car } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
@@ -49,6 +49,9 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
     const [isDeleting, setIsDeleting] = useState(false);
     const [deleteError, setDeleteError] = useState('');
     const [activeMapTab, setActiveMapTab] = useState("route"); // "route" or "distance"
+    const [joinRequested, setJoinRequested] = useState(false);
+
+    const isOwner = currentUser && post.user?.email && currentUser.email === post.user.email;
 
     // Function to handle weather forecast dialog opening
     const openWeatherForecast = (location) => {
@@ -246,15 +249,14 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
 
             {/* Header: badge + title + ID */}
             <div className='flex items-start justify-between mb-3 min-w-0'>
-                <div className='flex items-center gap-2 flex-wrap min-w-0 flex-1'>
+                <div className='flex flex-col items-start gap-2 min-w-0 flex-1'>
                     <span className={`text-xs font-medium px-2.5 py-0.5 rounded-full shrink-0 ${isOffer ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}`}>
                         {isOffer ? 'Offering' : 'Requesting'}
                     </span>
-                    <h3 className='font-semibold text-gray-900 truncate max-w-[200px]'>
-                        {(title || '').length > 30 ? `${(title || '').slice(0, 30)}...` : (title || 'Untitled')}
+                    <h3 className='font-semibold text-gray-900 truncate w-full'>
+                        {title || 'Untitled'}
                     </h3>
                 </div>
-                <span className='text-xs text-gray-400 shrink-0 ml-2'>#{_id?.slice(-6)}</span>
             </div>
             <p className='text-sm text-gray-500 mb-4'>
                 {user.googleId ? (
@@ -426,6 +428,42 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
                         </DialogFooter>
                     </DialogContent>
                 </Dialog>
+
+                {/* Join / Pickup Button — only for non-owners */}
+                {currentUser && !isOwner && (
+                    <Button
+                        variant={joinRequested ? 'outline' : 'default'}
+                        size='sm'
+                        className={`flex-1 ${joinRequested ? 'text-gray-400' : isOffer ? 'bg-green-600 hover:bg-green-700' : 'bg-blue-600 hover:bg-blue-700'}`}
+                        disabled={joinRequested}
+                        onClick={async () => {
+                            const msg = isOffer
+                                ? `${currentUser.name} wants to join your ride from ${post.trip?.startLocation?.title || 'start'} to ${post.trip?.endLocation?.title || 'destination'}.`
+                                : `${currentUser.name} can take you from ${post.trip?.startLocation?.title || 'start'} to ${post.trip?.endLocation?.title || 'destination'}.`;
+                            await fetch(NOTIFICATIONS_ENDPOINT, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    recipientEmail: post.user.email,
+                                    senderName: currentUser.name,
+                                    senderId: currentUser._id,
+                                    message: msg,
+                                    postId: post._id,
+                                    type: 'ride_request',
+                                }),
+                            });
+                            setJoinRequested(true);
+                        }}
+                    >
+                        {joinRequested ? (
+                            'Request Sent'
+                        ) : isOffer ? (
+                            <><UserPlus className='w-4 h-4 mr-1' />Join</>
+                        ) : (
+                            <><Car className='w-4 h-4 mr-1' />Take</>
+                        )}
+                    </Button>
+                )}
 
                 {/* Details Dialog */}
                 <Dialog open={detailsOpen} onOpenChange={setDetailsOpen}>

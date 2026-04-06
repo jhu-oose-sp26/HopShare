@@ -7,7 +7,7 @@ const router = express.Router();
 // CREATE notification (send message)
 router.post('/', async (req, res) => {
   try {
-    const { recipientId, recipientEmail, senderName, senderId, message, postId, replyToMessage } = req.body;
+    const { recipientId, recipientEmail, senderName, senderId, message, postId, replyToMessage, type } = req.body;
 
     // Validate required fields
     if (!message) {
@@ -42,6 +42,8 @@ router.post('/', async (req, res) => {
       message,
       postId: postId && ObjectId.isValid(postId) ? new ObjectId(postId) : null,
       replyToMessage: replyToMessage || null,
+      type: type || 'message',
+      response: null,
       read: false,
       createdAt: new Date(),
     };
@@ -78,6 +80,56 @@ router.get('/:userId', async (req, res) => {
   } catch (err) {
     console.error('Fetch notifications error:', err);
     res.status(500).json({ error: 'Failed to fetch notifications' });
+  }
+});
+
+// respond to a ride request (accept or decline)
+router.patch('/:id/respond', async (req, res) => {
+  try {
+    const id = req.params.id;
+    const { response, responderName } = req.body;
+
+    if (!ObjectId.isValid(id)) {
+      return res.status(400).json({ error: 'Invalid id' });
+    }
+    if (!['accepted', 'declined'].includes(response)) {
+      return res.status(400).json({ error: 'response must be accepted or declined' });
+    }
+
+    const db = getDB();
+    const notif = await db.collection('notifications').findOne({ _id: new ObjectId(id) });
+    if (!notif) return res.status(404).json({ error: 'Notification not found' });
+
+    await db.collection('notifications').updateOne(
+      { _id: new ObjectId(id) },
+      { $set: { response, read: true } }
+    );
+
+    // Send reply notification back to the original requester
+    if (notif.senderId) {
+      const replyMessage =
+        response === 'accepted'
+          ? `${responderName || 'The poster'} accepted your ride request!`
+          : `${responderName || 'The poster'} declined your ride request.`;
+
+      await db.collection('notifications').insertOne({
+        recipientId: notif.senderId,
+        senderName: responderName || 'Someone',
+        senderId: notif.recipientId,
+        message: replyMessage,
+        postId: notif.postId || null,
+        replyToMessage: notif.message,
+        type: 'ride_request_response',
+        response: null,
+        read: false,
+        createdAt: new Date(),
+      });
+    }
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Respond to ride request error:', err);
+    res.status(500).json({ error: 'Failed to respond to ride request' });
   }
 });
 
