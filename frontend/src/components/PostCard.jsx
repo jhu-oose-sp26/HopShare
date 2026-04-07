@@ -32,11 +32,13 @@ import SubmitBox from './SubmitBox';
 const API_ROOT = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '');
 const NOTIFICATIONS_ENDPOINT = `${API_ROOT}/notifications`;
 
-const PostCard = ({ post, onDelete, onUpdate, coords, routeSearch, distanceFilter,  currentUser }) => {
+const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, routeSearch, distanceFilter, currentUser }) => {
     const { _id, title, description, user, trip, type = 'request', createdAt } = post;
     const navigate = useNavigate();
     const isOffer = type === 'offer';
-
+    const truncatedDescription = description 
+    ? (description.length > 50 ? `${description.slice(0, 50)}...` : description)
+    : '';
     const [editOpen, setEditOpen] = useState(false);
     const [detailsOpen, setDetailsOpen] = useState(false);
     const [deleteOpen, setDeleteOpen] = useState(false);
@@ -187,86 +189,98 @@ const PostCard = ({ post, onDelete, onUpdate, coords, routeSearch, distanceFilte
     };
 
     return (
-        <div className='relative rounded-xl border border-gray-200 bg-white px-6 pt-10 pb-6 shadow-sm hover:shadow-md transition-shadow'>
-            {/* Edit button — top left */}
-            <Dialog open={editOpen} onOpenChange={setEditOpen}>
-                <DialogTrigger asChild>
-                    <button className='absolute top-3 left-3 p-1.5 rounded-md text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors'>
-                        <Pencil className='w-4 h-4' />
-                    </button>
-                </DialogTrigger>
-                <DialogContent className="w-[90%] max-w-[800px] sm:max-w-[800px] max-h-[80vh] overflow-y-auto">
-                    <DialogDescription className="sr-only">
-                        Edit ride post form
-                    </DialogDescription>
-                    <DialogHeader>
-                        <DialogTitle>Edit Ride</DialogTitle>
-                    </DialogHeader>
-                    <SubmitBox
-                        onSubmit={handleEditSubmit}
-                        coords={coords}
-                        initialData={initialData}
-                    />
-                </DialogContent>
-            </Dialog>
+        <div className={`relative rounded-xl border border-gray-200 bg-white px-6 pb-6 shadow-sm hover:shadow-md transition-shadow ${showActions ? 'pt-10' : 'pt-6'}`}>
+            {showActions && (
+                <>
+                    {/* Edit button — top left */}
+                    <Dialog open={editOpen} onOpenChange={setEditOpen}>
+                        <DialogTrigger asChild>
+                            <button className='absolute top-3 left-3 p-1.5 rounded-md text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors'>
+                                <Pencil className='w-4 h-4' />
+                            </button>
+                        </DialogTrigger>
+                        <DialogContent className="w-[90%] max-w-[800px] sm:max-w-[800px] max-h-[80vh] overflow-y-auto">
+                            <DialogDescription className="sr-only">
+                                Edit ride post form
+                            </DialogDescription>
+                            <DialogHeader>
+                                <DialogTitle>Edit Ride</DialogTitle>
+                            </DialogHeader>
+                            <SubmitBox
+                                onSubmit={handleEditSubmit}
+                                coords={coords}
+                                initialData={initialData}
+                            />
+                        </DialogContent>
+                    </Dialog>
 
-            {/* Delete button — top right */}
-            <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
-                <DialogTrigger asChild>
-                    <button className='absolute top-3 right-3 p-1.5 rounded-md text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors'>
-                        <Trash2 className='w-4 h-4' />
-                    </button>
-                </DialogTrigger>
-                <DialogContent className="sm:max-w-[425px]">
-                    <DialogHeader>
-                        <DialogTitle>Delete Ride</DialogTitle>
-                        <DialogDescription>
-                            Are you sure you want to delete this ride? This action cannot be undone.
-                        </DialogDescription>
-                    </DialogHeader>
-                    {deleteError && (
-                        <p className='text-sm text-red-600'>{deleteError}</p>
-                    )}
-                    <DialogFooter>
-                        <Button variant='outline' onClick={() => setDeleteOpen(false)} disabled={isDeleting}>
-                            Cancel
-                        </Button>
-                        <Button variant='destructive' onClick={handleDelete} disabled={isDeleting}>
-                            {isDeleting ? 'Deleting...' : 'Delete'}
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
+                    {/* Delete button — top right */}
+                    <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+                        <DialogTrigger asChild>
+                            <button className='absolute top-3 right-3 p-1.5 rounded-md text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors'>
+                                <Trash2 className='w-4 h-4' />
+                            </button>
+                        </DialogTrigger>
+                        <DialogContent className="sm:max-w-[425px]">
+                            <DialogHeader>
+                                <DialogTitle>Delete Ride</DialogTitle>
+                                <DialogDescription>
+                                    Are you sure you want to delete this ride? This action cannot be undone.
+                                </DialogDescription>
+                            </DialogHeader>
+                            {deleteError && (
+                                <p className='text-sm text-red-600'>{deleteError}</p>
+                            )}
+                            <DialogFooter>
+                                <Button variant='outline' onClick={() => setDeleteOpen(false)} disabled={isDeleting}>
+                                    Cancel
+                                </Button>
+                                <Button variant='destructive' onClick={handleDelete} disabled={isDeleting}>
+                                    {isDeleting ? 'Deleting...' : 'Delete'}
+                                </Button>
+                            </DialogFooter>
+                        </DialogContent>
+                    </Dialog>
+                </>
+            )}
 
             {/* Header: badge + title + ID */}
-            <div className='flex items-start justify-between mb-3'>
-                <div className='flex items-center gap-2 flex-wrap'>
-                    <span className={`text-xs font-medium px-2.5 py-0.5 rounded-full ${isOffer ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}`}>
+            <div className='flex items-start justify-between mb-3 min-w-0'>
+                <div className='flex items-center gap-2 flex-wrap min-w-0 flex-1'>
+                    <span className={`text-xs font-medium px-2.5 py-0.5 rounded-full shrink-0 ${isOffer ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}`}>
                         {isOffer ? 'Offering' : 'Requesting'}
                     </span>
-                    <h3 className='font-semibold text-gray-900 break-words'>{title}</h3>
+                    <h3 className='font-semibold text-gray-900 truncate max-w-[200px]'>
+                        {(title || '').length > 30 ? `${(title || '').slice(0, 30)}...` : (title || 'Untitled')}
+                    </h3>
                 </div>
                 <span className='text-xs text-gray-400 shrink-0 ml-2'>#{_id?.slice(-6)}</span>
             </div>
-            <p className='text-sm text-gray-500 mb-4 wrap-break-word'>
-                <button
-                    onClick={() => navigate(`/user/${user._id || user.id}`)}
-                    className='text-blue-600 hover:text-blue-800 hover:underline font-medium break-all'
-                >
-                    {user.name}
-                </button>
+            <p className='text-sm text-gray-500 mb-4'>
+                {user.googleId ? (
+                    <button
+                        onClick={() => navigate(`/user/${user.googleId}`)}
+                        className='text-blue-600 hover:text-blue-800 hover:underline font-medium'
+                    >
+                        {(user.name || '').length > 25 ? `${user.name.slice(0, 25)}...` : user.name}
+                    </button>
+                ) : (
+                    <span className='text-gray-700 font-medium'>
+                        {(user.name || '').length > 25 ? `${user.name.slice(0, 25)}...` : user.name}
+                    </span>
+                )}
                 {' · '}
-                <span className='break-all'>
-                    {user.email.length > 40 ? `${user.email.slice(0, 40)}...` : user.email}
+                <span>
+                    {(user.email || '').length > 25 ? `${user.email.slice(0, 25)}...` : user.email}
                 </span>
             </p>
 
             {/* Post content */}
-            <p className='text-gray-700 mb-4 break-words'>
-                {description.length > 100
-                ? `${description.slice(0, 100)}...`
-                : description}
-            </p>
+            {truncatedDescription && (
+                <p className='text-gray-700 mb-4 break-all'>
+                    {truncatedDescription}
+                </p>
+            )}
 
             {/* Trip details (if exists) */}
             {trip && (
@@ -480,7 +494,7 @@ const PostCard = ({ post, onDelete, onUpdate, coords, routeSearch, distanceFilte
                             {description && (
                                 <div className='bg-gray-50 rounded-lg p-3 space-y-2'>
                                     <p className='text-xs font-semibold uppercase tracking-wide text-gray-400'>Description</p>
-                                    <p className='text-gray-700 break-words whitespace-pre-wrap'>{description}</p>
+                                    <p className='text-gray-700 break-all whitespace-pre-wrap'>{description}</p>
                                 </div>
                             )}
 

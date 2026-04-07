@@ -19,6 +19,10 @@ function isValidUSPhoneNumber(phone) {
   return normalizeUSPhoneDigits(phone).length === 10;
 }
 
+function isValidUsername(username) {
+  return username.length >= 3 && username.length <= 20;
+}
+
 function formatUSPhoneNumber(phone) {
   const digits = normalizeUSPhoneDigits(phone);
   if (digits.length !== 10) {
@@ -80,6 +84,19 @@ function ProfilePage({ currentUser, onUserUpdate }) {
 
   const handleInputChange = (field, value) => {
     setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleNameChange = (value) => {
+    setFormData(prev => ({ ...prev, name: value }));
+    
+    const trimmed = value.trim();
+    if (!trimmed) {
+      setError('Name cannot be empty.');
+    } else if (!isValidUsername(trimmed)) {
+      setError('Name must be between 3 and 20 characters.');
+    } else {
+      setError('');
+    }
   };
 
   const handlePhoneChange = (value) => {
@@ -155,6 +172,16 @@ function ProfilePage({ currentUser, onUserUpdate }) {
 
   const handleSave = async () => {
     if (!currentUser?._id) return;
+
+    const trimmedName = formData.name.trim();
+    if (!trimmedName) {
+      setError('Name cannot be empty.');
+      return;
+    }
+    if (!isValidUsername(trimmedName)) {
+      setError('Name must be between 3 and 20 characters.');
+      return;
+    }
 
     const trimmedPhone = formData.phone.trim();
     if (trimmedPhone && !isValidUSPhoneNumber(trimmedPhone)) {
@@ -348,7 +375,7 @@ function ProfilePage({ currentUser, onUserUpdate }) {
                     <input
                       type="text"
                       value={formData.name}
-                      onChange={(e) => handleInputChange('name', e.target.value)}
+                      onChange={(e) => handleNameChange(e.target.value)}
                       className={inputBase}
                       placeholder="Your full name"
                     />
