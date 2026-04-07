@@ -14,7 +14,7 @@ function formatTime(time) {
     const hour12 = hour % 12 || 12;
     return `${hour12}:${minute} ${period}`;
 }
-import { MapPin, Calendar, Clock, MessageCircle, Pencil, Trash2, Info, User, Mail, Phone, Navigation, ExternalLink, UserPlus, Car } from 'lucide-react';
+import { MapPin, Calendar, Clock, MessageCircle, Pencil, Trash2, Info, User, Mail, Phone, Navigation, ExternalLink, UserPlus, Car, Users, Send, CheckCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
@@ -49,7 +49,31 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
     const [isDeleting, setIsDeleting] = useState(false);
     const [deleteError, setDeleteError] = useState('');
     const [activeMapTab, setActiveMapTab] = useState("route"); // "route" or "distance"
-    const [joinRequested, setJoinRequested] = useState(false);
+    // "Take" button — persisted in post.drivers
+    const [joinRequested, setJoinRequested] = useState(() => {
+        if (!currentUser) return false;
+        return (post.drivers || []).some(d => d.email === currentUser.email);
+    });
+    // Rider list / Waitlist — persisted in post.riderList / post.waitlist
+    const [listMembers, setListMembers] = useState(() => {
+        const field = post.type === 'offer' ? 'riderList' : 'waitlist';
+        return post[field] || [];
+    });
+    const [listJoined, setListJoined] = useState(() => {
+        if (!currentUser) return false;
+        const field = post.type === 'offer' ? 'riderList' : 'waitlist';
+        return (post[field] || []).some(u => u.email === currentUser.email);
+    });
+    const [listJoinLoading, setListJoinLoading] = useState(false);
+    const [listJoinError, setListJoinError] = useState('');
+    // Invite button — persisted in post.invitedRiders
+    const [inviteSent, setInviteSent] = useState(() => {
+        const map = {};
+        for (const email of (post.invitedRiders || [])) {
+            map[email] = true;
+        }
+        return map;
+    });
 
     const isOwner = currentUser && post.user?.email && currentUser.email === post.user.email;
 
@@ -429,17 +453,103 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
                     </DialogContent>
                 </Dialog>
 
-                {/* Join / Pickup Button — only for non-owners */}
+                {/* Join the rider list (offer) / Join the waitlist (request) — only for non-owners */}
                 {currentUser && !isOwner && (
+                    <div className='flex-1 flex flex-col gap-1'>
+                        <Button
+                            variant={listJoined ? 'outline' : 'default'}
+                            size='sm'
+                            className={`w-full ${listJoined ? 'text-gray-400' : isOffer ? 'bg-green-600 hover:bg-green-700' : 'bg-purple-600 hover:bg-purple-700'}`}
+                            disabled={listJoined || listJoinLoading}
+                            onClick={async () => {
+                                setListJoinError('');
+                                setListJoinLoading(true);
+                                try {
+                                    const res = await fetch(`${API_ROOT}/posts/${post._id}/join`, {
+                                        method: 'POST',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({
+                                            name: currentUser.name,
+                                            email: currentUser.email,
+                                            picture: currentUser.picture || null,
+                                            avatar: currentUser.avatar || null,
+                                            googleId: currentUser.googleId || null,
+                                        }),
+                                    });
+                                    if (res.ok) {
+                                        const msg = isOffer
+                                            ? `${currentUser.name} wants to join your rider list for the ride from ${post.trip?.startLocation?.title || 'start'} to ${post.trip?.endLocation?.title || 'destination'}.`
+                                            : `${currentUser.name} wants to join the waitlist for your ride request from ${post.trip?.startLocation?.title || 'start'} to ${post.trip?.endLocation?.title || 'destination'}.`;
+                                        await fetch(NOTIFICATIONS_ENDPOINT, {
+                                            method: 'POST',
+                                            headers: { 'Content-Type': 'application/json' },
+                                            body: JSON.stringify({
+                                                recipientEmail: post.user.email,
+                                                senderName: currentUser.name,
+                                                senderId: currentUser._id,
+                                                message: msg,
+                                                postId: post._id,
+                                                type: 'join_list',
+                                            }),
+                                        });
+                                        const newEntry = { name: currentUser.name, email: currentUser.email, picture: currentUser.picture || null, avatar: currentUser.avatar || null, googleId: currentUser.googleId || null };
+                                        setListMembers(prev => [...prev, newEntry]);
+                                        setListJoined(true);
+                                    } else {
+                                        const data = await res.json().catch(() => ({}));
+                                        setListJoinError(data.error || 'Failed to join. Please try again.');
+                                    }
+                                } catch (err) {
+                                    setListJoinError('Network error. Please try again.');
+                                } finally {
+                                    setListJoinLoading(false);
+                                }
+                            }}
+                        >
+                            {listJoinLoading ? (
+                                'Joining...'
+                            ) : listJoined ? (
+                                <><CheckCircle className='w-4 h-4 mr-1' />{isOffer ? 'On Rider List' : 'On Waitlist'}</>
+                            ) : isOffer ? (
+                                <><Users className='w-4 h-4 mr-1' />Request a seat</>
+                            ) : (
+                                <><Users className='w-4 h-4 mr-1' />Join the waitlist</>
+                            )}
+                        </Button>
+                        {listJoinError && <p className='text-xs text-red-500'>{listJoinError}</p>}
+                    </div>
+                )}
+
+                {/* Take button — only for non-owners on request posts (driver offering to take) */}
+                {currentUser && !isOwner && !isOffer && (
                     <Button
                         variant={joinRequested ? 'outline' : 'default'}
                         size='sm'
-                        className={`flex-1 ${joinRequested ? 'text-gray-400' : isOffer ? 'bg-green-600 hover:bg-green-700' : 'bg-blue-600 hover:bg-blue-700'}`}
+                        className={`flex-1 ${joinRequested ? 'text-gray-400' : 'bg-blue-600 hover:bg-blue-700'}`}
                         disabled={joinRequested}
                         onClick={async () => {
-                            const msg = isOffer
-                                ? `${currentUser.name} wants to join your ride from ${post.trip?.startLocation?.title || 'start'} to ${post.trip?.endLocation?.title || 'destination'}.`
-                                : `${currentUser.name} can take you from ${post.trip?.startLocation?.title || 'start'} to ${post.trip?.endLocation?.title || 'destination'}.`;
+                            // Persist the take on the post so it survives refresh
+                            const takeRes = await fetch(`${API_ROOT}/posts/${post._id}/take`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    name: currentUser.name,
+                                    email: currentUser.email,
+                                    picture: currentUser.picture || null,
+                                    avatar: currentUser.avatar || null,
+                                    googleId: currentUser.googleId || null,
+                                }),
+                            });
+                            const takeData = await takeRes.json().catch(() => ({}));
+                            // If already taken, just update UI silently
+                            if (takeData.alreadyTaken) {
+                                setJoinRequested(true);
+                                return;
+                            }
+                            if (!takeRes.ok) return;
+
+                            const msg = `${currentUser.name} can take you from ${post.trip?.startLocation?.title || 'start'} to ${post.trip?.endLocation?.title || 'destination'}.`;
+                            // Notify post owner
                             await fetch(NOTIFICATIONS_ENDPOINT, {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json' },
@@ -452,13 +562,28 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
                                     type: 'ride_request',
                                 }),
                             });
+                            // Also notify all waitlist members
+                            for (const member of listMembers) {
+                                if (member.email !== currentUser.email) {
+                                    await fetch(NOTIFICATIONS_ENDPOINT, {
+                                        method: 'POST',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({
+                                            recipientEmail: member.email,
+                                            senderName: currentUser.name,
+                                            senderId: currentUser._id,
+                                            message: `${currentUser.name} is offering to drive from ${post.trip?.startLocation?.title || 'start'} to ${post.trip?.endLocation?.title || 'destination'}. Check the post for details!`,
+                                            postId: post._id,
+                                            type: 'ride_request',
+                                        }),
+                                    });
+                                }
+                            }
                             setJoinRequested(true);
                         }}
                     >
                         {joinRequested ? (
-                            'Request Sent'
-                        ) : isOffer ? (
-                            <><UserPlus className='w-4 h-4 mr-1' />Join</>
+                            <><CheckCircle className='w-4 h-4 mr-1' />Request Sent</>
                         ) : (
                             <><Car className='w-4 h-4 mr-1' />Take</>
                         )}
@@ -535,6 +660,88 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
                                     <p className='text-gray-700 break-all whitespace-pre-wrap'>{description}</p>
                                 </div>
                             )}
+
+                            {/* Rider List / Waitlist */}
+                            <div className='bg-gray-50 rounded-lg p-3 space-y-2'>
+                                <p className='text-xs font-semibold uppercase tracking-wide text-gray-400'>
+                                    {isOffer ? 'Rider List' : 'Waitlist'}
+                                    <span className='ml-2 text-gray-500 font-normal normal-case'>({listMembers.length} {listMembers.length === 1 ? 'person' : 'people'})</span>
+                                </p>
+                                {listMembers.length === 0 ? (
+                                    <p className='text-xs text-gray-400 italic'>No one has joined yet.</p>
+                                ) : (
+                                    <div className='space-y-2'>
+                                        {listMembers.map((member, idx) => (
+                                            <div key={idx} className='flex items-center justify-between gap-3'>
+                                                <div className='flex items-center gap-2'>
+                                                    <img
+                                                        src={member.avatar || member.picture || `https://ui-avatars.com/api/?name=${encodeURIComponent(member.name || 'User')}&background=e5e7eb&color=374151&size=64`}
+                                                        alt={member.name || 'User'}
+                                                        className='w-8 h-8 rounded-full border border-gray-200 object-cover shrink-0'
+                                                        onError={(e) => { e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(member.name || 'User')}&background=e5e7eb&color=374151&size=64`; }}
+                                                    />
+                                                    <div className='min-w-0'>
+                                                        {member.googleId ? (
+                                                            <button
+                                                                onClick={() => navigate(`/user/${member.googleId}`)}
+                                                                className='text-blue-600 hover:text-blue-800 hover:underline font-medium text-sm truncate block'
+                                                            >
+                                                                {member.name || '—'}
+                                                            </button>
+                                                        ) : (
+                                                            <span className='text-gray-800 font-medium text-sm'>{member.name || '—'}</span>
+                                                        )}
+                                                        <div className='text-xs text-gray-500 truncate'>{member.email}</div>
+                                                    </div>
+                                                </div>
+                                                {/* Invite button — only for offer post owner */}
+                                                {isOwner && isOffer && (
+                                                    <Button
+                                                        variant={inviteSent[member.email] ? 'outline' : 'default'}
+                                                        size='sm'
+                                                        className={`shrink-0 text-xs ${inviteSent[member.email] ? 'text-gray-400' : 'bg-green-600 hover:bg-green-700'}`}
+                                                        disabled={!!inviteSent[member.email]}
+                                                        onClick={async () => {
+                                                            // Persist invited status on the post
+                                                            const invRes = await fetch(`${API_ROOT}/posts/${post._id}/invite`, {
+                                                                method: 'POST',
+                                                                headers: { 'Content-Type': 'application/json' },
+                                                                body: JSON.stringify({ email: member.email }),
+                                                            });
+                                                            const invData = await invRes.json().catch(() => ({}));
+                                                            if (invData.alreadyInvited) {
+                                                                setInviteSent(prev => ({ ...prev, [member.email]: true }));
+                                                                return;
+                                                            }
+                                                            if (!invRes.ok) return;
+                                                            // Send invitation notification
+                                                            await fetch(NOTIFICATIONS_ENDPOINT, {
+                                                                method: 'POST',
+                                                                headers: { 'Content-Type': 'application/json' },
+                                                                body: JSON.stringify({
+                                                                    recipientEmail: member.email,
+                                                                    senderName: currentUser.name,
+                                                                    senderId: currentUser._id,
+                                                                    message: `${currentUser.name} is inviting you to join their ride from ${post.trip?.startLocation?.title || 'start'} to ${post.trip?.endLocation?.title || 'destination'} on ${post.trip?.date || 'the scheduled date'}.`,
+                                                                    postId: post._id,
+                                                                    type: 'invitation',
+                                                                }),
+                                                            });
+                                                            setInviteSent(prev => ({ ...prev, [member.email]: true }));
+                                                        }}
+                                                    >
+                                                        {inviteSent[member.email] ? (
+                                                            <><CheckCircle className='w-3 h-3 mr-1' />Invited</>
+                                                        ) : (
+                                                            <><Send className='w-3 h-3 mr-1' />Invite</>
+                                                        )}
+                                                    </Button>
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
 
                             {/* Trip details */}
                             {trip && (
