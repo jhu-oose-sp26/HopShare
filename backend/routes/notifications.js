@@ -105,16 +105,35 @@ router.patch('/:id/respond', async (req, res) => {
       { $set: { response, read: true } }
     );
 
-    // If a join_list request is declined, remove the sender from the post's riderList/waitlist
-    if (notif.type === 'join_list' && response === 'declined' && notif.senderId && notif.postId) {
-      const senderUser = await db.collection('users').findOne({ _id: notif.senderId });
-      if (senderUser?.email) {
-        const post = await db.collection('posts').findOne({ _id: notif.postId });
-        if (post) {
-          const listField = 'riderList';
+    // Handle join_list approval/decline
+    if (notif.type === 'join_list' && notif.postId) {
+      // Extract sender email from pendingJoins via the stored notification message sender
+      // Look up sender by senderId first, fall back to senderName from notif
+      let senderUser = null;
+      if (notif.senderId) {
+        senderUser = await db.collection('users').findOne({ _id: notif.senderId });
+      }
+      const senderEmail = senderUser?.email;
+      if (senderEmail) {
+        if (response === 'accepted') {
           await db.collection('posts').updateOne(
             { _id: notif.postId },
-            { $pull: { [listField]: { email: senderUser.email } } }
+            {
+              $pull: { pendingJoins: senderEmail },
+              $push: { riderList: {
+                name: senderUser.name || senderUser.displayName || notif.senderName || '',
+                email: senderEmail,
+                picture: senderUser.picture || null,
+                avatar: senderUser.avatar || null,
+                googleId: senderUser.googleId || null,
+                joinedAt: new Date().toISOString(),
+              }},
+            }
+          );
+        } else {
+          await db.collection('posts').updateOne(
+            { _id: notif.postId },
+            { $pull: { pendingJoins: senderEmail } }
           );
         }
       }

@@ -56,12 +56,13 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
     });
     // Rider list — persisted in post.riderList
     const [listMembers, setListMembers] = useState(() => post.riderList || []);
-    const [listJoined, setListJoined] = useState(() => {
-        if (!currentUser) return false;
-        return (post.riderList || []).some(u => u.email === currentUser.email);
-    });
+    const listJoined = currentUser ? listMembers.some(u => u.email === currentUser.email) : false;
     const [listJoinLoading, setListJoinLoading] = useState(false);
     const [listJoinError, setListJoinError] = useState('');
+    const [listRequestSent, setListRequestSent] = useState(() => {
+        if (!currentUser) return false;
+        return (post.pendingJoins || []).includes(currentUser.email);
+    });
 
     const isOwner = currentUser && post.user?.email && currentUser.email === post.user.email;
 
@@ -461,11 +462,11 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
                 {/* Join the rider list — only for non-owners */}
                 {currentUser && !isOwner && (
                     <div className='flex-1 flex flex-col gap-1'>
-                        <Button
-                            variant={listJoined ? 'outline' : 'default'}
+                        {!listJoined && <Button
+                            variant={listJoined || listRequestSent ? 'outline' : 'default'}
                             size='sm'
-                            className={`w-full ${listJoined ? 'text-gray-400' : 'bg-green-600 hover:bg-green-700'}`}
-                            disabled={listJoined || listJoinLoading}
+                            className={`w-full ${listJoined || listRequestSent ? 'text-gray-400' : 'bg-green-600 hover:bg-green-700'}`}
+                            disabled={listJoined || listRequestSent || listJoinLoading}
                             onClick={async () => {
                                 setListJoinError('');
                                 setListJoinLoading(true);
@@ -473,18 +474,10 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
                                     const res = await fetch(`${API_ROOT}/posts/${post._id}/join`, {
                                         method: 'POST',
                                         headers: { 'Content-Type': 'application/json' },
-                                        body: JSON.stringify({
-                                            name: currentUser.name,
-                                            email: currentUser.email,
-                                            picture: currentUser.picture || null,
-                                            avatar: currentUser.avatar || null,
-                                            googleId: currentUser.googleId || null,
-                                        }),
+                                        body: JSON.stringify({ email: currentUser.email }),
                                     });
                                     if (res.ok) {
-                                        const msg = isOffer
-                                            ? `${currentUser.name} wants to join your rider list for the ride from ${post.trip?.startLocation?.title || 'start'} to ${post.trip?.endLocation?.title || 'destination'}.`
-                                            : `${currentUser.name} wants to join the rider list for your ride request from ${post.trip?.startLocation?.title || 'start'} to ${post.trip?.endLocation?.title || 'destination'}.`;
+                                        const msg = `${currentUser.name} wants to join your rider list for the ride from ${post.trip?.startLocation?.title || 'start'} to ${post.trip?.endLocation?.title || 'destination'}.`;
                                         await fetch(NOTIFICATIONS_ENDPOINT, {
                                             method: 'POST',
                                             headers: { 'Content-Type': 'application/json' },
@@ -497,12 +490,10 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
                                                 type: 'join_list',
                                             }),
                                         });
-                                        const newEntry = { name: currentUser.name, email: currentUser.email, picture: currentUser.picture || null, avatar: currentUser.avatar || null, googleId: currentUser.googleId || null };
-                                        setListMembers(prev => [...prev, newEntry]);
-                                        setListJoined(true);
+                                        setListRequestSent(true);
                                     } else {
                                         const data = await res.json().catch(() => ({}));
-                                        setListJoinError(data.error || 'Failed to join. Please try again.');
+                                        setListJoinError(data.error || 'Failed to send request. Please try again.');
                                     }
                                 } catch (err) {
                                     setListJoinError('Network error. Please try again.');
@@ -512,13 +503,34 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
                             }}
                         >
                             {listJoinLoading ? (
-                                'Joining...'
+                                'Sending...'
                             ) : listJoined ? (
                                 <><CheckCircle className='w-4 h-4 mr-1' />On Rider List</>
+                            ) : listRequestSent ? (
+                                <><CheckCircle className='w-4 h-4 mr-1' />Request Sent</>
                             ) : (
                                 <><Users className='w-4 h-4 mr-1' />Join the Rider List</>
                             )}
-                        </Button>
+                        </Button>}
+                        {listJoined && (
+                            <Button
+                                variant='outline'
+                                size='sm'
+                                className='w-full text-xs text-red-600 border-red-300 hover:bg-red-50 hover:text-red-700'
+                                onClick={async () => {
+                                    const res = await fetch(`${API_ROOT}/posts/${post._id}/remove-member`, {
+                                        method: 'POST',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({ email: currentUser.email, name: currentUser.name }),
+                                    });
+                                    if (res.ok) {
+                                        setListMembers(prev => prev.filter(m => m.email !== currentUser.email));
+                                    }
+                                }}
+                            >
+                                <UserMinus className='w-3 h-3 mr-1' />Leave Rider List
+                            </Button>
+                        )}
                         {listJoinError && <p className='text-xs text-red-500'>{listJoinError}</p>}
                     </div>
                 )}
@@ -731,7 +743,7 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
                                                             const res = await fetch(`${API_ROOT}/posts/${post._id}/remove-member`, {
                                                                 method: 'POST',
                                                                 headers: { 'Content-Type': 'application/json' },
-                                                                body: JSON.stringify({ email: member.email }),
+                                                                body: JSON.stringify({ email: member.email, name: member.name }),
                                                             });
                                                             if (!res.ok) return;
                                                             setListMembers(prev => prev.filter(m => m.email !== member.email));
