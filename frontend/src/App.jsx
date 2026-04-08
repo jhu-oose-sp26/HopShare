@@ -4,6 +4,7 @@ import HomePage from '@/pages/HomePage';
 import LandingPage from '@/pages/LandingPage';
 import ProfilePage from '@/pages/ProfilePage';
 import UserProfile from '@/pages/UserProfile';
+import ChatPage from './pages/ChatPage';
 
 const USER_STORAGE_KEY = 'hopshare.user';
 
@@ -76,6 +77,7 @@ function App() {
             )
           }
         />
+        <Route path="/chat" element={<ChatPage />} />
         <Route
           path='*'
           element={<Navigate to={currentUser ? '/' : '/landing'} replace />}

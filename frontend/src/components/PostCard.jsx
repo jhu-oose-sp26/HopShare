@@ -360,6 +360,11 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
 
             {/* Action buttons */}
             <div className='flex flex-wrap gap-2'>
+                <Button variant='default' size='sm' className='flex-1' onClick={() => navigate("/chat")}>
+                    <MessageCircle className='w-4 h-4 mr-1' />
+                    Chat
+                </Button>
+
                 {/* Contact Dialog */}
 
                 <Dialog open={contactOpen} onOpenChange={setContactOpen}>
