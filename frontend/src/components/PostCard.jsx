@@ -14,7 +14,7 @@ function formatTime(time) {
     const hour12 = hour % 12 || 12;
     return `${hour12}:${minute} ${period}`;
 }
-import { MapPin, Calendar, Clock, MessageCircle, Pencil, Trash2, Info, User, Mail, Phone, Navigation, ExternalLink, UserPlus, Car, Users, Send, CheckCircle } from 'lucide-react';
+import { MapPin, Calendar, Clock, MessageCircle, Pencil, Trash2, Info, User, Mail, Phone, Navigation, ExternalLink, UserPlus, Car, Users, CheckCircle, UserMinus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
@@ -66,14 +66,6 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
     });
     const [listJoinLoading, setListJoinLoading] = useState(false);
     const [listJoinError, setListJoinError] = useState('');
-    // Invite button — persisted in post.invitedRiders
-    const [inviteSent, setInviteSent] = useState(() => {
-        const map = {};
-        for (const email of (post.invitedRiders || [])) {
-            map[email] = true;
-        }
-        return map;
-    });
 
     const isOwner = currentUser && post.user?.email && currentUser.email === post.user.email;
 
@@ -694,47 +686,23 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
                                                         <div className='text-xs text-gray-500 truncate'>{member.email}</div>
                                                     </div>
                                                 </div>
-                                                {/* Invite button — only for offer post owner */}
-                                                {isOwner && isOffer && (
+                                                {/* Remove button — for post owner on both offer and request */}
+                                                {isOwner && (
                                                     <Button
-                                                        variant={inviteSent[member.email] ? 'outline' : 'default'}
+                                                        variant='outline'
                                                         size='sm'
-                                                        className={`shrink-0 text-xs ${inviteSent[member.email] ? 'text-gray-400' : 'bg-green-600 hover:bg-green-700'}`}
-                                                        disabled={!!inviteSent[member.email]}
+                                                        className='shrink-0 text-xs text-red-600 border-red-300 hover:bg-red-50 hover:text-red-700'
                                                         onClick={async () => {
-                                                            // Persist invited status on the post
-                                                            const invRes = await fetch(`${API_ROOT}/posts/${post._id}/invite`, {
+                                                            const res = await fetch(`${API_ROOT}/posts/${post._id}/remove-member`, {
                                                                 method: 'POST',
                                                                 headers: { 'Content-Type': 'application/json' },
                                                                 body: JSON.stringify({ email: member.email }),
                                                             });
-                                                            const invData = await invRes.json().catch(() => ({}));
-                                                            if (invData.alreadyInvited) {
-                                                                setInviteSent(prev => ({ ...prev, [member.email]: true }));
-                                                                return;
-                                                            }
-                                                            if (!invRes.ok) return;
-                                                            // Send invitation notification
-                                                            await fetch(NOTIFICATIONS_ENDPOINT, {
-                                                                method: 'POST',
-                                                                headers: { 'Content-Type': 'application/json' },
-                                                                body: JSON.stringify({
-                                                                    recipientEmail: member.email,
-                                                                    senderName: currentUser.name,
-                                                                    senderId: currentUser._id,
-                                                                    message: `${currentUser.name} is inviting you to join their ride from ${post.trip?.startLocation?.title || 'start'} to ${post.trip?.endLocation?.title || 'destination'} on ${post.trip?.date || 'the scheduled date'}.`,
-                                                                    postId: post._id,
-                                                                    type: 'invitation',
-                                                                }),
-                                                            });
-                                                            setInviteSent(prev => ({ ...prev, [member.email]: true }));
+                                                            if (!res.ok) return;
+                                                            setListMembers(prev => prev.filter(m => m.email !== member.email));
                                                         }}
                                                     >
-                                                        {inviteSent[member.email] ? (
-                                                            <><CheckCircle className='w-3 h-3 mr-1' />Invited</>
-                                                        ) : (
-                                                            <><Send className='w-3 h-3 mr-1' />Invite</>
-                                                        )}
+                                                        <UserMinus className='w-3 h-3 mr-1' />Remove
                                                     </Button>
                                                 )}
                                             </div>
