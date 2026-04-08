@@ -85,7 +85,7 @@ function HomePage({ currentUser, onLogout }) {
       : 'Create a Ride Request';
 
   return (
-    <div className='min-h-screen bg-white'>
+    <div className='min-h-screen bg-white bg-20'>
       <div className='bg-white'>
         <div className="relative">
           <div className="absolute top-6 right-6">
