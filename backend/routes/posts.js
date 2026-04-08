@@ -266,7 +266,7 @@ router.put('/:id', async (req, res) => {
   }
 });
 
-// JOIN rider list (offer) or waitlist (request)
+// JOIN rider list
 router.post('/:id/join', async (req, res) => {
   try {
     const postId = toObjectId(req.params.id);
@@ -279,7 +279,7 @@ router.post('/:id/join', async (req, res) => {
     const post = await db.collection('posts').findOne({ _id: postId });
     if (!post) return res.status(404).json({ error: 'Post not found' });
 
-    const listField = post.type === 'offer' ? 'riderList' : 'waitlist';
+    const listField = 'riderList';
     const existingList = post[listField] || [];
 
     if (existingList.some(u => u.email === email)) {
@@ -337,34 +337,5 @@ router.post('/:id/take', async (req, res) => {
   }
 });
 
-// INVITE a specific rider (owner records who was invited — persisted)
-router.post('/:id/invite', async (req, res) => {
-  try {
-    const postId = toObjectId(req.params.id);
-    if (!postId) return res.status(400).json({ error: 'Invalid post id' });
-
-    const { email } = req.body;
-    if (!email) return res.status(400).json({ error: 'Email required' });
-
-    const db = getDB();
-    const post = await db.collection('posts').findOne({ _id: postId });
-    if (!post) return res.status(404).json({ error: 'Post not found' });
-
-    const invited = post.invitedRiders || [];
-    if (invited.includes(email)) {
-      return res.json({ success: true, alreadyInvited: true });
-    }
-
-    await db.collection('posts').updateOne(
-      { _id: postId },
-      { $push: { invitedRiders: email } }
-    );
-
-    res.json({ success: true });
-  } catch (err) {
-    console.error('Invite rider error:', err);
-    res.status(500).json({ error: 'Failed to invite rider' });
-  }
-});
 
 module.exports = router;

@@ -111,7 +111,7 @@ router.patch('/:id/respond', async (req, res) => {
       if (senderUser?.email) {
         const post = await db.collection('posts').findOne({ _id: notif.postId });
         if (post) {
-          const listField = post.type === 'offer' ? 'riderList' : 'waitlist';
+          const listField = 'riderList';
           await db.collection('posts').updateOne(
             { _id: notif.postId },
             { $pull: { [listField]: { email: senderUser.email } } }
@@ -120,18 +120,7 @@ router.patch('/:id/respond', async (req, res) => {
       }
     }
 
-    // If an invitation is declined, remove the rider from invitedRiders so owner can re-invite later
-    if (notif.type === 'invitation' && response === 'declined' && notif.postId) {
-      const responder = await db.collection('users').findOne({ _id: notif.recipientId });
-      if (responder?.email) {
-        await db.collection('posts').updateOne(
-          { _id: notif.postId },
-          { $pull: { invitedRiders: responder.email } }
-        );
-      }
-    }
-
-    // If a ride_request is declined, remove the driver from the drivers list so they can re-apply
+// If a ride_request is declined, remove the driver from the drivers list so they can re-apply
     if (notif.type === 'ride_request' && response === 'declined' && notif.senderId && notif.postId) {
       const senderUser = await db.collection('users').findOne({ _id: notif.senderId });
       if (senderUser?.email) {
@@ -149,10 +138,6 @@ router.patch('/:id/respond', async (req, res) => {
         replyMessage = response === 'accepted'
           ? `${responderName || 'The poster'} accepted your request to join the list!`
           : `${responderName || 'The poster'} removed you from the list.`;
-      } else if (notif.type === 'invitation') {
-        replyMessage = response === 'accepted'
-          ? `${responderName || 'The rider'} accepted your ride invitation!`
-          : `${responderName || 'The rider'} declined your ride invitation.`;
       } else {
         replyMessage = response === 'accepted'
           ? `${responderName || 'The poster'} accepted your ride request!`

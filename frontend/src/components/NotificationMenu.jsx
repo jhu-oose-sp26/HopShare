@@ -141,12 +141,11 @@ function NotificationMenu({ currentUser }) {
               const typeStyles = {
                 join_list:            { bg: 'bg-purple-50 border-purple-200', badge: 'bg-purple-100 text-purple-700', label: 'Joined List' },
                 ride_request:         { bg: 'bg-blue-50 border-blue-200',     badge: 'bg-blue-100 text-blue-700',     label: 'Ride Request' },
-                invitation:           { bg: 'bg-green-50 border-green-200',   badge: 'bg-green-100 text-green-700',   label: 'Invitation' },
-                ride_request_response:{ bg: 'bg-gray-50 border-gray-200',     badge: notif.message?.includes('accepted') ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700', label: notif.message?.includes('accepted') ? 'Accepted' : 'Declined' },
+ride_request_response:{ bg: 'bg-gray-50 border-gray-200',     badge: notif.message?.includes('accepted') ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700', label: notif.message?.includes('accepted') ? 'Accepted' : 'Declined' },
                 message:              { bg: 'bg-gray-50 border-gray-200',     badge: 'bg-gray-100 text-gray-600',     label: 'Message' },
               };
               const style = typeStyles[notif.type] || typeStyles.message;
-              const actionableTypes = ['ride_request', 'join_list', 'invitation'];
+              const actionableTypes = ['ride_request', 'join_list'];
               const isActionable = actionableTypes.includes(notif.type) && !notif.response;
               const hasResponded = actionableTypes.includes(notif.type) && notif.response;
               const canReply = !actionableTypes.includes(notif.type);
@@ -197,10 +196,9 @@ function NotificationMenu({ currentUser }) {
                   {/* Response status */}
                   {hasResponded && (
                     <p className={`mt-2 text-xs font-medium ${notif.response === 'accepted' ? 'text-green-600' : 'text-red-500'}`}>
-                      You {notif.response} this {notif.type === 'invitation' ? 'invitation' : 'request'}.
+                      You {notif.response} this request.
                       {notif.type === 'join_list' && notif.response === 'declined' && ' (Removed from list)'}
                       {notif.type === 'ride_request' && notif.response === 'declined' && ' (Driver removed)'}
-                      {notif.type === 'invitation' && notif.response === 'declined' && ' (Can be re-invited)'}
                     </p>
                   )}
 
