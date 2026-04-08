@@ -4,7 +4,7 @@ import HomePage from '@/pages/HomePage';
 import LandingPage from '@/pages/LandingPage';
 import ProfilePage from '@/pages/ProfilePage';
 import UserProfile from '@/pages/UserProfile';
-import ChatPage from './pages/ChatPage';
+import ChatPage from '@/pages/ChatPage';
 
 const USER_STORAGE_KEY = 'hopshare.user';
 

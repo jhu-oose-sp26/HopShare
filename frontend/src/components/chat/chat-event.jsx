@@ -39,11 +39,6 @@
 
 import { cn } from "@/lib/utils";
 import {
-  AvatarFallbackProps,
-  AvatarImageProps,
-  AvatarProps,
-} from "@radix-ui/react-avatar";
-import {
   Avatar,
   AvatarFallback,
   AvatarImage,
@@ -287,6 +282,13 @@ function getRelativeTimeString(date, locale) {
     timeStyle: "short",
   }).format(date);
 }
+
+const FORMAT_PRESETS = {
+  time: { timeStyle: 'short' },
+  date: { dateStyle: 'medium' },
+  dateTime: { dateStyle: 'medium', timeStyle: 'short' },
+  longDate: { dateStyle: 'long' },
+};
 
 /**
  * Locale-aware timestamp display with preset and custom formatting.
