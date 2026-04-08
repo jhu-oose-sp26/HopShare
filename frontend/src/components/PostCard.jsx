@@ -464,7 +464,7 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
                         <Button
                             variant={listJoined ? 'outline' : 'default'}
                             size='sm'
-                            className={`w-full ${listJoined ? 'text-gray-400' : isOffer ? 'bg-green-600 hover:bg-green-700' : 'bg-purple-600 hover:bg-purple-700'}`}
+                            className={`w-full ${listJoined ? 'text-gray-400' : 'bg-green-600 hover:bg-green-700'}`}
                             disabled={listJoined || listJoinLoading}
                             onClick={async () => {
                                 setListJoinError('');
@@ -515,8 +515,6 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
                                 'Joining...'
                             ) : listJoined ? (
                                 <><CheckCircle className='w-4 h-4 mr-1' />On Rider List</>
-                            ) : isOffer ? (
-                                <><Users className='w-4 h-4 mr-1' />Request a seat</>
                             ) : (
                                 <><Users className='w-4 h-4 mr-1' />Join the Rider List</>
                             )}
@@ -590,7 +588,7 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
                         {joinRequested ? (
                             <><CheckCircle className='w-4 h-4 mr-1' />Request Sent</>
                         ) : (
-                            <><Car className='w-4 h-4 mr-1' />Take</>
+                            <><Car className='w-4 h-4 mr-1' />Offer to Be a Driver</>
                         )}
                     </Button>
                 )}
