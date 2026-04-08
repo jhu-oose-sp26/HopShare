@@ -204,10 +204,9 @@ function SubmitBox({ onSubmit, coords, initialData = null }) {
                         id='submit-phone'
                         type='tel'
                         className={inputBase}
-                        placeholder='Your phone number'
+                        placeholder='Your phone number (optional)'
                         value={phone}
                         onChange={(e) => setPhone(e.target.value)}
-                        required
                     />
                 </div>
 
@@ -330,11 +329,10 @@ function SubmitBox({ onSubmit, coords, initialData = null }) {
                     <textarea
                         id='submit-description'
                         className={inputBase}
-                        placeholder='Describe your trip'
+                        placeholder='Describe your trip (optional)'
                         value={description}
                         onChange={(e) => setDescription(e.target.value)}
                         maxLength={500}
-                        required
                     />
                     <p className='text-xs text-muted-foreground text-right'>
                         {description.length}/500

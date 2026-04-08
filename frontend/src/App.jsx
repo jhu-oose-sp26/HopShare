@@ -1,10 +1,13 @@
 import { useMemo, useState } from 'react';
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
+import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import HomePage from '@/pages/HomePage';
 import LandingPage from '@/pages/LandingPage';
 import ProfilePage from '@/pages/ProfilePage';
 import UserProfile from '@/pages/UserProfile';
 import ChatPage from '@/pages/ChatPage';
+import FriendsPage from '@/pages/FriendsPage';
+import MessagesPage from '@/pages/MessagesPage';
+import BottomNav from '@/components/BottomNav';
 
 const USER_STORAGE_KEY = 'hopshare.user';
 
@@ -17,6 +20,47 @@ function readStoredUser() {
   } catch {
     return null;
   }
+}
+
+function AppRoutes({ currentUser, authApi }) {
+  const location = useLocation();
+  const showNav = currentUser && location.pathname !== '/landing';
+
+  return (
+    <>
+      <Routes>
+        <Route
+          path='/landing'
+          element={currentUser ? <Navigate to='/home' replace /> : <LandingPage onLogin={authApi.login} />}
+        />
+        <Route
+          path='/home'
+          element={currentUser ? <HomePage currentUser={currentUser} onLogout={authApi.logout} /> : <Navigate to='/landing' replace />}
+        />
+        <Route
+          path='/friends'
+          element={currentUser ? <FriendsPage currentUser={currentUser} /> : <Navigate to='/landing' replace />}
+        />
+        <Route
+          path='/messages'
+          element={currentUser ? <MessagesPage currentUser={currentUser} /> : <Navigate to='/landing' replace />}
+        />
+        <Route
+          path='/profile'
+          element={currentUser ? <ProfilePage currentUser={currentUser} onUserUpdate={authApi.updateUser} /> : <Navigate to='/landing' replace />}
+        />
+        <Route
+          path='/user/:googleId'
+          element={currentUser ? <UserProfile currentUser={currentUser} /> : <Navigate to='/landing' replace />}
+        />
+        <Route
+          path='*'
+          element={<Navigate to={currentUser ? '/home' : '/landing'} replace />}
+        />
+      </Routes>
+      {showNav && <BottomNav />}
+    </>
+  );
 }
 
 function App() {
@@ -42,47 +86,7 @@ function App() {
 
   return (
     <BrowserRouter>
-      <Routes>
-        <Route
-          path='/landing'
-          element={currentUser ? <Navigate to='/' replace /> : <LandingPage onLogin={authApi.login} />}
-        />
-        <Route
-          path='/'
-          element={
-            currentUser ? (
-              <HomePage currentUser={currentUser} onLogout={authApi.logout} />
-            ) : (
-              <Navigate to='/landing' replace />
-            )
-          }
-        />
-        <Route
-          path='/profile'
-          element={
-            currentUser ? (
-              <ProfilePage currentUser={currentUser} onUserUpdate={authApi.updateUser} />
-            ) : (
-              <Navigate to='/landing' replace />
-            )
-          }
-        />
-        <Route
-          path='/user/:googleId'
-          element={
-            currentUser ? (
-              <UserProfile currentUser={currentUser} />
-            ) : (
-              <Navigate to='/landing' replace />
-            )
-          }
-        />
-        <Route path="/chat" element={<ChatPage />} />
-        <Route
-          path='*'
-          element={<Navigate to={currentUser ? '/' : '/landing'} replace />}
-        />
-      </Routes>
+        <AppRoutes currentUser={currentUser} authApi={authApi} />
     </BrowserRouter>
   );
 }
