@@ -14,7 +14,7 @@ function formatTime(time) {
     const hour12 = hour % 12 || 12;
     return `${hour12}:${minute} ${period}`;
 }
-import { MapPin, Calendar, Clock, MessageCircle, Pencil, Trash2, Info, User, Mail, Phone, Navigation, ExternalLink, UserPlus, Car, Users, CheckCircle } from 'lucide-react';
+import { MapPin, Calendar, Clock, MessageCircle, Pencil, Trash2, Info, User, Mail, Phone, Navigation, ExternalLink, UserPlus, Car, Users, CheckCircle, UserMinus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
@@ -721,6 +721,25 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
                                                         <div className='text-xs text-gray-500 truncate'>{member.email}</div>
                                                     </div>
                                                 </div>
+                                                {/* Remove button — for post owner on both offer and request */}
+                                                {isOwner && (
+                                                    <Button
+                                                        variant='outline'
+                                                        size='sm'
+                                                        className='shrink-0 text-xs text-red-600 border-red-300 hover:bg-red-50 hover:text-red-700'
+                                                        onClick={async () => {
+                                                            const res = await fetch(`${API_ROOT}/posts/${post._id}/remove-member`, {
+                                                                method: 'POST',
+                                                                headers: { 'Content-Type': 'application/json' },
+                                                                body: JSON.stringify({ email: member.email }),
+                                                            });
+                                                            if (!res.ok) return;
+                                                            setListMembers(prev => prev.filter(m => m.email !== member.email));
+                                                        }}
+                                                    >
+                                                        <UserMinus className='w-3 h-3 mr-1' />Remove
+                                                    </Button>
+                                                )}
                                             </div>
                                         ))}
                                     </div>
