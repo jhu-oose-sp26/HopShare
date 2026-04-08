@@ -83,7 +83,7 @@ router.get('/:userId', async (req, res) => {
   }
 });
 
-// respond to a ride request (accept or decline)
+// respond to a ride request or join_list notification (accept or decline)
 router.patch('/:id/respond', async (req, res) => {
   try {
     const id = req.params.id;
@@ -105,12 +105,59 @@ router.patch('/:id/respond', async (req, res) => {
       { $set: { response, read: true } }
     );
 
+    // If a join_list request is declined, remove the sender from the post's riderList/waitlist
+    if (notif.type === 'join_list' && response === 'declined' && notif.senderId && notif.postId) {
+      const senderUser = await db.collection('users').findOne({ _id: notif.senderId });
+      if (senderUser?.email) {
+        const post = await db.collection('posts').findOne({ _id: notif.postId });
+        if (post) {
+          const listField = post.type === 'offer' ? 'riderList' : 'waitlist';
+          await db.collection('posts').updateOne(
+            { _id: notif.postId },
+            { $pull: { [listField]: { email: senderUser.email } } }
+          );
+        }
+      }
+    }
+
+    // If an invitation is declined, remove the rider from invitedRiders so owner can re-invite later
+    if (notif.type === 'invitation' && response === 'declined' && notif.postId) {
+      const responder = await db.collection('users').findOne({ _id: notif.recipientId });
+      if (responder?.email) {
+        await db.collection('posts').updateOne(
+          { _id: notif.postId },
+          { $pull: { invitedRiders: responder.email } }
+        );
+      }
+    }
+
+    // If a ride_request is declined, remove the driver from the drivers list so they can re-apply
+    if (notif.type === 'ride_request' && response === 'declined' && notif.senderId && notif.postId) {
+      const senderUser = await db.collection('users').findOne({ _id: notif.senderId });
+      if (senderUser?.email) {
+        await db.collection('posts').updateOne(
+          { _id: notif.postId },
+          { $pull: { drivers: { email: senderUser.email } } }
+        );
+      }
+    }
+
     // Send reply notification back to the original requester
     if (notif.senderId) {
-      const replyMessage =
-        response === 'accepted'
+      let replyMessage;
+      if (notif.type === 'join_list') {
+        replyMessage = response === 'accepted'
+          ? `${responderName || 'The poster'} accepted your request to join the list!`
+          : `${responderName || 'The poster'} removed you from the list.`;
+      } else if (notif.type === 'invitation') {
+        replyMessage = response === 'accepted'
+          ? `${responderName || 'The rider'} accepted your ride invitation!`
+          : `${responderName || 'The rider'} declined your ride invitation.`;
+      } else {
+        replyMessage = response === 'accepted'
           ? `${responderName || 'The poster'} accepted your ride request!`
           : `${responderName || 'The poster'} declined your ride request.`;
+      }
 
       await db.collection('notifications').insertOne({
         recipientId: notif.senderId,
