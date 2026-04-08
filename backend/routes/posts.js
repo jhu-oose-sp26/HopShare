@@ -351,7 +351,7 @@ router.post('/:id/remove-member', async (req, res) => {
     const post = await db.collection('posts').findOne({ _id: postId });
     if (!post) return res.status(404).json({ error: 'Post not found' });
 
-    const listField = post.type === 'offer' ? 'riderList' : 'waitlist';
+    const listField = 'riderList';
     await db.collection('posts').updateOne(
       { _id: postId },
       { $pull: { [listField]: { email } } }
