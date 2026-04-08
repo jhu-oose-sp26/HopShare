@@ -14,7 +14,7 @@ function formatTime(time) {
     const hour12 = hour % 12 || 12;
     return `${hour12}:${minute} ${period}`;
 }
-import { MapPin, Calendar, Clock, MessageCircle, Pencil, Trash2, Info, User, Mail, Phone, Navigation, ExternalLink, UserPlus, Car, Users, CheckCircle, UserMinus } from 'lucide-react';
+import { MapPin, Calendar, Clock, MessageCircle, Pencil, Trash2, Info, User, Mail, Phone, Navigation, ExternalLink, UserPlus, Car, Users, CheckCircle, UserMinus, Hash } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
@@ -43,6 +43,7 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
     const [detailsOpen, setDetailsOpen] = useState(false);
     const [deleteOpen, setDeleteOpen] = useState(false);
     const [contactOpen, setContactOpen] = useState(false);
+    const [codeOpen, setCodeOpen] = useState(false);
     const [weatherForecastOpen, setWeatherForecastOpen] = useState(false);
     const [selectedWeatherLocation, setSelectedWeatherLocation] = useState(null);
     const [message, setMessage] = useState('');
@@ -591,6 +592,36 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
                             <><Car className='w-4 h-4 mr-1' />Offer to Be a Driver</>
                         )}
                     </Button>
+                )}
+
+                {/* Confirmation Code — only for the owner in My Rides */}
+                {showActions && (
+                    <Dialog open={codeOpen} onOpenChange={setCodeOpen}>
+                        <DialogTrigger asChild>
+                            <Button variant='outline' size='sm'>
+                                <Hash className='w-4 h-4 mr-1' />
+                                Show Code
+                            </Button>
+                        </DialogTrigger>
+                        <DialogContent className='sm:max-w-xs'>
+                            <DialogHeader>
+                                <DialogTitle>Confirmation Code</DialogTitle>
+                                <DialogDescription>
+                                    Share this code with your riders to confirm the trip.
+                                </DialogDescription>
+                            </DialogHeader>
+                            <div className='flex items-center justify-center py-4'>
+                                <span className='text-3xl font-bold tracking-widest text-gray-900 font-mono'>
+                                    {post.confirmationCode || '—'}
+                                </span>
+                            </div>
+                            <DialogFooter>
+                                <DialogClose asChild>
+                                    <Button variant='outline'>Close</Button>
+                                </DialogClose>
+                            </DialogFooter>
+                        </DialogContent>
+                    </Dialog>
                 )}
 
                 {/* Details Dialog */}
