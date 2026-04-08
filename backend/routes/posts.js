@@ -266,4 +266,102 @@ router.put('/:id', async (req, res) => {
   }
 });
 
+// JOIN rider list
+router.post('/:id/join', async (req, res) => {
+  try {
+    const postId = toObjectId(req.params.id);
+    if (!postId) return res.status(400).json({ error: 'Invalid post id' });
+
+    const { name, email, picture, avatar, googleId } = req.body;
+    if (!email) return res.status(400).json({ error: 'User email required' });
+
+    const db = getDB();
+    const post = await db.collection('posts').findOne({ _id: postId });
+    if (!post) return res.status(404).json({ error: 'Post not found' });
+
+    const listField = 'riderList';
+    const existingList = post[listField] || [];
+
+    if (existingList.some(u => u.email === email)) {
+      return res.json({ success: true, alreadyJoined: true });
+    }
+
+    const userEntry = {
+      name: name || 'Unknown',
+      email,
+      picture: picture || null,
+      avatar: avatar || null,
+      googleId: googleId || null,
+      joinedAt: new Date().toISOString(),
+    };
+
+    await db.collection('posts').updateOne(
+      { _id: postId },
+      { $push: { [listField]: userEntry } }
+    );
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Join list error:', err);
+    res.status(500).json({ error: 'Failed to join list' });
+  }
+});
+
+// TAKE a ride request (driver offers to drive — persisted so it survives refresh)
+router.post('/:id/take', async (req, res) => {
+  try {
+    const postId = toObjectId(req.params.id);
+    if (!postId) return res.status(400).json({ error: 'Invalid post id' });
+
+    const { name, email, picture, avatar, googleId } = req.body;
+    if (!email) return res.status(400).json({ error: 'User email required' });
+
+    const db = getDB();
+    const post = await db.collection('posts').findOne({ _id: postId });
+    if (!post) return res.status(404).json({ error: 'Post not found' });
+
+    const drivers = post.drivers || [];
+    if (drivers.some(d => d.email === email)) {
+      return res.json({ success: true, alreadyTaken: true });
+    }
+
+    await db.collection('posts').updateOne(
+      { _id: postId },
+      { $push: { drivers: { name, email, picture, avatar, googleId, takenAt: new Date().toISOString() } } }
+    );
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Take ride error:', err);
+    res.status(500).json({ error: 'Failed to take ride' });
+  }
+});
+
+
+// REMOVE a member from riderList (offer) or waitlist (request) — owner action
+router.post('/:id/remove-member', async (req, res) => {
+  try {
+    const postId = toObjectId(req.params.id);
+    if (!postId) return res.status(400).json({ error: 'Invalid post id' });
+
+    const { email } = req.body;
+    if (!email) return res.status(400).json({ error: 'Email required' });
+
+    const db = getDB();
+    const post = await db.collection('posts').findOne({ _id: postId });
+    if (!post) return res.status(404).json({ error: 'Post not found' });
+
+    const listField = post.type === 'offer' ? 'riderList' : 'waitlist';
+    await db.collection('posts').updateOne(
+      { _id: postId },
+      { $pull: { [listField]: { email } } }
+    );
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Remove member error:', err);
+    res.status(500).json({ error: 'Failed to remove member' });
+  }
+});
+
 module.exports = router;
