@@ -139,14 +139,31 @@ router.patch('/:id/respond', async (req, res) => {
       }
     }
 
-// If a ride_request is declined, remove the driver from the drivers list so they can re-apply
-    if (notif.type === 'ride_request' && response === 'declined' && notif.senderId && notif.postId) {
+    // Handle ride_request (driver offer) approval/decline
+    if (notif.type === 'ride_request' && notif.senderId && notif.postId) {
       const senderUser = await db.collection('users').findOne({ _id: notif.senderId });
       if (senderUser?.email) {
-        await db.collection('posts').updateOne(
-          { _id: notif.postId },
-          { $pull: { drivers: { email: senderUser.email } } }
-        );
+        if (response === 'accepted') {
+          await db.collection('posts').updateOne(
+            { _id: notif.postId },
+            {
+              $pull: { pendingDrivers: { email: senderUser.email } },
+              $push: { drivers: {
+                name: senderUser.name || notif.senderName || '',
+                email: senderUser.email,
+                picture: senderUser.picture || null,
+                avatar: senderUser.avatar || null,
+                googleId: senderUser.googleId || null,
+                takenAt: new Date().toISOString(),
+              }},
+            }
+          );
+        } else {
+          await db.collection('posts').updateOne(
+            { _id: notif.postId },
+            { $pull: { pendingDrivers: { email: senderUser.email } } }
+          );
+        }
       }
     }
 
@@ -159,8 +176,8 @@ router.patch('/:id/respond', async (req, res) => {
           : `${responderName || 'The poster'} removed you from the list.`;
       } else {
         replyMessage = response === 'accepted'
-          ? `${responderName || 'The poster'} accepted your ride request!`
-          : `${responderName || 'The poster'} declined your ride request.`;
+          ? `${responderName || 'The poster'} accepted your driver request!`
+          : `${responderName || 'The poster'} declined your driver request.`;
       }
 
       await db.collection('notifications').insertOne({

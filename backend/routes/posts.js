@@ -312,13 +312,14 @@ router.post('/:id/take', async (req, res) => {
     if (!post) return res.status(404).json({ error: 'Post not found' });
 
     const drivers = post.drivers || [];
-    if (drivers.some(d => d.email === email)) {
+    const pendingDrivers = post.pendingDrivers || [];
+    if (drivers.some(d => d.email === email) || pendingDrivers.some(d => d.email === email)) {
       return res.json({ success: true, alreadyTaken: true });
     }
 
     await db.collection('posts').updateOne(
       { _id: postId },
-      { $push: { drivers: { name, email, picture, avatar, googleId, takenAt: new Date().toISOString() } } }
+      { $push: { pendingDrivers: { name, email, picture, avatar, googleId, requestedAt: new Date().toISOString() } } }
     );
 
     res.json({ success: true });
@@ -361,6 +362,28 @@ router.post('/:id/remove-member', async (req, res) => {
   } catch (err) {
     console.error('Remove member error:', err);
     res.status(500).json({ error: 'Failed to remove member' });
+  }
+});
+
+// REMOVE a driver — owner action
+router.post('/:id/remove-driver', async (req, res) => {
+  try {
+    const postId = toObjectId(req.params.id);
+    if (!postId) return res.status(400).json({ error: 'Invalid post id' });
+
+    const { email } = req.body;
+    if (!email) return res.status(400).json({ error: 'Email required' });
+
+    const db = getDB();
+    await db.collection('posts').updateOne(
+      { _id: postId },
+      { $pull: { drivers: { email }, pendingDrivers: { email } } }
+    );
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Remove driver error:', err);
+    res.status(500).json({ error: 'Failed to remove driver' });
   }
 });
 

@@ -50,10 +50,12 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
     const [isDeleting, setIsDeleting] = useState(false);
     const [deleteError, setDeleteError] = useState('');
     const [activeMapTab, setActiveMapTab] = useState("route"); // "route" or "distance"
-    // "Take" button — persisted in post.drivers
+    // "Take" button — persisted in post.pendingDrivers / post.drivers
+    const [driverList, setDriverList] = useState(() => post.drivers || []);
     const [joinRequested, setJoinRequested] = useState(() => {
         if (!currentUser) return false;
-        return (post.drivers || []).some(d => d.email === currentUser.email);
+        return (post.drivers || []).some(d => d.email === currentUser.email)
+            || (post.pendingDrivers || []).some(d => d.email === currentUser.email);
     });
     // Rider list — persisted in post.riderList
     const [listMembers, setListMembers] = useState(() => post.riderList || []);
@@ -376,13 +378,23 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
 
             {/* Driver status */}
             {(() => {
-                const driver = (post.drivers || [])[0];
+                const driver = driverList[0];
                 return (
                     <div className='flex items-center gap-2 mb-4 text-sm'>
                         <User className='w-4 h-4 text-gray-400 shrink-0' />
                         {driver ? (
                             <span className='text-gray-700'>
-                                A JHU student offered to drive! Driver: <span className='font-medium'>{driver.name || driver.email}</span>
+                                Driver:{' '}
+                                {driver.googleId ? (
+                                    <button
+                                        onClick={() => navigate(`/user/${driver.googleId}`)}
+                                        className='font-medium text-blue-600 hover:underline hover:text-blue-800'
+                                    >
+                                        {driver.name || driver.email}
+                                    </button>
+                                ) : (
+                                    <span className='font-medium'>{driver.name || driver.email}</span>
+                                )}
                             </span>
                         ) : (
                             <span className='text-gray-400 italic'>No driver yet - use Uber/Lyft</span>
@@ -537,7 +549,7 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
                 )}
 
                 {/* Take button — only for non-owners on request posts (driver offering to take) */}
-                {currentUser && !isOwner && !isOffer && (
+                {currentUser && !isOwner && !isOffer && !driverList.some(d => d.email === currentUser.email) && (
                     <Button
                         variant={joinRequested ? 'outline' : 'default'}
                         size='sm'
@@ -603,6 +615,28 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
                         ) : (
                             <><Car className='w-4 h-4 mr-1' />Offer to Be a Driver</>
                         )}
+                    </Button>
+                )}
+
+                {/* Leave as driver — only if current user is an accepted driver */}
+                {currentUser && !isOwner && driverList.some(d => d.email === currentUser.email) && (
+                    <Button
+                        variant='outline'
+                        size='sm'
+                        className='flex-1 text-red-600 border-red-300 hover:bg-red-50 hover:text-red-700'
+                        onClick={async () => {
+                            const res = await fetch(`${API_ROOT}/posts/${post._id}/remove-driver`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ email: currentUser.email }),
+                            });
+                            if (res.ok) {
+                                setDriverList(prev => prev.filter(d => d.email !== currentUser.email));
+                                setJoinRequested(false);
+                            }
+                        }}
+                    >
+                        <UserMinus className='w-4 h-4 mr-1' />Leave as Driver
                     </Button>
                 )}
 
@@ -702,25 +736,39 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
                             {/* Driver */}
                             <div className='bg-gray-50 rounded-lg p-3 space-y-2'>
                                 <p className='text-xs font-semibold uppercase tracking-wide text-gray-400'>Driver</p>
-                                {(() => {
-                                    const driver = (post.drivers || [])[0];
-                                    return driver ? (
-                                        <div className='flex items-center gap-3'>
-                                            <img
-                                                src={driver.avatar || driver.picture || `https://ui-avatars.com/api/?name=${encodeURIComponent(driver.name || 'Driver')}&background=e5e7eb&color=374151&size=64`}
-                                                alt={driver.name || 'Driver'}
-                                                className='w-10 h-10 rounded-full border border-gray-200 object-cover'
-                                                onError={(e) => { e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(driver.name || 'Driver')}&background=e5e7eb&color=374151&size=64`; }}
-                                            />
-                                            <div className='flex-1 min-w-0'>
-                                                <p className='font-medium text-sm break-all'>{driver.name || '—'}</p>
-                                                <p className='text-xs text-gray-500 break-all'>{driver.email || '—'}</p>
-                                            </div>
+                                {driverList.length > 0 ? driverList.map((driver) => (
+                                    <div key={driver.email} className='flex items-center gap-3'>
+                                        <img
+                                            src={driver.avatar || driver.picture || `https://ui-avatars.com/api/?name=${encodeURIComponent(driver.name || 'Driver')}&background=e5e7eb&color=374151&size=64`}
+                                            alt={driver.name || 'Driver'}
+                                            className='w-10 h-10 rounded-full border border-gray-200 object-cover'
+                                            onError={(e) => { e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(driver.name || 'Driver')}&background=e5e7eb&color=374151&size=64`; }}
+                                        />
+                                        <div className='flex-1 min-w-0'>
+                                            <p className='font-medium text-sm break-all'>{driver.name || '—'}</p>
+                                            <p className='text-xs text-gray-500 break-all'>{driver.email || '—'}</p>
                                         </div>
-                                    ) : (
-                                        <p className='text-gray-400 italic text-sm'>No driver yet</p>
-                                    );
-                                })()}
+                                        {isOwner && (
+                                            <Button
+                                                variant='outline'
+                                                size='sm'
+                                                className='shrink-0 text-xs text-red-600 border-red-300 hover:bg-red-50 hover:text-red-700'
+                                                onClick={async () => {
+                                                    const res = await fetch(`${API_ROOT}/posts/${post._id}/remove-driver`, {
+                                                        method: 'POST',
+                                                        headers: { 'Content-Type': 'application/json' },
+                                                        body: JSON.stringify({ email: driver.email }),
+                                                    });
+                                                    if (res.ok) setDriverList(prev => prev.filter(d => d.email !== driver.email));
+                                                }}
+                                            >
+                                                <UserMinus className='w-3 h-3 mr-1' />Remove
+                                            </Button>
+                                        )}
+                                    </div>
+                                )) : (
+                                    <p className='text-gray-400 italic text-sm'>No driver yet</p>
+                                )}
                             </div>
 
                             {/* Description */}
