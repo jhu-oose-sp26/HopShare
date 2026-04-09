@@ -38,6 +38,7 @@ router.get('/autocomplete', async (req, res) => {
             engine: 'google_maps_autocomplete',
             q: q.trim(),
             api_key: process.env.SERP_API_KEY,
+            hl: 'en',
         };
         if (lat && lng) {
             params.ll = `@${lat},${lng},14z`;

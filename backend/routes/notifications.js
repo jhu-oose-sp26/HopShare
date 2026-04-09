@@ -105,29 +105,65 @@ router.patch('/:id/respond', async (req, res) => {
       { $set: { response, read: true } }
     );
 
-    // If a join_list request is declined, remove the sender from the post's riderList/waitlist
-    if (notif.type === 'join_list' && response === 'declined' && notif.senderId && notif.postId) {
-      const senderUser = await db.collection('users').findOne({ _id: notif.senderId });
-      if (senderUser?.email) {
-        const post = await db.collection('posts').findOne({ _id: notif.postId });
-        if (post) {
-          const listField = 'riderList';
+    // Handle join_list approval/decline
+    if (notif.type === 'join_list' && notif.postId) {
+      // Extract sender email from pendingJoins via the stored notification message sender
+      // Look up sender by senderId first, fall back to senderName from notif
+      let senderUser = null;
+      if (notif.senderId) {
+        senderUser = await db.collection('users').findOne({ _id: notif.senderId });
+      }
+      const senderEmail = senderUser?.email;
+      if (senderEmail) {
+        if (response === 'accepted') {
           await db.collection('posts').updateOne(
             { _id: notif.postId },
-            { $pull: { [listField]: { email: senderUser.email } } }
+            {
+              $pull: { pendingJoins: senderEmail },
+              $push: { riderList: {
+                name: senderUser.name || senderUser.displayName || notif.senderName || '',
+                email: senderEmail,
+                picture: senderUser.picture || null,
+                avatar: senderUser.avatar || null,
+                googleId: senderUser.googleId || null,
+                joinedAt: new Date().toISOString(),
+              }},
+            }
+          );
+        } else {
+          await db.collection('posts').updateOne(
+            { _id: notif.postId },
+            { $pull: { pendingJoins: senderEmail } }
           );
         }
       }
     }
 
-// If a ride_request is declined, remove the driver from the drivers list so they can re-apply
-    if (notif.type === 'ride_request' && response === 'declined' && notif.senderId && notif.postId) {
+    // Handle ride_request (driver offer) approval/decline
+    if (notif.type === 'ride_request' && notif.senderId && notif.postId) {
       const senderUser = await db.collection('users').findOne({ _id: notif.senderId });
       if (senderUser?.email) {
-        await db.collection('posts').updateOne(
-          { _id: notif.postId },
-          { $pull: { drivers: { email: senderUser.email } } }
-        );
+        if (response === 'accepted') {
+          await db.collection('posts').updateOne(
+            { _id: notif.postId },
+            {
+              $pull: { pendingDrivers: { email: senderUser.email } },
+              $push: { drivers: {
+                name: senderUser.name || notif.senderName || '',
+                email: senderUser.email,
+                picture: senderUser.picture || null,
+                avatar: senderUser.avatar || null,
+                googleId: senderUser.googleId || null,
+                takenAt: new Date().toISOString(),
+              }},
+            }
+          );
+        } else {
+          await db.collection('posts').updateOne(
+            { _id: notif.postId },
+            { $pull: { pendingDrivers: { email: senderUser.email } } }
+          );
+        }
       }
     }
 
@@ -140,8 +176,8 @@ router.patch('/:id/respond', async (req, res) => {
           : `${responderName || 'The poster'} removed you from the list.`;
       } else {
         replyMessage = response === 'accepted'
-          ? `${responderName || 'The poster'} accepted your ride request!`
-          : `${responderName || 'The poster'} declined your ride request.`;
+          ? `${responderName || 'The poster'} accepted your driver request!`
+          : `${responderName || 'The poster'} declined your driver request.`;
       }
 
       await db.collection('notifications').insertOne({
