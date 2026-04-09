@@ -55,7 +55,8 @@ function ProfilePage({ currentUser, onUserUpdate }) {
   const [phoneWarning, setPhoneWarning] = useState('');
   const fileInputRef = useRef(null);
   const [visibleCount, setVisibleCount] = useState(3);
-  
+  const [expandedPostId, setExpandedPostId] = useState(null);
+
   // Form state
   const [formData, setFormData] = useState({
     name: currentUser?.name || '',
@@ -107,7 +108,7 @@ function ProfilePage({ currentUser, onUserUpdate }) {
 
   const handleNameChange = (value) => {
     setFormData(prev => ({ ...prev, name: value }));
-    
+
     const trimmed = value.trim();
     if (!trimmed) {
       setError('Name cannot be empty.');
@@ -209,7 +210,7 @@ function ProfilePage({ currentUser, onUserUpdate }) {
       return;
     }
     const formattedPhone = trimmedPhone ? formatUSPhoneNumber(trimmedPhone) : '';
-    
+
     setIsLoading(true);
     setError('');
     setSuccess('');
@@ -235,13 +236,13 @@ function ProfilePage({ currentUser, onUserUpdate }) {
       }
 
       const { user } = payload;
-      
+
       // Update the user in app state and localStorage
       onUserUpdate(user);
-      
+
       setIsEditing(false);
       setSuccess('Profile updated successfully!');
-      
+
       // Clear success message after 3 seconds
       setTimeout(() => setSuccess(''), 3000);
     } catch (err) {
@@ -306,7 +307,7 @@ function ProfilePage({ currentUser, onUserUpdate }) {
                     </button>
                   )}
                 </div>
-                
+
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-3 mb-2">
                     <h1 className="text-2xl font-bold text-gray-900">
@@ -342,7 +343,7 @@ function ProfilePage({ currentUser, onUserUpdate }) {
                   )}
                 </div>
               </div>
-              
+
               <div className="flex gap-2 sm:flex-col sm:items-end">
                 {isEditing && (
                   <div className="flex gap-2">
@@ -374,7 +375,7 @@ function ProfilePage({ currentUser, onUserUpdate }) {
                 <p className="text-red-700 text-sm">{error}</p>
               </div>
             )}
-            
+
             {success && (
               <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-md">
                 <p className="text-green-700 text-sm">{success}</p>
@@ -525,10 +526,11 @@ function ProfilePage({ currentUser, onUserUpdate }) {
                   {archivedPosts.slice(0, visibleCount).map(post => (
                     <div key={post._id} className="border border-gray-100 rounded-lg p-4 bg-gray-50">
                       <div className="flex items-center justify-between mb-1">
-                        <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${post.type === 'offer'
+                        <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
+                          post.type === 'offer'
                             ? 'bg-green-100 text-green-700'
                             : 'bg-blue-100 text-blue-700'
-                          }`}>
+                        }`}>
                           {post.type === 'offer' ? 'Offered Ride' : 'Requested Ride'}
                         </span>
                         <span className="text-xs text-gray-400">{post.trip?.date}</span>
@@ -538,6 +540,23 @@ function ProfilePage({ currentUser, onUserUpdate }) {
                       </p>
                       {post.trip?.time && (
                         <p className="text-xs text-gray-500 mt-0.5">{post.trip.time}</p>
+                      )}
+                      {post.description && (
+                        <>
+                          {expandedPostId === post._id && (
+                            <p className="text-sm text-gray-600 mt-2 border-t border-gray-200 pt-2">
+                              {post.description}
+                            </p>
+                          )}
+                          <button
+                            onClick={() => setExpandedPostId(
+                              expandedPostId === post._id ? null : post._id
+                            )}
+                            className="mt-2 text-xs text-blue-600 hover:text-blue-800 font-medium"
+                          >
+                            {expandedPostId === post._id ? 'Show less' : 'View details'}
+                          </button>
+                        </>
                       )}
                     </div>
                   ))}
