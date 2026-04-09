@@ -4,7 +4,6 @@ import HomePage from '@/pages/HomePage';
 import LandingPage from '@/pages/LandingPage';
 import ProfilePage from '@/pages/ProfilePage';
 import UserProfile from '@/pages/UserProfile';
-import ChatPage from '@/pages/ChatPage';
 import FriendsPage from '@/pages/FriendsPage';
 import MessagesPage from '@/pages/MessagesPage';
 import BottomNav from '@/components/BottomNav';

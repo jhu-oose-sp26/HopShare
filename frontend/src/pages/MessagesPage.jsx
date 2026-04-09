@@ -10,58 +10,58 @@ import { DateItem } from '@/components/examples/date-item';
 
 const MessagesPage = () => {
   return (
-    <Chat className="h-screen">
+    <Chat className="h-screen pb-20">
       <ChatHeader>Chat Header</ChatHeader>
 
       <ChatMessages>
-  {MESSAGES.map((msg, i, msgs) => {
-    // If date changed, show date item
-    if (
-      new Date(msg.timestamp).toDateString() !==
-      new Date(msgs[i + 1]?.timestamp).toDateString()
-    ) {
-      return (
-        <Fragment key={msg.id}>
-          <PrimaryMessage
-            avatarSrc={msg.sender.avatarUrl}
-            avatarAlt={msg.sender.username}
-            avatarFallback={msg.sender.name.slice(0, 2)}
-            senderName={msg.sender.name}
-            content={msg.content}
-            timestamp={msg.timestamp}
-          />
-          <DateItem timestamp={msg.timestamp} className="my-4" />
-        </Fragment>
-      );
-    }
+        {MESSAGES.map((msg, i, msgs) => {
+          // If date changed, show date item
+          if (
+            new Date(msg.timestamp).toDateString() !==
+            new Date(msgs[i + 1]?.timestamp).toDateString()
+          ) {
+            return (
+              <Fragment key={msg.id}>
+                <PrimaryMessage
+                  avatarSrc={msg.sender.avatarUrl}
+                  avatarAlt={msg.sender.username}
+                  avatarFallback={msg.sender.name.slice(0, 2)}
+                  senderName={msg.sender.name}
+                  content={msg.content}
+                  timestamp={msg.timestamp}
+                />
+                <DateItem timestamp={msg.timestamp} className="my-4" />
+              </Fragment>
+            );
+          }
 
-    // If next item is same user, show additional
-    if (msg.sender.id === msgs[i + 1]?.sender.id) {
-      return (
-        <AdditionalMessage
-          key={msg.id}
-          content={msg.content}
-          timestamp={msg.timestamp}
-        />
-      );
-    }
-    // Else, show primary
-    else {
-      return (
-        <PrimaryMessage
-          className="mt-4"
-          key={msg.id}
-          avatarSrc={msg.sender.avatarUrl}
-          avatarAlt={msg.sender.username}
-          avatarFallback={msg.sender.name.slice(0, 2)}
-          senderName={msg.sender.name}
-          content={msg.content}
-          timestamp={msg.timestamp}
-        />
-      );
-    }
-  })}
-</ChatMessages>
+          // If next item is same user, show additional
+          if (msg.sender.id === msgs[i + 1]?.sender.id) {
+            return (
+              <AdditionalMessage
+                key={msg.id}
+                content={msg.content}
+                timestamp={msg.timestamp}
+              />
+            );
+          }
+          // Else, show primary
+          else {
+            return (
+              <PrimaryMessage
+                className="mt-4"
+                key={msg.id}
+                avatarSrc={msg.sender.avatarUrl}
+                avatarAlt={msg.sender.username}
+                avatarFallback={msg.sender.name.slice(0, 2)}
+                senderName={msg.sender.name}
+                content={msg.content}
+                timestamp={msg.timestamp}
+              />
+            );
+          }
+        })}
+      </ChatMessages>
     
 
       <ChatToolbar>
