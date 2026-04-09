@@ -131,7 +131,7 @@ function NotificationMenu({ currentUser }) {
           </SheetDescription>
         </SheetHeader>
 
-        <div className="mt-4 space-y-3 px-4">
+        <div className="mt-4 space-y-3 px-4 overflow-y-auto max-h-[calc(100vh-8rem)]">
           {notifications.length === 0 ? (
             <p className="text-sm text-gray-500">
               No notifications yet.

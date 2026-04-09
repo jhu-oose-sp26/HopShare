@@ -14,7 +14,7 @@ function formatTime(time) {
     const hour12 = hour % 12 || 12;
     return `${hour12}:${minute} ${period}`;
 }
-import { MapPin, Calendar, Clock, MessageCircle, Pencil, Trash2, Info, User, Mail, Phone, Navigation, ExternalLink, UserPlus, Car, Users, CheckCircle, UserMinus } from 'lucide-react';
+import { MapPin, Calendar, Clock, MessageCircle, Pencil, Trash2, Info, User, Mail, Phone, Navigation, ExternalLink, UserPlus, Car, Users, CheckCircle, UserMinus, Hash } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
@@ -43,25 +43,29 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
     const [detailsOpen, setDetailsOpen] = useState(false);
     const [deleteOpen, setDeleteOpen] = useState(false);
     const [contactOpen, setContactOpen] = useState(false);
+    const [codeOpen, setCodeOpen] = useState(false);
     const [weatherForecastOpen, setWeatherForecastOpen] = useState(false);
     const [selectedWeatherLocation, setSelectedWeatherLocation] = useState(null);
     const [message, setMessage] = useState('');
     const [isDeleting, setIsDeleting] = useState(false);
     const [deleteError, setDeleteError] = useState('');
     const [activeMapTab, setActiveMapTab] = useState("route"); // "route" or "distance"
-    // "Take" button — persisted in post.drivers
+    // "Take" button — persisted in post.pendingDrivers / post.drivers
+    const [driverList, setDriverList] = useState(() => post.drivers || []);
     const [joinRequested, setJoinRequested] = useState(() => {
         if (!currentUser) return false;
-        return (post.drivers || []).some(d => d.email === currentUser.email);
+        return (post.drivers || []).some(d => d.email === currentUser.email)
+            || (post.pendingDrivers || []).some(d => d.email === currentUser.email);
     });
     // Rider list — persisted in post.riderList
     const [listMembers, setListMembers] = useState(() => post.riderList || []);
-    const [listJoined, setListJoined] = useState(() => {
-        if (!currentUser) return false;
-        return (post.riderList || []).some(u => u.email === currentUser.email);
-    });
+    const listJoined = currentUser ? listMembers.some(u => u.email === currentUser.email) : false;
     const [listJoinLoading, setListJoinLoading] = useState(false);
     const [listJoinError, setListJoinError] = useState('');
+    const [listRequestSent, setListRequestSent] = useState(() => {
+        if (!currentUser) return false;
+        return (post.pendingJoins || []).includes(currentUser.email);
+    });
 
     const isOwner = currentUser && post.user?.email && currentUser.email === post.user.email;
 
@@ -374,13 +378,23 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
 
             {/* Driver status */}
             {(() => {
-                const driver = (post.drivers || [])[0];
+                const driver = driverList[0];
                 return (
                     <div className='flex items-center gap-2 mb-4 text-sm'>
                         <User className='w-4 h-4 text-gray-400 shrink-0' />
                         {driver ? (
                             <span className='text-gray-700'>
-                                A JHU student offered to drive! Driver: <span className='font-medium'>{driver.name || driver.email}</span>
+                                Driver:{' '}
+                                {driver.googleId ? (
+                                    <button
+                                        onClick={() => navigate(`/user/${driver.googleId}`)}
+                                        className='font-medium text-blue-600 hover:underline hover:text-blue-800'
+                                    >
+                                        {driver.name || driver.email}
+                                    </button>
+                                ) : (
+                                    <span className='font-medium'>{driver.name || driver.email}</span>
+                                )}
                             </span>
                         ) : (
                             <span className='text-gray-400 italic'>No driver yet - use Uber/Lyft</span>
@@ -466,11 +480,11 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
                 {/* Join the rider list — only for non-owners */}
                 {currentUser && !isOwner && (
                     <div className='flex-1 flex flex-col gap-1'>
-                        <Button
-                            variant={listJoined ? 'outline' : 'default'}
+                        {!listJoined && <Button
+                            variant={listJoined || listRequestSent ? 'outline' : 'default'}
                             size='sm'
-                            className={`w-full ${listJoined ? 'text-gray-400' : 'bg-green-600 hover:bg-green-700'}`}
-                            disabled={listJoined || listJoinLoading}
+                            className={`w-full ${listJoined || listRequestSent ? 'text-gray-400' : 'bg-green-600 hover:bg-green-700'}`}
+                            disabled={listJoined || listRequestSent || listJoinLoading}
                             onClick={async () => {
                                 setListJoinError('');
                                 setListJoinLoading(true);
@@ -478,18 +492,10 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
                                     const res = await fetch(`${API_ROOT}/posts/${post._id}/join`, {
                                         method: 'POST',
                                         headers: { 'Content-Type': 'application/json' },
-                                        body: JSON.stringify({
-                                            name: currentUser.name,
-                                            email: currentUser.email,
-                                            picture: currentUser.picture || null,
-                                            avatar: currentUser.avatar || null,
-                                            googleId: currentUser.googleId || null,
-                                        }),
+                                        body: JSON.stringify({ email: currentUser.email }),
                                     });
                                     if (res.ok) {
-                                        const msg = isOffer
-                                            ? `${currentUser.name} wants to join your rider list for the ride from ${post.trip?.startLocation?.title || 'start'} to ${post.trip?.endLocation?.title || 'destination'}.`
-                                            : `${currentUser.name} wants to join the rider list for your ride request from ${post.trip?.startLocation?.title || 'start'} to ${post.trip?.endLocation?.title || 'destination'}.`;
+                                        const msg = `${currentUser.name} wants to join your rider list for the ride from ${post.trip?.startLocation?.title || 'start'} to ${post.trip?.endLocation?.title || 'destination'}.`;
                                         await fetch(NOTIFICATIONS_ENDPOINT, {
                                             method: 'POST',
                                             headers: { 'Content-Type': 'application/json' },
@@ -502,12 +508,10 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
                                                 type: 'join_list',
                                             }),
                                         });
-                                        const newEntry = { name: currentUser.name, email: currentUser.email, picture: currentUser.picture || null, avatar: currentUser.avatar || null, googleId: currentUser.googleId || null };
-                                        setListMembers(prev => [...prev, newEntry]);
-                                        setListJoined(true);
+                                        setListRequestSent(true);
                                     } else {
                                         const data = await res.json().catch(() => ({}));
-                                        setListJoinError(data.error || 'Failed to join. Please try again.');
+                                        setListJoinError(data.error || 'Failed to send request. Please try again.');
                                     }
                                 } catch (err) {
                                     setListJoinError('Network error. Please try again.');
@@ -517,19 +521,40 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
                             }}
                         >
                             {listJoinLoading ? (
-                                'Joining...'
+                                'Sending...'
                             ) : listJoined ? (
                                 <><CheckCircle className='w-4 h-4 mr-1' />On Rider List</>
+                            ) : listRequestSent ? (
+                                <><CheckCircle className='w-4 h-4 mr-1' />Request Sent</>
                             ) : (
                                 <><Users className='w-4 h-4 mr-1' />Join the Rider List</>
                             )}
-                        </Button>
+                        </Button>}
+                        {listJoined && (
+                            <Button
+                                variant='outline'
+                                size='sm'
+                                className='w-full text-xs text-red-600 border-red-300 hover:bg-red-50 hover:text-red-700'
+                                onClick={async () => {
+                                    const res = await fetch(`${API_ROOT}/posts/${post._id}/remove-member`, {
+                                        method: 'POST',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({ email: currentUser.email, name: currentUser.name }),
+                                    });
+                                    if (res.ok) {
+                                        setListMembers(prev => prev.filter(m => m.email !== currentUser.email));
+                                    }
+                                }}
+                            >
+                                <UserMinus className='w-3 h-3 mr-1' />Leave Rider List
+                            </Button>
+                        )}
                         {listJoinError && <p className='text-xs text-red-500'>{listJoinError}</p>}
                     </div>
                 )}
 
                 {/* Take button — only for non-owners on request posts (driver offering to take) */}
-                {currentUser && !isOwner && !isOffer && (
+                {currentUser && !isOwner && !isOffer && !driverList.some(d => d.email === currentUser.email) && (
                     <Button
                         variant={joinRequested ? 'outline' : 'default'}
                         size='sm'
@@ -598,6 +623,58 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
                     </Button>
                 )}
 
+                {/* Leave as driver — only if current user is an accepted driver */}
+                {currentUser && !isOwner && driverList.some(d => d.email === currentUser.email) && (
+                    <Button
+                        variant='outline'
+                        size='sm'
+                        className='flex-1 text-red-600 border-red-300 hover:bg-red-50 hover:text-red-700'
+                        onClick={async () => {
+                            const res = await fetch(`${API_ROOT}/posts/${post._id}/remove-driver`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ email: currentUser.email }),
+                            });
+                            if (res.ok) {
+                                setDriverList(prev => prev.filter(d => d.email !== currentUser.email));
+                                setJoinRequested(false);
+                            }
+                        }}
+                    >
+                        <UserMinus className='w-4 h-4 mr-1' />Leave as Driver
+                    </Button>
+                )}
+
+                {/* Confirmation Code — only for the owner in My Rides */}
+                {showActions && (
+                    <Dialog open={codeOpen} onOpenChange={setCodeOpen}>
+                        <DialogTrigger asChild>
+                            <Button variant='outline' size='sm'>
+                                <Hash className='w-4 h-4 mr-1' />
+                                Show Code
+                            </Button>
+                        </DialogTrigger>
+                        <DialogContent className='sm:max-w-xs'>
+                            <DialogHeader>
+                                <DialogTitle>Confirmation Code</DialogTitle>
+                                <DialogDescription>
+                                    Share this code with your riders to confirm the trip.
+                                </DialogDescription>
+                            </DialogHeader>
+                            <div className='flex items-center justify-center py-4'>
+                                <span className='text-3xl font-bold tracking-widest text-gray-900 font-mono'>
+                                    {post.confirmationCode || '—'}
+                                </span>
+                            </div>
+                            <DialogFooter>
+                                <DialogClose asChild>
+                                    <Button variant='outline'>Close</Button>
+                                </DialogClose>
+                            </DialogFooter>
+                        </DialogContent>
+                    </Dialog>
+                )}
+
                 {/* Details Dialog */}
                 <Dialog open={detailsOpen} onOpenChange={setDetailsOpen}>
                     <DialogTrigger asChild>
@@ -664,25 +741,39 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
                             {/* Driver */}
                             <div className='bg-gray-50 rounded-lg p-3 space-y-2'>
                                 <p className='text-xs font-semibold uppercase tracking-wide text-gray-400'>Driver</p>
-                                {(() => {
-                                    const driver = (post.drivers || [])[0];
-                                    return driver ? (
-                                        <div className='flex items-center gap-3'>
-                                            <img
-                                                src={driver.avatar || driver.picture || `https://ui-avatars.com/api/?name=${encodeURIComponent(driver.name || 'Driver')}&background=e5e7eb&color=374151&size=64`}
-                                                alt={driver.name || 'Driver'}
-                                                className='w-10 h-10 rounded-full border border-gray-200 object-cover'
-                                                onError={(e) => { e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(driver.name || 'Driver')}&background=e5e7eb&color=374151&size=64`; }}
-                                            />
-                                            <div className='flex-1 min-w-0'>
-                                                <p className='font-medium text-sm break-all'>{driver.name || '—'}</p>
-                                                <p className='text-xs text-gray-500 break-all'>{driver.email || '—'}</p>
-                                            </div>
+                                {driverList.length > 0 ? driverList.map((driver) => (
+                                    <div key={driver.email} className='flex items-center gap-3'>
+                                        <img
+                                            src={driver.avatar || driver.picture || `https://ui-avatars.com/api/?name=${encodeURIComponent(driver.name || 'Driver')}&background=e5e7eb&color=374151&size=64`}
+                                            alt={driver.name || 'Driver'}
+                                            className='w-10 h-10 rounded-full border border-gray-200 object-cover'
+                                            onError={(e) => { e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(driver.name || 'Driver')}&background=e5e7eb&color=374151&size=64`; }}
+                                        />
+                                        <div className='flex-1 min-w-0'>
+                                            <p className='font-medium text-sm break-all'>{driver.name || '—'}</p>
+                                            <p className='text-xs text-gray-500 break-all'>{driver.email || '—'}</p>
                                         </div>
-                                    ) : (
-                                        <p className='text-gray-400 italic text-sm'>No driver yet</p>
-                                    );
-                                })()}
+                                        {isOwner && (
+                                            <Button
+                                                variant='outline'
+                                                size='sm'
+                                                className='shrink-0 text-xs text-red-600 border-red-300 hover:bg-red-50 hover:text-red-700'
+                                                onClick={async () => {
+                                                    const res = await fetch(`${API_ROOT}/posts/${post._id}/remove-driver`, {
+                                                        method: 'POST',
+                                                        headers: { 'Content-Type': 'application/json' },
+                                                        body: JSON.stringify({ email: driver.email }),
+                                                    });
+                                                    if (res.ok) setDriverList(prev => prev.filter(d => d.email !== driver.email));
+                                                }}
+                                            >
+                                                <UserMinus className='w-3 h-3 mr-1' />Remove
+                                            </Button>
+                                        )}
+                                    </div>
+                                )) : (
+                                    <p className='text-gray-400 italic text-sm'>No driver yet</p>
+                                )}
                             </div>
 
                             {/* Description */}
@@ -736,7 +827,7 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
                                                             const res = await fetch(`${API_ROOT}/posts/${post._id}/remove-member`, {
                                                                 method: 'POST',
                                                                 headers: { 'Content-Type': 'application/json' },
-                                                                body: JSON.stringify({ email: member.email }),
+                                                                body: JSON.stringify({ email: member.email, name: member.name }),
                                                             });
                                                             if (!res.ok) return;
                                                             setListMembers(prev => prev.filter(m => m.email !== member.email));
