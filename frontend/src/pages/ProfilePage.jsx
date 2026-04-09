@@ -54,6 +54,7 @@ function ProfilePage({ currentUser, onUserUpdate }) {
   const [success, setSuccess] = useState('');
   const [phoneWarning, setPhoneWarning] = useState('');
   const fileInputRef = useRef(null);
+  const [visibleCount, setVisibleCount] = useState(3);
   
   // Form state
   const [formData, setFormData] = useState({
@@ -519,27 +520,37 @@ function ProfilePage({ currentUser, onUserUpdate }) {
             ) : archivedPosts.length === 0 ? (
               <p className="text-gray-500 text-sm">No past trips yet.</p>
             ) : (
-              <div className="space-y-3">
-                {archivedPosts.map(post => (
-                  <div key={post._id} className="border border-gray-100 rounded-lg p-4 bg-gray-50">
-                    <div className="flex items-center justify-between mb-1">
-                      <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${post.type === 'offer'
-                          ? 'bg-green-100 text-green-700'
-                          : 'bg-blue-100 text-blue-700'
-                        }`}>
-                        {post.type === 'offer' ? 'Offered Ride' : 'Requested Ride'}
-                      </span>
-                      <span className="text-xs text-gray-400">{post.trip?.date}</span>
+              <>
+                <div className="space-y-3">
+                  {archivedPosts.slice(0, visibleCount).map(post => (
+                    <div key={post._id} className="border border-gray-100 rounded-lg p-4 bg-gray-50">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${post.type === 'offer'
+                            ? 'bg-green-100 text-green-700'
+                            : 'bg-blue-100 text-blue-700'
+                          }`}>
+                          {post.type === 'offer' ? 'Offered Ride' : 'Requested Ride'}
+                        </span>
+                        <span className="text-xs text-gray-400">{post.trip?.date}</span>
+                      </div>
+                      <p className="text-sm font-medium text-gray-800">
+                        {post.title || 'Unknown route'}
+                      </p>
+                      {post.trip?.time && (
+                        <p className="text-xs text-gray-500 mt-0.5">{post.trip.time}</p>
+                      )}
                     </div>
-                    <p className="text-sm font-medium text-gray-800">
-                      {post.title || 'Unknown route'}
-                    </p>
-                    {post.trip?.time && (
-                      <p className="text-xs text-gray-500 mt-0.5">{post.trip.time}</p>
-                    )}
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+                {visibleCount < archivedPosts.length && (
+                  <button
+                    onClick={() => setVisibleCount(archivedPosts.length)}
+                    className="mt-4 text-sm text-blue-600 hover:text-blue-800 font-medium"
+                  >
+                    See all ({archivedPosts.length} trips)
+                  </button>
+                )}
+              </>
             )}
           </div>
         </div>
