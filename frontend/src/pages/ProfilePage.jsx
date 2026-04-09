@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { User, Mail, Phone, BookOpen, Calendar, MapPin, Edit3, Save, X, Camera, Upload, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { formatTime, formatDate } from '@/lib/utils';
 
 const API_ROOT = (import.meta.env.VITE_API_BASE_URL || '/api').replace(/\/$/, '');
 
@@ -533,13 +534,15 @@ function ProfilePage({ currentUser, onUserUpdate }) {
                         }`}>
                           {post.type === 'offer' ? 'Offered Ride' : 'Requested Ride'}
                         </span>
-                        <span className="text-xs text-gray-400">{post.trip?.date}</span>
+                        <span className="text-xs text-gray-400">{formatDate(post.trip?.date)}</span>
                       </div>
                       <p className="text-sm font-medium text-gray-800">
                         {post.title || 'Unknown route'}
                       </p>
                       {post.trip?.time && (
-                        <p className="text-xs text-gray-500 mt-0.5">{post.trip.time}</p>
+                        <p className="text-xs text-gray-500 mt-0.5">
+                          {formatTime(post.trip?.time)}
+                        </p>
                       )}
                       {post.description && (
                         <>
