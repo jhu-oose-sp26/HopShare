@@ -18,6 +18,11 @@ import { MapPin, Calendar, Clock, MessageCircle, Pencil, Trash2, Info, User, Mai
 import { Button } from '@/components/ui/button';
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
+    HoverCard,
+    HoverCardTrigger,
+    HoverCardContent,
+} from '@/components/ui/hover-card';
+import {
     Dialog,
     DialogClose,
     DialogContent,
@@ -405,10 +410,41 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
 
             {/* Action buttons */}
             <div className='flex flex-wrap gap-2'>
-                <Button variant='default' size='sm' className='flex-1' onClick={() => navigate("/messages", {/*IMPLEMENT ACCORDING TO PROJECT BOARD*/})}>
-                    <MessageCircle className='w-4 h-4 mr-1' />
-                    Chat
-                </Button>
+                {currentUser && (isOwner || listJoined) ? (
+                    <Button 
+                        variant='default' 
+                        size='sm' 
+                        className='flex-1' 
+                        onClick={() => navigate("/messages", {/*IMPLEMENT ACCORDING TO PROJECT BOARD*/})}
+                    >
+                        <MessageCircle className='w-4 h-4 mr-1' />
+                        Chat
+                    </Button>
+                ) : currentUser && !isOwner && !listJoined ? (
+                    <HoverCard openDelay={10} closeDelay={100}>
+                        <HoverCardTrigger asChild>
+                            <div className='flex-1'>
+                                <Button 
+                                variant='default' 
+                                size='sm' 
+                                className='w-full' 
+                                disabled={true}
+                                >
+                                    <MessageCircle className='w-4 h-4 mr-1' />
+                                    Chat
+                                </Button>
+                            </div>
+                        </HoverCardTrigger>
+                        <HoverCardContent className="w-80">
+                            <div className="space-y-2">
+                                <p className="text-sm font-semibold">Chat Unavailable</p>
+                                <p className="text-sm text-gray-600">
+                                    You must be on the rider list to chat about this ride. Request to join first!
+                                </p>
+                            </div>
+                        </HoverCardContent>
+                    </HoverCard>
+                ) : null}
 
                 {/* Contact Dialog */}
 
