@@ -67,6 +67,8 @@ function ProfilePage({ currentUser, onUserUpdate }) {
 
   // Avatar preview state
   const [avatarPreview, setAvatarPreview] = useState(null);
+  const [archivedPosts, setArchivedPosts] = useState([]);
+  const [archivedLoading, setArchivedLoading] = useState(true);
 
   // Reset form when currentUser changes or edit mode is cancelled
   useEffect(() => {
@@ -81,6 +83,22 @@ function ProfilePage({ currentUser, onUserUpdate }) {
     setAvatarPreview(null);
     setPhoneWarning('');
   }, [currentUser, isEditing]);
+
+  useEffect(() => {
+    const fetchArchived = async () => {
+      try {
+        const res = await fetch(`${API_ROOT}/posts/archived`);
+        const data = await res.json();
+        const mine = data.filter(p => p.user?.email === currentUser?.email);
+        setArchivedPosts(mine);
+      } catch (err) {
+        console.error('Failed to load archived posts', err);
+      } finally {
+        setArchivedLoading(false);
+      }
+    };
+    fetchArchived();
+  }, [currentUser?.email]);
 
   const handleInputChange = (field, value) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -490,6 +508,39 @@ function ProfilePage({ currentUser, onUserUpdate }) {
                 )}
               </div>
             </div>
+          </div>
+        </div>
+        {/* Past Trips */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 mt-6">
+          <div className="px-6 py-6">
+            <h2 className="text-lg font-semibold text-gray-900 mb-4">Past Trips</h2>
+            {archivedLoading ? (
+              <p className="text-gray-500 text-sm">Loading...</p>
+            ) : archivedPosts.length === 0 ? (
+              <p className="text-gray-500 text-sm">No past trips yet.</p>
+            ) : (
+              <div className="space-y-3">
+                {archivedPosts.map(post => (
+                  <div key={post._id} className="border border-gray-100 rounded-lg p-4 bg-gray-50">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${post.type === 'offer'
+                          ? 'bg-green-100 text-green-700'
+                          : 'bg-blue-100 text-blue-700'
+                        }`}>
+                        {post.type === 'offer' ? 'Offered Ride' : 'Requested Ride'}
+                      </span>
+                      <span className="text-xs text-gray-400">{post.trip?.date}</span>
+                    </div>
+                    <p className="text-sm font-medium text-gray-800">
+                      {post.title || 'Unknown route'}
+                    </p>
+                    {post.trip?.time && (
+                      <p className="text-xs text-gray-500 mt-0.5">{post.trip.time}</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </div>
