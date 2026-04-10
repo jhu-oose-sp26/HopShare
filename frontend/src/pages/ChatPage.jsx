@@ -23,8 +23,8 @@ const ChatPage = () => {
     <Chat className="h-screen pb-20">
       <ChatHeader className="border-b">
         <ChatHeaderAddon>
-          <ChatHeaderButton onClick={() => navigate(-1)}>
-            <ArrowLeft /> {/*CONFIGURE BACK*/}
+          <ChatHeaderButton onClick={() => navigate(-1)}> {/*Go back to previous page*/}
+            <ArrowLeft />
           </ChatHeaderButton>
         </ChatHeaderAddon>
         <ChatHeaderMain>
