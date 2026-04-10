@@ -5,6 +5,7 @@ import LandingPage from '@/pages/LandingPage';
 import ProfilePage from '@/pages/ProfilePage';
 import UserProfile from '@/pages/UserProfile';
 import FriendsPage from '@/pages/FriendsPage';
+import ChatPage from '@/pages/ChatPage';
 import MessagesPage from '@/pages/MessagesPage';
 import BottomNav from '@/components/BottomNav';
 
@@ -43,6 +44,10 @@ function AppRoutes({ currentUser, authApi }) {
         <Route
           path='/messages'
           element={currentUser ? <MessagesPage currentUser={currentUser} /> : <Navigate to='/landing' replace />}
+        />
+        <Route
+          path='/chat'
+          element={currentUser ? <ChatPage currentUser={currentUser} /> : <Navigate to='/landing' replace />}
         />
         <Route
           path='/profile'

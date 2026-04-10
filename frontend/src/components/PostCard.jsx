@@ -415,7 +415,7 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
                         variant='default' 
                         size='sm' 
                         className='flex-1' 
-                        onClick={() => navigate("/messages", {/*IMPLEMENT ACCORDING TO PROJECT BOARD*/})}
+                        onClick={() => navigate("/chat", {/*IMPLEMENT ACCORDING TO PROJECT BOARD*/})}
                     >
                         <MessageCircle className='w-4 h-4 mr-1' />
                         Chat
