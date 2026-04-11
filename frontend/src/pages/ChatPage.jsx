@@ -53,7 +53,8 @@ const ChatPage = () => {
 
   // Transform messages to match the expected format
   const transformedMessages = messages
-    .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp)) // Sort oldest first
+    .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp))
+    .reverse() // Sort oldest first
     .map(msg => ({
       id: msg._id,
       sender: {
@@ -95,9 +96,6 @@ const ChatPage = () => {
       setError('Failed to send message');
     }
   };
-
-  // log the chat info
-  console.log('Chat ID:', chatId, 'Post ID:', postId);
 
   return (
     <Chat className="h-screen pb-20">
