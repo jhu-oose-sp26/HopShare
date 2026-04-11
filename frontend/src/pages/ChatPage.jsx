@@ -95,10 +95,6 @@ const ChatPage = ({ currentUser }) => {
   }, [chatId]);
 
   useEffect(() => {
-  console.log("POST UPDATED:", post);
-}, [post]);
-
-  useEffect(() => {
     if (messages.length === 0) return;
 
     const fetchUsers = async () => {
