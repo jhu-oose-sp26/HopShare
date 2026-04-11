@@ -72,6 +72,24 @@ const ChatPage = ({ currentUser }) => {
 };
 
   useEffect(() => {
+    if (!post?.user?.googleId) return;
+
+    const fetchAuthor = async () => {
+      const res = await fetch(
+        `${API_ROOT}/profile/google/${post.user.googleId}`
+      );
+      const data = await res.json();
+
+      setPost((prev) => ({
+        ...prev,
+        user: data.user,
+      }));
+    };
+
+    fetchAuthor();
+  }, [post?.user?.googleId]);
+
+  useEffect(() => {
     if (!chatId) {
       setError('No chat ID provided');
       setLoading(false);
@@ -93,10 +111,6 @@ const ChatPage = ({ currentUser }) => {
 
     fetchChat();
   }, [chatId]);
-
-  useEffect(() => {
-  console.log("POST UPDATED:", post);
-}, [post]);
 
   useEffect(() => {
     if (messages.length === 0) return;
