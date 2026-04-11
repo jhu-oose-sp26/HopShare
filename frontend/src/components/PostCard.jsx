@@ -80,6 +80,22 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
         setWeatherForecastOpen(true);
     };
 
+    // Function to handle chatting
+    const handleChatClick = async () => {
+        try {
+            const response = await fetch(`http://localhost:3000/chat/${_id}`);
+            if (!response.ok) {
+                throw new Error('Failed to get/create chat');
+            }
+            const chat = await response.json();
+            navigate("/chat", { state: { chatId: chat._id, postId: _id } });
+        } catch (error) {
+            console.error('Error opening chat:', error);
+            // Fallback to navigate without chat
+            navigate("/chat", { state: { postId: _id } });
+        }
+    };
+
     // Calculate distances from user's route to post's locations
     const getDistanceToPost = () => {
         if (!routeSearch || !trip) return null;
@@ -415,7 +431,7 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
                         variant='default' 
                         size='sm' 
                         className='flex-1' 
-                        onClick={() => navigate("/chat", {/*IMPLEMENT ACCORDING TO PROJECT BOARD*/})}
+                        onClick={handleChatClick}
                     >
                         <MessageCircle className='w-4 h-4 mr-1' />
                         Chat

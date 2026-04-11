@@ -13,11 +13,16 @@ import { MESSAGES } from '@/data/examples/messages';
 import { AdditionalMessage } from '@/components/examples/additional-message';
 import { PrimaryMessage } from '@/components/examples/primary-message';
 import { Fragment } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { DateItem } from '@/components/examples/date-item';
 
 const ChatPage = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+  const { chatId, postId } = location.state || {};
+
+  // log the chat info
+  console.log('Chat ID:', chatId, 'Post ID:', postId);
 
   return (
     <Chat className="h-screen pb-20">
