@@ -11,16 +11,17 @@ import { ChatToolbar,
 import { SquareChevronRightIcon, ArrowLeft, Info } from 'lucide-react';
 import { AdditionalMessage } from '@/components/examples/additional-message';
 import { PrimaryMessage } from '@/components/examples/primary-message';
-import { Fragment, useState, useEffect } from 'react';
+import { Fragment, useState, useEffect, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { DateItem } from '@/components/examples/date-item';
 
-const ChatPage = () => {
+const ChatPage = ({ currentUser }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const { chatId, postId } = location.state || {};
 
   const [messages, setMessages] = useState([]);
+  const [usersMap, setUsersMap] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [message, setMessage] = useState('');
@@ -35,9 +36,6 @@ const ChatPage = () => {
     const fetchChat = async () => {
       try {
         const response = await fetch(`http://localhost:3000/chat/${chatId}`);
-        if (!response.ok) {
-          throw new Error('Failed to load chat');
-        }
         const chat = await response.json();
         setMessages(chat.messages || []);
       } catch (err) {
@@ -51,24 +49,62 @@ const ChatPage = () => {
     fetchChat();
   }, [chatId]);
 
+  useEffect(() => {
+    if (messages.length === 0) return;
+
+    const fetchUsers = async () => {
+      const uniqueIds = [...new Set(messages.map(m => m.sender))];
+
+      const results = await Promise.all(
+        uniqueIds.map(async (id) => {
+          try {
+            const res = await fetch(`http://localhost:3000/profile/${id}`);
+            const data = await res.json();
+            return { id, user: data.user };
+          } catch {
+            return { id, user: null };
+          }
+        })
+      );
+
+      const map = {};
+      results.forEach(({ id, user }) => {
+        if (user) map[id] = user;
+      });
+
+      setUsersMap(map);
+    };
+
+    fetchUsers();
+  }, [messages]);
+
   // Transform messages to match the expected format
-  const transformedMessages = messages
+  const transformedMessages = useMemo(() => {
+    return messages
+    .slice()
     .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp))
     .reverse() // Sort oldest first
-    .map(msg => ({
-      id: msg._id,
-      sender: {
-        id: msg.sender,
-        name: msg.sender, // Assuming sender is email or name
-        username: msg.sender,
-        avatarUrl: '', // TODO: get avatar from user data
-        avatarAlt: msg.sender,
-        avatarFallback: msg.sender.slice(0, 2).toUpperCase()
-      },
-      content: msg.message,
-      timestamp: msg.timestamp
-    }));
-
+    .map(msg => {
+      const user = usersMap[msg.sender];
+      
+      return {
+        id: msg._id,
+        sender: {
+          id: msg.sender,
+          name: user?.name || "Unknown",
+          username: user?.email || "unknown",
+          avatarUrl: user?.picture || '',
+          avatarAlt: user?.name || "User",
+          avatarFallback: (user?.name || "U")
+            .slice(0, 2)
+            .toUpperCase()
+        },
+        content: msg.message,
+        timestamp: msg.timestamp
+      };
+    });
+  }, [messages, usersMap]);
+  
   const handleSendMessage = async () => {
     if (!message.trim() || !chatId) return;
 
@@ -79,7 +115,7 @@ const ChatPage = () => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          sender: 'currentUser@example.com', // TODO: get from current user context
+          sender: currentUser._id,
           message: message.trim(),
         }),
       });
