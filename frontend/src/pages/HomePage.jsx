@@ -78,6 +78,11 @@ function HomePage({ currentUser, onLogout }) {
     [visiblePosts, currentUser]
   );
 
+  const availablePosts = useMemo(
+    () => visiblePosts.filter((p) => p.user?.email !== currentUser?.email),
+    [visiblePosts, currentUser]
+  );
+
   const isShowingSearchResults = routeSearch !== null;
   const dialogTitle =
     submitInitialData?.startTitle && submitInitialData?.endTitle
@@ -85,7 +90,7 @@ function HomePage({ currentUser, onLogout }) {
       : 'Create a Ride Request';
 
   return (
-    <div className='min-h-screen bg-white'>
+    <div className='min-h-screen bg-white pb-20'>
       <div className='bg-white'>
         <div className="relative">
           <div className="absolute top-6 right-6">
@@ -120,7 +125,7 @@ function HomePage({ currentUser, onLogout }) {
             <RouteSearchPanel
               coords={coords}
               hasSearched={hasSearched}
-              matchCount={activeView === 'my-rides' ? myPosts.length : visiblePosts.length}
+              matchCount={activeView === 'my-rides' ? myPosts.length : availablePosts.length}
               searchRadiusKm={routeSearch?.radiusKm ?? ''}
               posts={visiblePosts}
               onClearSearch={clearRouteSearch}
@@ -175,7 +180,7 @@ function HomePage({ currentUser, onLogout }) {
 
       {activeView === 'available' ? (
         <PostList
-          posts={visiblePosts}
+          posts={availablePosts}
           isLoading={isLoading}
           error={error}
           routeSearch={routeSearch}
@@ -184,7 +189,7 @@ function HomePage({ currentUser, onLogout }) {
           heading={isShowingSearchResults ? 'Matching Routes' : 'Available Rides'}
           subheading={
             isShowingSearchResults
-              ? `${visiblePosts.length} route${visiblePosts.length === 1 ? '' : 's'} within ${routeSearch.radiusKm} km of the selected route center`
+              ? `${availablePosts.length} route${availablePosts.length === 1 ? '' : 's'} within ${routeSearch.radiusKm} km of the selected route center`
               : ''
           }
           emptyTitle={

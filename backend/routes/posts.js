@@ -266,4 +266,125 @@ router.put('/:id', async (req, res) => {
   }
 });
 
+// JOIN rider list
+router.post('/:id/join', async (req, res) => {
+  try {
+    const postId = toObjectId(req.params.id);
+    if (!postId) return res.status(400).json({ error: 'Invalid post id' });
+
+    const { email } = req.body;
+    if (!email) return res.status(400).json({ error: 'User email required' });
+
+    const db = getDB();
+    const post = await db.collection('posts').findOne({ _id: postId });
+    if (!post) return res.status(404).json({ error: 'Post not found' });
+
+    const riderList = post.riderList || [];
+    const pendingJoins = post.pendingJoins || [];
+
+    if (riderList.some(u => u.email === email) || pendingJoins.includes(email)) {
+      return res.json({ success: true, alreadyJoined: true });
+    }
+
+    await db.collection('posts').updateOne(
+      { _id: postId },
+      { $push: { pendingJoins: email } }
+    );
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Join list error:', err);
+    res.status(500).json({ error: 'Failed to join list' });
+  }
+});
+
+// TAKE a ride request (driver offers to drive — persisted so it survives refresh)
+router.post('/:id/take', async (req, res) => {
+  try {
+    const postId = toObjectId(req.params.id);
+    if (!postId) return res.status(400).json({ error: 'Invalid post id' });
+
+    const { name, email, picture, avatar, googleId } = req.body;
+    if (!email) return res.status(400).json({ error: 'User email required' });
+
+    const db = getDB();
+    const post = await db.collection('posts').findOne({ _id: postId });
+    if (!post) return res.status(404).json({ error: 'Post not found' });
+
+    const drivers = post.drivers || [];
+    const pendingDrivers = post.pendingDrivers || [];
+    if (drivers.some(d => d.email === email) || pendingDrivers.some(d => d.email === email)) {
+      return res.json({ success: true, alreadyTaken: true });
+    }
+
+    await db.collection('posts').updateOne(
+      { _id: postId },
+      { $push: { pendingDrivers: { name, email, picture, avatar, googleId, requestedAt: new Date().toISOString() } } }
+    );
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Take ride error:', err);
+    res.status(500).json({ error: 'Failed to take ride' });
+  }
+});
+
+
+// REMOVE a member from riderList (offer) or waitlist (request) — owner action
+router.post('/:id/remove-member', async (req, res) => {
+  try {
+    const postId = toObjectId(req.params.id);
+    if (!postId) return res.status(400).json({ error: 'Invalid post id' });
+
+    const { email } = req.body;
+    if (!email) return res.status(400).json({ error: 'Email required' });
+
+    const db = getDB();
+    const post = await db.collection('posts').findOne({ _id: postId });
+    if (!post) return res.status(404).json({ error: 'Post not found' });
+
+    await db.collection('posts').updateOne(
+      { _id: postId },
+      { $pull: { riderList: { email: email || null } } }
+    );
+    // Also remove any entry that matched on name if email was blank
+    if (!email) {
+      const { name } = req.body;
+      if (name) {
+        await db.collection('posts').updateOne(
+          { _id: postId },
+          { $pull: { riderList: { name } } }
+        );
+      }
+    }
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Remove member error:', err);
+    res.status(500).json({ error: 'Failed to remove member' });
+  }
+});
+
+// REMOVE a driver — owner action
+router.post('/:id/remove-driver', async (req, res) => {
+  try {
+    const postId = toObjectId(req.params.id);
+    if (!postId) return res.status(400).json({ error: 'Invalid post id' });
+
+    const { email } = req.body;
+    if (!email) return res.status(400).json({ error: 'Email required' });
+
+    const db = getDB();
+    await db.collection('posts').updateOne(
+      { _id: postId },
+      { $pull: { drivers: { email }, pendingDrivers: { email } } }
+    );
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Remove driver error:', err);
+    res.status(500).json({ error: 'Failed to remove driver' });
+  }
+});
+
 module.exports = router;

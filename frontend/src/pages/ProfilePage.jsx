@@ -251,7 +251,7 @@ function ProfilePage({ currentUser, onUserUpdate }) {
   const years = Array.from({ length: 10 }, (_, i) => currentYear + i);
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 pb-20">
       <div className="container mx-auto px-6 py-8 max-w-4xl">
         <Button
           variant="outline"
