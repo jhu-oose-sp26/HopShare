@@ -6,7 +6,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 const API_ROOT = (import.meta.env.VITE_API_BASE_URL || '/api').replace(/\/$/, '');
 
 function UserProfile({ currentUser }) {
-  const { userId } = useParams();
+  const { googleId } = useParams();
   const navigate = useNavigate();
   const [profile, setProfile] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -14,21 +14,21 @@ function UserProfile({ currentUser }) {
 
   // If viewing your own profile, redirect to the main profile page
   useEffect(() => {
-    if (userId === currentUser?._id) {
+    if (googleId === currentUser?.googleId) {
       navigate('/profile', { replace: true });
       return;
     }
-  }, [userId, currentUser?._id, navigate]);
+  }, [googleId, currentUser?.googleId, navigate]);
 
   useEffect(() => {
     const fetchProfile = async () => {
-      if (!userId || userId === currentUser?._id) return;
+      if (!googleId || googleId === currentUser?.googleId) return;
       
       setIsLoading(true);
       setError('');
 
       try {
-        const response = await fetch(`${API_ROOT}/profile/${userId}`);
+        const response = await fetch(`${API_ROOT}/profile/google/${googleId}`);
         
         if (!response.ok) {
           if (response.status === 404) {
@@ -48,7 +48,7 @@ function UserProfile({ currentUser }) {
     };
 
     fetchProfile();
-  }, [userId, currentUser?._id]);
+  }, [googleId, currentUser?.googleId]);
 
   const formatJoinDate = (dateString) => {
     if (!dateString) return 'Unknown';
@@ -161,6 +161,14 @@ function UserProfile({ currentUser }) {
                     Email
                   </label>
                   <p className="text-gray-900">{profile.email || '—'}</p>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
+                    <User className="w-4 h-4" />
+                    Google ID
+                  </label>
+                  <p className="text-gray-600 text-sm font-mono break-all">{profile.googleId || '—'}</p>
                 </div>
 
                 <div className="space-y-2">
