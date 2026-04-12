@@ -74,12 +74,37 @@ function HomePage({ currentUser, onLogout }) {
   };
 
   const myPosts = useMemo(
-    () => visiblePosts.filter((p) => p.user?.email === currentUser?.email),
+    () =>
+      visiblePosts.filter((p) => {
+        const userEmail = currentUser?.email;
+        if (!userEmail) return false;
+
+        const isOwner = p.user?.email === userEmail;
+        const isAcceptedRider = Array.isArray(p.riderList)
+          && p.riderList.some((r) => r?.email === userEmail);
+        const isAcceptedDriver = Array.isArray(p.drivers)
+          && p.drivers.some((d) => d?.email === userEmail);
+
+        return isOwner || isAcceptedRider || isAcceptedDriver;
+      }),
     [visiblePosts, currentUser]
   );
 
   const availablePosts = useMemo(
-    () => visiblePosts.filter((p) => p.user?.email !== currentUser?.email),
+    () => {
+      const userEmail = currentUser?.email;
+      if (!userEmail) return visiblePosts;
+
+      return visiblePosts.filter((p) => {
+        const isOwner = p.user?.email === userEmail;
+        const isAcceptedRider = Array.isArray(p.riderList)
+          && p.riderList.some((r) => r?.email === userEmail);
+        const isAcceptedDriver = Array.isArray(p.drivers)
+          && p.drivers.some((d) => d?.email === userEmail);
+
+        return !isOwner && !isAcceptedRider && !isAcceptedDriver;
+      });
+    },
     [visiblePosts, currentUser]
   );
 

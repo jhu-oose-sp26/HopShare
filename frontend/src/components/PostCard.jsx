@@ -20,7 +20,7 @@ import {
 } from '@/components/ui/dialog';
 import SubmitBox from './SubmitBox';
 
-const API_ROOT = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '');
+const API_ROOT = (import.meta.env.VITE_API_BASE_URL || '/api').replace(/\/$/, '');
 const NOTIFICATIONS_ENDPOINT = `${API_ROOT}/notifications`;
 
 const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, routeSearch, distanceFilter, currentUser }) => {
@@ -438,6 +438,18 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
                 );
             })()}
 
+            {/* Sharing status */}
+            <div className='flex items-center gap-2 mb-4 text-sm'>
+                <Users className='w-4 h-4 text-gray-400 shrink-0' />
+                {listMembers.length === 0 ? (
+                    <span className='text-gray-400 italic'>No sharing people yet</span>
+                ) : listMembers.length > 1 ? (
+                    <span className='text-gray-700'>{listMembers.length} riders sharing this trip</span>
+                ) : (
+                    <span className='text-gray-700'>1 rider sharing this trip</span>
+                )}
+            </div>
+
             {/* Action buttons */}
             <div className='flex flex-wrap gap-2'>
                 {/* Contact Dialog */}
@@ -569,7 +581,13 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
                                     const res = await fetch(`${API_ROOT}/posts/${post._id}/remove-member`, {
                                         method: 'POST',
                                         headers: { 'Content-Type': 'application/json' },
-                                        body: JSON.stringify({ email: currentUser.email, name: currentUser.name }),
+                                        body: JSON.stringify({
+                                            email: currentUser.email,
+                                            name: currentUser.name,
+                                            actorEmail: currentUser.email,
+                                            actorName: currentUser.name,
+                                            actorId: currentUser._id,
+                                        }),
                                     });
                                     if (res.ok) {
                                         setListMembers(prev => prev.filter(m => m.email !== currentUser.email));
@@ -818,10 +836,12 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
                             <div className='bg-gray-50 rounded-lg p-3 space-y-2'>
                                 <p className='text-xs font-semibold uppercase tracking-wide text-gray-400'>
                                     Rider List
-                                    <span className='ml-2 text-gray-500 font-normal normal-case'>({listMembers.length} {listMembers.length === 1 ? 'person' : 'people'})</span>
+                                    {listMembers.length > 1 && (
+                                        <span className='ml-2 text-gray-500 font-normal normal-case'>({listMembers.length} people sharing)</span>
+                                    )}
                                 </p>
                                 {listMembers.length === 0 ? (
-                                    <p className='text-xs text-gray-400 italic'>No one has joined yet.</p>
+                                    <p className='text-xs text-gray-400 italic'>No sharing people yet.</p>
                                 ) : (
                                     <div className='space-y-2'>
                                         {listMembers.map((member, idx) => (
@@ -857,7 +877,13 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
                                                             const res = await fetch(`${API_ROOT}/posts/${post._id}/remove-member`, {
                                                                 method: 'POST',
                                                                 headers: { 'Content-Type': 'application/json' },
-                                                                body: JSON.stringify({ email: member.email, name: member.name }),
+                                                                body: JSON.stringify({
+                                                                    email: member.email,
+                                                                    name: member.name,
+                                                                    actorEmail: currentUser?.email,
+                                                                    actorName: currentUser?.name,
+                                                                    actorId: currentUser?._id,
+                                                                }),
                                                             });
                                                             if (!res.ok) return;
                                                             setListMembers(prev => prev.filter(m => m.email !== member.email));
