@@ -65,6 +65,7 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
     // Rider list — persisted in post.riderList
     const [listMembers, setListMembers] = useState(() => post.riderList || []);
     const listJoined = currentUser ? listMembers.some(u => u.email === currentUser.email) : false;
+    const isDriverListMember = currentUser ? driverList.some(d => d.email === currentUser.email) : false;
     const [listJoinLoading, setListJoinLoading] = useState(false);
     const [listJoinError, setListJoinError] = useState('');
     const [listRequestSent, setListRequestSent] = useState(() => {
@@ -426,7 +427,7 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
 
             {/* Action buttons */}
             <div className='flex flex-wrap gap-2'>
-                {currentUser && (isOwner || listJoined) ? (
+                {currentUser && (isOwner || listJoined || isDriverListMember) ? (
                     <Button 
                         variant='default' 
                         size='sm' 
@@ -436,7 +437,7 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
                         <MessageCircle className='w-4 h-4 mr-1' />
                         Chat
                     </Button>
-                ) : currentUser && !isOwner && !listJoined ? (
+                ) : currentUser && !isOwner && !listJoined && !isDriverListMember ? (
                     <HoverCard openDelay={10} closeDelay={100}>
                         <HoverCardTrigger asChild>
                             <div className='flex-1'>
@@ -455,7 +456,7 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
                             <div className="space-y-2">
                                 <p className="text-sm font-semibold">Chat Unavailable</p>
                                 <p className="text-sm text-gray-600">
-                                    You must be on the rider list to chat about this ride. Request to join first!
+                                    You must be on the rider list or driver list to chat about this ride. Request to join first!
                                 </p>
                             </div>
                         </HoverCardContent>
