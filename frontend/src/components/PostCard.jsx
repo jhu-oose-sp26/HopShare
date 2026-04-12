@@ -69,6 +69,7 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
     });
 
     const isOwner = currentUser && post.user?.email && currentUser.email === post.user.email;
+    const canManagePost = showActions && isOwner;
     const riderRequestStatus = !currentUser || isOwner || !isOffer
         ? null
         : listJoined
@@ -257,8 +258,8 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
     };
 
     return (
-        <div className={`relative rounded-xl border border-gray-200 bg-white px-6 pb-6 shadow-sm hover:shadow-md transition-shadow ${showActions ? 'pt-10' : 'pt-6'}`}>
-            {showActions && (
+        <div className={`relative rounded-xl border border-gray-200 bg-white px-6 pb-6 shadow-sm hover:shadow-md transition-shadow ${canManagePost ? 'pt-10' : 'pt-6'}`}>
+            {canManagePost && (
                 <>
                     {/* Edit button — top left */}
                     <Dialog open={editOpen} onOpenChange={setEditOpen}>
@@ -278,6 +279,7 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
                                 onSubmit={handleEditSubmit}
                                 coords={coords}
                                 initialData={initialData}
+                                isEdit={true}
                             />
                         </DialogContent>
                     </Dialog>
@@ -784,7 +786,7 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
                 )}
 
                 {/* Confirmation Code — only for the owner in My Rides */}
-                {showActions && (
+                {canManagePost && (
                     <Dialog open={codeOpen} onOpenChange={setCodeOpen}>
                         <DialogTrigger asChild>
                             <Button variant='outline' size='sm'>
