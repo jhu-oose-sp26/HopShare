@@ -73,6 +73,7 @@
     "side-channel-list": "^1.0.0",
     "side-channel-map": "^1.0.1",
     "side-channel-weakmap": "^1.0.2",
+    "socket.io": "^4.8.3",
     "sparse-bitfield": "^3.0.3",
     "statuses": "^2.0.2",
     "toidentifier": "^1.0.1",
