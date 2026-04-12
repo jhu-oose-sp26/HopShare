@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
+import { RefreshCw } from 'lucide-react';
 import PostCard from './PostCard';
+import { Button } from '@/components/ui/button';
 
 
 const PostList = ({
@@ -15,7 +17,10 @@ const PostList = ({
     emptyTitle = 'No rides available yet.',
     emptyDescription = 'Try to create a ride with the above button!',
     showActions = false,
-    currentUser
+    currentUser,
+    onRefresh,
+    isRefreshing = false,
+    lastUpdatedAt = null,
 }) => {
     const [dateOrder, setDateOrder] = useState('asc');
     const [timeOrder, setTimeOrder] = useState('asc');
@@ -46,6 +51,17 @@ const PostList = ({
                         {heading}
                     </h2>
                     <div className="flex items-center gap-2 text-sm">
+                        {onRefresh ? (
+                            <Button
+                                variant='outline'
+                                size='sm'
+                                onClick={() => onRefresh().catch(() => {})}
+                                disabled={isLoading || isRefreshing}
+                            >
+                                <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+                                Refresh Posts
+                            </Button>
+                        ) : null}
                         <button
                             onClick={() => setDateOrder(o => o === 'asc' ? 'desc' : 'asc')}
                             className="px-2 py-1 rounded border border-gray-300 text-gray-600 hover:text-gray-800 hover:border-gray-500"
@@ -69,6 +85,11 @@ const PostList = ({
                                   filteredPosts.length === 1 ? '' : 's'
                               } available`)}
                 </p>
+                {lastUpdatedAt ? (
+                    <p className='mt-1 text-xs text-gray-400'>
+                        Updated {new Date(lastUpdatedAt).toLocaleTimeString()}
+                    </p>
+                ) : null}
             </div>
 
             {error && (

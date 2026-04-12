@@ -20,7 +20,7 @@ const MessagesPage = ({ currentUser }) => {
       try {
         const response = await fetch(`${API_ROOT}/chat/user/${encodeURIComponent(currentUser.email)}`);
         if (!response.ok) throw new Error('Failed to fetch messages');
-        
+
         const data = await response.json();
         setChats(data);
       } catch (err) {
@@ -72,7 +72,7 @@ const MessagesPage = ({ currentUser }) => {
       ) : (
         <div className="space-y-3">
           {chats.map((chat) => (
-            <div 
+            <div
               key={chat._id}
               onClick={() => navigate('/chat', { state: { chatId: chat._id, postId: chat.postId } })}
               className="bg-white border border-gray-200 rounded-xl p-4 hover:shadow-md hover:border-blue-200 transition-all cursor-pointer flex items-center justify-between group"
@@ -82,7 +82,7 @@ const MessagesPage = ({ currentUser }) => {
                   {chat.postTitle}
                 </h3>
                 <p className="text-sm text-gray-500 truncate">
-                  {chat.lastMessage 
+                  {chat.lastMessage
                     ? (
                       <>
                         <span className="font-medium text-gray-700">
@@ -95,7 +95,7 @@ const MessagesPage = ({ currentUser }) => {
                   }
                 </p>
               </div>
-              
+
               <div className="flex flex-col items-end shrink-0 gap-2">
                 {chat.lastMessage && (
                   <span className="text-xs text-gray-400 flex items-center gap-1">

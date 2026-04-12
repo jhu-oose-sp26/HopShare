@@ -2,7 +2,7 @@ import { calculateDistance } from './RouteMap';
 import RouteMap from './RouteMap';
 import WeatherDisplay from './WeatherDisplay';
 import WeatherForecastDialog from './WeatherForecastDialog';
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { cn, formatTime, formatDate } from '@/lib/utils';
 import { MapPin, Calendar, Clock, MessageCircle, Pencil, Trash2, Info, User, Mail, Phone, Navigation, ExternalLink, UserPlus, Car, Users, CheckCircle, UserMinus, Hash } from 'lucide-react';
@@ -35,6 +35,10 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
     const truncatedDescription = description 
     ? (description.length > 50 ? `${description.slice(0, 50)}...` : description)
     : '';
+    const displayName = user?.name || 'User';
+    const displayEmail = user?.email || '—';
+    const avatarFallback = `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=e5e7eb&color=374151&size=64`;
+    const avatarSrc = user?.avatar || user?.picture || avatarFallback;
     const [editOpen, setEditOpen] = useState(false);
     const [detailsOpen, setDetailsOpen] = useState(false);
     const [deleteOpen, setDeleteOpen] = useState(false);
@@ -65,6 +69,38 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
     });
 
     const isOwner = currentUser && post.user?.email && currentUser.email === post.user.email;
+    const riderRequestStatus = !currentUser || isOwner || !isOffer
+        ? null
+        : listJoined
+            ? {
+                badgeClassName: 'bg-green-100 text-green-700',
+                title: 'Request accepted',
+                description: 'You are on the rider list for this trip.',
+            }
+            : listRequestSent
+                ? {
+                    badgeClassName: 'bg-amber-100 text-amber-700',
+                    title: 'Awaiting poster approval',
+                    description: 'Your join request has been sent and is waiting for the poster to respond.',
+                }
+                : null;
+
+    useEffect(() => {
+        setDriverList(post.drivers || []);
+        setListMembers(post.riderList || []);
+
+        if (!currentUser) {
+            setJoinRequested(false);
+            setListRequestSent(false);
+            return;
+        }
+
+        setJoinRequested(
+            (post.drivers || []).some(d => d.email === currentUser.email)
+            || (post.pendingDrivers || []).some(d => d.email === currentUser.email)
+        );
+        setListRequestSent((post.pendingJoins || []).includes(currentUser.email));
+    }, [post.drivers, post.pendingDrivers, post.pendingJoins, post.riderList, currentUser]);
 
     // Function to handle weather forecast dialog opening
     const openWeatherForecast = (location) => {
@@ -276,35 +312,63 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
                 </>
             )}
 
-            {/* Header: badge + title + ID */}
-            <div className='flex items-start justify-between mb-3 min-w-0'>
-                <div className='flex flex-col items-start gap-2 min-w-0 flex-1'>
-                    <span className={`text-xs font-medium px-2.5 py-0.5 rounded-full shrink-0 ${isOffer ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}`}>
-                        {isOffer ? 'Offering' : 'Requesting'}
-                    </span>
-                    <h3 className='font-semibold text-gray-900 truncate w-full'>
-                        {title || 'Untitled'}
-                    </h3>
+            {/* Header: poster info + badge + title + ID */}
+            <div className='flex items-start justify-between gap-3 mb-3'>
+                <div className='flex items-start gap-3 min-w-0 flex-1'>
+                    {user?.googleId ? (
+                        <button
+                            onClick={() => navigate(`/user/${user.googleId}`)}
+                            className='shrink-0 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2'
+                            aria-label={`View ${displayName}'s profile`}
+                        >
+                            <img
+                                src={avatarSrc}
+                                alt={displayName}
+                                className='w-11 h-11 rounded-full border border-gray-200 object-cover'
+                                onError={(e) => {
+                                    e.target.src = avatarFallback;
+                                }}
+                            />
+                        </button>
+                    ) : (
+                        <img
+                            src={avatarSrc}
+                            alt={displayName}
+                            className='w-11 h-11 rounded-full border border-gray-200 object-cover shrink-0'
+                            onError={(e) => {
+                                e.target.src = avatarFallback;
+                            }}
+                        />
+                    )}
+                    <div className='min-w-0 flex-1'>
+                        <div className='flex items-center gap-2 flex-wrap mb-1'>
+                            <span className={`text-xs font-medium px-2.5 py-0.5 rounded-full ${isOffer ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}`}>
+                                {isOffer ? 'Offering' : 'Requesting'}
+                            </span>
+                            <h3 className='font-semibold text-gray-900 break-words'>{title || 'Untitled'}</h3>
+                        </div>
+                        <p className='text-sm text-gray-500 wrap-break-word'>
+                            {user?.googleId ? (
+                                <button
+                                    onClick={() => navigate(`/user/${user.googleId}`)}
+                                    className='text-blue-600 hover:text-blue-800 hover:underline font-medium break-all'
+                                >
+                                    {displayName.length > 25 ? `${displayName.slice(0, 25)}...` : displayName}
+                                </button>
+                            ) : (
+                                <span className='text-gray-700 font-medium break-all cursor-not-allowed'>
+                                    {displayName.length > 25 ? `${displayName.slice(0, 25)}...` : displayName}
+                                </span>
+                            )}
+                            {' · '}
+                            <span className='break-all'>
+                                {displayEmail.length > 25 ? `${displayEmail.slice(0, 25)}...` : displayEmail}
+                            </span>
+                        </p>
+                    </div>
                 </div>
+                <span className='text-xs text-gray-400 shrink-0'>#{_id?.slice(-6)}</span>
             </div>
-            <p className='text-sm text-gray-500 mb-4'>
-                {user.googleId ? (
-                    <button
-                        onClick={() => navigate(`/user/${user.googleId}`)}
-                        className='text-blue-600 hover:text-blue-800 hover:underline font-medium'
-                    >
-                        {(user.name || '').length > 25 ? `${user.name.slice(0, 25)}...` : user.name}
-                    </button>
-                ) : (
-                    <span className='text-gray-700 font-medium'>
-                        {(user.name || '').length > 25 ? `${user.name.slice(0, 25)}...` : user.name}
-                    </span>
-                )}
-                {' · '}
-                <span>
-                    {(user.email || '').length > 25 ? `${user.email.slice(0, 25)}...` : user.email}
-                </span>
-            </p>
 
             {/* Post content */}
             {truncatedDescription && (
@@ -389,6 +453,18 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
                 </div>
             )}
 
+            {riderRequestStatus && (
+                <div className='mb-4 rounded-lg border border-gray-200 bg-slate-50 px-4 py-3'>
+                    <div className='flex items-center gap-2'>
+                        <span className={`text-xs font-medium px-2.5 py-0.5 rounded-full ${riderRequestStatus.badgeClassName}`}>
+                            Rider Request Status
+                        </span>
+                        <p className='text-sm font-medium text-gray-900'>{riderRequestStatus.title}</p>
+                    </div>
+                    <p className='mt-1 text-sm text-gray-600'>{riderRequestStatus.description}</p>
+                </div>
+            )}
+
             {/* Driver status */}
             {(() => {
                 const driver = driverList[0];
@@ -415,6 +491,18 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
                     </div>
                 );
             })()}
+
+            {/* Sharing status */}
+            <div className='flex items-center gap-2 mb-4 text-sm'>
+                <Users className='w-4 h-4 text-gray-400 shrink-0' />
+                {listMembers.length === 0 ? (
+                    <span className='text-gray-400 italic'>No sharing people yet</span>
+                ) : listMembers.length > 1 ? (
+                    <span className='text-gray-700'>{listMembers.length} riders sharing this trip</span>
+                ) : (
+                    <span className='text-gray-700'>1 rider sharing this trip</span>
+                )}
+            </div>
 
             {/* Action buttons */}
             <div className='flex flex-wrap gap-2'>
@@ -567,9 +655,9 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
                             {listJoinLoading ? (
                                 'Sending...'
                             ) : listJoined ? (
-                                <><CheckCircle className='w-4 h-4 mr-1' />On Rider List</>
+                                <><CheckCircle className='w-4 h-4 mr-1' />Request Accepted</>
                             ) : listRequestSent ? (
-                                <><CheckCircle className='w-4 h-4 mr-1' />Request Sent</>
+                                <><CheckCircle className='w-4 h-4 mr-1' />Awaiting Approval</>
                             ) : (
                                 <><Users className='w-4 h-4 mr-1' />Join the Rider List</>
                             )}
@@ -583,7 +671,13 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
                                     const res = await fetch(`${API_ROOT}/posts/${post._id}/remove-member`, {
                                         method: 'POST',
                                         headers: { 'Content-Type': 'application/json' },
-                                        body: JSON.stringify({ email: currentUser.email, name: currentUser.name }),
+                                        body: JSON.stringify({
+                                            email: currentUser.email,
+                                            name: currentUser.name,
+                                            actorEmail: currentUser.email,
+                                            actorName: currentUser.name,
+                                            actorId: currentUser._id,
+                                        }),
                                     });
                                     if (res.ok) {
                                         setListMembers(prev => prev.filter(m => m.email !== currentUser.email));
@@ -752,28 +846,45 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
                             <div className='bg-gray-50 rounded-lg p-3 space-y-2'>
                                 <p className='text-xs font-semibold uppercase tracking-wide text-gray-400'>Contact</p>
                                 <div className='flex items-center gap-3'>
-                                    <img
-                                        src={user?.avatar || user?.picture || `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.name || 'User')}&background=e5e7eb&color=374151&size=64`}
-                                        alt={user?.name || 'User'}
-                                        className="w-10 h-10 rounded-full border border-gray-200 object-cover"
-                                        onError={(e) => {
-                                            e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.name || 'User')}&background=e5e7eb&color=374151&size=64`;
-                                        }}
-                                    />
+                                    {user?.googleId ? (
+                                        <button
+                                            onClick={() => navigate(`/user/${user.googleId}`)}
+                                            className='shrink-0 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2'
+                                            aria-label={`View ${displayName}'s profile`}
+                                        >
+                                            <img
+                                                src={avatarSrc}
+                                                alt={displayName}
+                                                className="w-10 h-10 rounded-full border border-gray-200 object-cover"
+                                                onError={(e) => {
+                                                    e.target.src = avatarFallback;
+                                                }}
+                                            />
+                                        </button>
+                                    ) : (
+                                        <img
+                                            src={avatarSrc}
+                                            alt={displayName}
+                                            className="w-10 h-10 rounded-full border border-gray-200 object-cover"
+                                            onError={(e) => {
+                                                e.target.src = avatarFallback;
+                                            }}
+                                        />
+                                    )}
                                     <div className="flex-1 min-w-0">
-                                        {user.googleId ? (
+                                        {user?.googleId ? (
                                             <button
                                                 onClick={() => navigate(`/user/${user.googleId}`)}
                                                 className='text-blue-600 hover:text-blue-800 hover:underline font-medium text-sm break-all'
                                             >
-                                                {user?.name || '—'}
+                                                {displayName}
                                             </button>
                                         ) : (
                                             <span className='text-gray-700 font-medium text-sm break-all cursor-not-allowed'>
-                                                {user?.name || '—'}
+                                                {displayName}
                                             </span>
                                         )}
-                                        <div className='text-xs text-gray-500 break-all'>{user?.email || '—'}</div>
+                                        <div className='text-xs text-gray-500 break-all'>{displayEmail}</div>
                                     </div>
                                 </div>
                                 <div className='flex items-center gap-2 text-gray-700'>
@@ -832,10 +943,12 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
                             <div className='bg-gray-50 rounded-lg p-3 space-y-2'>
                                 <p className='text-xs font-semibold uppercase tracking-wide text-gray-400'>
                                     Rider List
-                                    <span className='ml-2 text-gray-500 font-normal normal-case'>({listMembers.length} {listMembers.length === 1 ? 'person' : 'people'})</span>
+                                    {listMembers.length > 1 && (
+                                        <span className='ml-2 text-gray-500 font-normal normal-case'>({listMembers.length} people sharing)</span>
+                                    )}
                                 </p>
                                 {listMembers.length === 0 ? (
-                                    <p className='text-xs text-gray-400 italic'>No one has joined yet.</p>
+                                    <p className='text-xs text-gray-400 italic'>No sharing people yet.</p>
                                 ) : (
                                     <div className='space-y-2'>
                                         {listMembers.map((member, idx) => (
@@ -871,7 +984,13 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
                                                             const res = await fetch(`${API_ROOT}/posts/${post._id}/remove-member`, {
                                                                 method: 'POST',
                                                                 headers: { 'Content-Type': 'application/json' },
-                                                                body: JSON.stringify({ email: member.email, name: member.name }),
+                                                                body: JSON.stringify({
+                                                                    email: member.email,
+                                                                    name: member.name,
+                                                                    actorEmail: currentUser?.email,
+                                                                    actorName: currentUser?.name,
+                                                                    actorId: currentUser?._id,
+                                                                }),
                                                             });
                                                             if (!res.ok) return;
                                                             setListMembers(prev => prev.filter(m => m.email !== member.email));
@@ -885,6 +1004,18 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
                                     </div>
                                 )}
                             </div>
+
+                            {riderRequestStatus && (
+                                <div className='bg-gray-50 rounded-lg p-3 space-y-2'>
+                                    <p className='text-xs font-semibold uppercase tracking-wide text-gray-400'>Your Request Status</p>
+                                    <div className='flex items-center gap-2'>
+                                        <span className={`text-xs font-medium px-2.5 py-0.5 rounded-full ${riderRequestStatus.badgeClassName}`}>
+                                            {riderRequestStatus.title}
+                                        </span>
+                                    </div>
+                                    <p className='text-sm text-gray-600'>{riderRequestStatus.description}</p>
+                                </div>
+                            )}
 
                             {/* Trip details */}
                             {trip && (
