@@ -34,7 +34,7 @@ import {
 } from '@/components/ui/dialog';
 import SubmitBox from './SubmitBox';
 
-const API_ROOT = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '');
+const API_ROOT = (import.meta.env.VITE_API_BASE_URL || '/api').replace(/\/$/, '');
 const NOTIFICATIONS_ENDPOINT = `${API_ROOT}/notifications`;
 
 const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, routeSearch, distanceFilter, currentUser }) => {
@@ -65,6 +65,7 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
     // Rider list — persisted in post.riderList
     const [listMembers, setListMembers] = useState(() => post.riderList || []);
     const listJoined = currentUser ? listMembers.some(u => u.email === currentUser.email) : false;
+    const isDriverListMember = currentUser ? driverList.some(d => d.email === currentUser.email) : false;
     const [listJoinLoading, setListJoinLoading] = useState(false);
     const [listJoinError, setListJoinError] = useState('');
     const [listRequestSent, setListRequestSent] = useState(() => {
@@ -83,7 +84,7 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
     // Function to handle chatting
     const handleChatClick = async () => {
         try {
-            const response = await fetch(`http://localhost:3000/chat/${_id}`);
+            const response = await fetch(`${API_ROOT}/chat/${_id}`);
             if (!response.ok) {
                 throw new Error('Failed to get/create chat');
             }
@@ -426,7 +427,7 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
 
             {/* Action buttons */}
             <div className='flex flex-wrap gap-2'>
-                {currentUser && (isOwner || listJoined) ? (
+                {currentUser && (isOwner || listJoined || isDriverListMember) ? (
                     <Button 
                         variant='default' 
                         size='sm' 
@@ -436,7 +437,7 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
                         <MessageCircle className='w-4 h-4 mr-1' />
                         Chat
                     </Button>
-                ) : currentUser && !isOwner && !listJoined ? (
+                ) : currentUser && !isOwner && !listJoined && !isDriverListMember ? (
                     <HoverCard openDelay={10} closeDelay={100}>
                         <HoverCardTrigger asChild>
                             <div className='flex-1'>
@@ -455,7 +456,7 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
                             <div className="space-y-2">
                                 <p className="text-sm font-semibold">Chat Unavailable</p>
                                 <p className="text-sm text-gray-600">
-                                    You must be on the rider list to chat about this ride. Request to join first!
+                                    You must be on the rider list or driver list to chat about this ride. Request to join first!
                                 </p>
                             </div>
                         </HoverCardContent>
