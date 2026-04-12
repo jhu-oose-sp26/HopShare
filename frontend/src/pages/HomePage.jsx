@@ -12,11 +12,22 @@ import RouteSearchPanel from '@/components/RouteSearchPanel';
 import SubmitBox from '@/components/SubmitBox';
 import NotificationMenu from '@/components/NotificationMenu';
 import { usePosts } from '@/hooks/usePosts';
+import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 import { filterPostsByRouteRadius } from '@/lib/utils';
 
 function HomePage({ currentUser, onLogout }) {
   const navigate = useNavigate();
-  const { posts, addPost, removePost, updatePost, isLoading, error } = usePosts();
+  const {
+    posts,
+    addPost,
+    removePost,
+    updatePost,
+    refreshPosts,
+    isLoading,
+    isRefreshing,
+    error,
+    lastUpdatedAt,
+  } = usePosts();
   const [isOpen, setIsOpen] = useState(false);
   const [coords, setCoords] = useState(null);
   const [routeSearch, setRouteSearch] = useState(null);
@@ -114,8 +125,13 @@ function HomePage({ currentUser, onLogout }) {
       ? 'Request a Ride'
       : 'Create a Ride Request';
 
+  const { handlers, isPulling, progress } = usePullToRefresh(
+    () => refreshPosts({ silent: true }),
+    { enabled: true }
+  );
+
   return (
-    <div className='min-h-screen bg-white pb-20'>
+    <div className='min-h-screen bg-white pb-20' {...handlers}>
       <div className='bg-white'>
         <div className="relative">
           <div className="absolute top-6 right-6">
@@ -127,6 +143,15 @@ function HomePage({ currentUser, onLogout }) {
                 <h1 className='text-3xl font-bold text-gray-900 mb-2'>HopShare</h1>
                 <p className='text-gray-600'>
                   Create and find rides with fellow Hopkins students
+                </p>
+                <p className='mt-2 text-xs text-gray-400'>
+                  {isPulling
+                    ? progress >= 1
+                      ? 'Release to refresh rides'
+                      : 'Pull down to refresh rides'
+                    : lastUpdatedAt
+                      ? `Updated ${new Date(lastUpdatedAt).toLocaleTimeString()}`
+                      : 'Waiting for live updates'}
                 </p>
               </div>
 
@@ -211,6 +236,9 @@ function HomePage({ currentUser, onLogout }) {
           routeSearch={routeSearch}
           coords={coords}
           currentUser={currentUser}
+          onRefresh={() => refreshPosts({ silent: true })}
+          isRefreshing={isRefreshing}
+          lastUpdatedAt={lastUpdatedAt}
           heading={isShowingSearchResults ? 'Matching Routes' : 'Available Rides'}
           subheading={
             isShowingSearchResults
@@ -233,6 +261,9 @@ function HomePage({ currentUser, onLogout }) {
           coords={coords}
           currentUser={currentUser}
           showActions
+          onRefresh={() => refreshPosts({ silent: true })}
+          isRefreshing={isRefreshing}
+          lastUpdatedAt={lastUpdatedAt}
           heading='My Rides'
           emptyTitle='You have no rides yet.'
           emptyDescription='Use the "Create a Request" button above to post your first ride!'
