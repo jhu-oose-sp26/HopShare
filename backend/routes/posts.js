@@ -8,6 +8,10 @@ function toObjectId(id) {
   return new ObjectId(id);
 }
 
+function escapeRegex(value = '') {
+  return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 // Generates a 6-digits code.
 function generateConfirmationCode() {
   const chars = '0123456789';
@@ -336,12 +340,17 @@ router.post('/:id/remove-member', async (req, res) => {
     const postId = toObjectId(req.params.id);
     if (!postId) return res.status(400).json({ error: 'Invalid post id' });
 
-    const { email } = req.body;
+    const { email, name, actorEmail, actorName, actorId } = req.body;
     if (!email) return res.status(400).json({ error: 'Email required' });
 
     const db = getDB();
     const post = await db.collection('posts').findOne({ _id: postId });
     if (!post) return res.status(404).json({ error: 'Post not found' });
+
+    const riderListBefore = post.riderList || [];
+    const removedMember = riderListBefore.find((member) => member.email === email)
+      || riderListBefore.find((member) => name && member.name === name)
+      || null;
 
     await db.collection('posts').updateOne(
       { _id: postId },
@@ -349,7 +358,6 @@ router.post('/:id/remove-member', async (req, res) => {
     );
     // Also remove any entry that matched on name if email was blank
     if (!email) {
-      const { name } = req.body;
       if (name) {
         await db.collection('posts').updateOne(
           { _id: postId },
@@ -358,7 +366,80 @@ router.post('/:id/remove-member', async (req, res) => {
       }
     }
 
-    res.json({ success: true });
+    const updatedPost = await db.collection('posts').findOne({ _id: postId });
+    const remainingRiders = (updatedPost?.riderList || []).filter((member) => member.email !== email);
+    let notifiedCount = 0;
+
+    const removedDisplayName = removedMember?.name || name || email;
+    const actorDisplayName = actorName || removedDisplayName;
+    const removedOwnself = actorEmail && actorEmail === email;
+    const routeSummary = `${post.trip?.startLocation?.title || 'start'} to ${post.trip?.endLocation?.title || 'destination'}`;
+    const dateSummary = post.trip?.date ? ` on ${post.trip.date}` : '';
+    const timeSummary = post.trip?.time ? ` at ${post.trip.time}` : '';
+    const rideSummary = `${routeSummary}${dateSummary}${timeSummary}`;
+    const notificationMessage = removedOwnself
+      ? `${removedDisplayName} left your riding list for ${rideSummary}.`
+      : `${removedDisplayName} was removed from your riding list for ${rideSummary} by ${actorDisplayName}.`;
+
+    // Notify all remaining riders and the post owner.
+    const recipientEmailSet = new Set(
+      remainingRiders
+        .map((member) => (typeof member.email === 'string' ? member.email.trim() : ''))
+        .filter(Boolean)
+    );
+    if (typeof post.user?.email === 'string' && post.user.email.trim()) {
+      recipientEmailSet.add(post.user.email.trim());
+    }
+    if (typeof email === 'string' && email.trim()) {
+      // Don't notify the member who just left/was removed.
+      recipientEmailSet.delete(email.trim());
+    }
+
+    const recipientEmails = Array.from(recipientEmailSet);
+
+    const recipients = [];
+    for (const recipientEmail of recipientEmails) {
+      // Use exact match first, then a case-insensitive fallback for inconsistent email casing.
+      let user = await db.collection('users').findOne(
+        { email: recipientEmail },
+        { projection: { _id: 1, email: 1 } }
+      );
+
+      if (!user) {
+        user = await db.collection('users').findOne(
+          { email: { $regex: `^${escapeRegex(recipientEmail)}$`, $options: 'i' } },
+          { projection: { _id: 1, email: 1 } }
+        );
+      }
+
+      if (user) {
+        recipients.push(user);
+      }
+    }
+
+    if (recipients.length > 0) {
+      const senderObjectId = actorId && ObjectId.isValid(actorId)
+        ? new ObjectId(actorId)
+        : null;
+
+      const result = await db.collection('notifications').insertMany(
+        recipients.map((user) => ({
+          recipientId: user._id,
+          senderName: actorDisplayName || 'HopShare',
+          senderId: senderObjectId,
+          message: notificationMessage,
+          postId,
+          replyToMessage: null,
+          type: 'left_list',
+          response: null,
+          read: false,
+          createdAt: new Date(),
+        }))
+      );
+      notifiedCount = result.insertedCount || 0;
+    }
+
+    res.json({ success: true, notifiedCount });
   } catch (err) {
     console.error('Remove member error:', err);
     res.status(500).json({ error: 'Failed to remove member' });
