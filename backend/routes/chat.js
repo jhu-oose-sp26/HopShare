@@ -81,6 +81,63 @@ router.post('/:chatId/messages', async (req, res) => {
   }
 });
 
+// Add this to your chat.js file
+
+// GET all chats for a user
+router.get('/user/:email', async (req, res) => {
+  try {
+    const { email } = req.params;
+    const db = getDB();
+
+    // Find all posts where the user is the owner, a rider, or a driver
+    const userPosts = await db.collection('posts').find({
+      $or: [
+        { 'user.email': email },
+        { 'riderList.email': email },
+        { 'drivers.email': email }
+      ]
+    }).project({ title: 1 }).toArray(); 
+    
+    // Create an array of post IDs and a map to quickly look up post titles
+    const postIds = userPosts.map(p => p._id);
+    const postMap = userPosts.reduce((acc, post) => {
+      acc[post._id.toString()] = post.title;
+      return acc;
+    }, {});
+
+    // Find all chats tied to those posts OR where the user has sent a message
+    const chats = await db.collection('chats').find({
+      $or: [
+        { _id: { $in: postIds } },
+        { 'messages.sender': email }
+      ]
+    }).toArray();
+
+    // Format the chats for the UI (attach post title, get last message)
+    const formattedChats = chats.map(chat => {
+      const lastMessage = chat.messages.length > 0 
+        ? chat.messages[chat.messages.length - 1] 
+        : null;
+
+      return {
+        _id: chat._id,
+        postId: chat.postId,
+        postTitle: postMap[chat._id.toString()] || 'Unknown Ride',
+        lastMessage: lastMessage,
+        updatedAt: chat.updatedAt || chat.createdAt
+      };
+    });
+
+    // Sort by most recently updated
+    formattedChats.sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
+
+    res.json(formattedChats);
+  } catch (error) {
+    console.error('Error getting user chats:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 function toObjectId(id) {
   if (!ObjectId.isValid(id)) return null;
   return new ObjectId(id);
