@@ -24,10 +24,12 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import placeholderAvatar from '@/user-placeholder.png';
+import { io } from "socket.io-client";
 
 const API_ROOT = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '');
 const PROFILE_CACHE_KEY = 'profileCache';
 const PROFILE_CACHE_TTL = 1000 * 60 * 60 * 24; // 24 hours
+const socket = io("http://localhost:3000");
 
 const loadProfileCache = () => {
   if (typeof window === 'undefined') return {};
@@ -62,14 +64,34 @@ const ChatPage = ({ currentUser }) => {
   const [detailsOpen, setDetailsOpen] = useState(false);
 
   const getAvatar = (user) => {
-  const url = user?.picture || user?.avatar;
+    const url = user?.picture || user?.avatar;
 
-  if (!url || url.trim() === '') {
-    return placeholderAvatar;
-  }
+    if (!url || url.trim() === '') {
+      return placeholderAvatar;
+    }
 
-  return url;
-};
+    return url;
+  };
+
+  useEffect(() => {
+    if (!chatId) return;
+
+    socket.emit("joinChat", chatId);
+
+    return () => {
+      socket.off("joinChat");
+    };
+  }, [chatId]);
+
+  useEffect(() => {
+    socket.on("newMessage", (message) => {
+      setMessages((prev) => [...prev, message]);
+    });
+
+    return () => {
+      socket.off("newMessage");
+    };
+  }, []);
 
   useEffect(() => {
     if (!post?.user?.googleId) return;
@@ -253,7 +275,6 @@ const ChatPage = ({ currentUser }) => {
       }
 
       const newMessage = await response.json();
-      setMessages(prev => [...prev, newMessage]);
       setMessage('');
     } catch (err) {
       console.error('Error sending message:', err);

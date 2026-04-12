@@ -72,7 +72,9 @@ router.post('/:chatId/messages', async (req, res) => {
       return res.status(404).json({ error: 'Chat not found' });
     }
 
-    res.json(newMessage);
+    req.app.get('io').to(req.params.chatId).emit('newMessage', newMessage);
+
+    res.status(201).json(newMessage);
   } catch (error) {
     console.error('Error adding message:', error);
     res.status(500).json({ error: 'Internal server error' });
