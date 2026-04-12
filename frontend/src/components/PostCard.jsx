@@ -35,6 +35,10 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
     const truncatedDescription = description 
     ? (description.length > 50 ? `${description.slice(0, 50)}...` : description)
     : '';
+    const displayName = user?.name || 'User';
+    const displayEmail = user?.email || '—';
+    const avatarFallback = `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=e5e7eb&color=374151&size=64`;
+    const avatarSrc = user?.avatar || user?.picture || avatarFallback;
     const [editOpen, setEditOpen] = useState(false);
     const [detailsOpen, setDetailsOpen] = useState(false);
     const [deleteOpen, setDeleteOpen] = useState(false);
@@ -276,35 +280,63 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
                 </>
             )}
 
-            {/* Header: badge + title + ID */}
-            <div className='flex items-start justify-between mb-3 min-w-0'>
-                <div className='flex flex-col items-start gap-2 min-w-0 flex-1'>
-                    <span className={`text-xs font-medium px-2.5 py-0.5 rounded-full shrink-0 ${isOffer ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}`}>
-                        {isOffer ? 'Offering' : 'Requesting'}
-                    </span>
-                    <h3 className='font-semibold text-gray-900 truncate w-full'>
-                        {title || 'Untitled'}
-                    </h3>
+            {/* Header: poster info + badge + title + ID */}
+            <div className='flex items-start justify-between gap-3 mb-3'>
+                <div className='flex items-start gap-3 min-w-0 flex-1'>
+                    {user?.googleId ? (
+                        <button
+                            onClick={() => navigate(`/user/${user.googleId}`)}
+                            className='shrink-0 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2'
+                            aria-label={`View ${displayName}'s profile`}
+                        >
+                            <img
+                                src={avatarSrc}
+                                alt={displayName}
+                                className='w-11 h-11 rounded-full border border-gray-200 object-cover'
+                                onError={(e) => {
+                                    e.target.src = avatarFallback;
+                                }}
+                            />
+                        </button>
+                    ) : (
+                        <img
+                            src={avatarSrc}
+                            alt={displayName}
+                            className='w-11 h-11 rounded-full border border-gray-200 object-cover shrink-0'
+                            onError={(e) => {
+                                e.target.src = avatarFallback;
+                            }}
+                        />
+                    )}
+                    <div className='min-w-0 flex-1'>
+                        <div className='flex items-center gap-2 flex-wrap mb-1'>
+                            <span className={`text-xs font-medium px-2.5 py-0.5 rounded-full ${isOffer ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}`}>
+                                {isOffer ? 'Offering' : 'Requesting'}
+                            </span>
+                            <h3 className='font-semibold text-gray-900 break-words'>{title || 'Untitled'}</h3>
+                        </div>
+                        <p className='text-sm text-gray-500 wrap-break-word'>
+                            {user?.googleId ? (
+                                <button
+                                    onClick={() => navigate(`/user/${user.googleId}`)}
+                                    className='text-blue-600 hover:text-blue-800 hover:underline font-medium break-all'
+                                >
+                                    {displayName.length > 25 ? `${displayName.slice(0, 25)}...` : displayName}
+                                </button>
+                            ) : (
+                                <span className='text-gray-700 font-medium break-all cursor-not-allowed'>
+                                    {displayName.length > 25 ? `${displayName.slice(0, 25)}...` : displayName}
+                                </span>
+                            )}
+                            {' · '}
+                            <span className='break-all'>
+                                {displayEmail.length > 25 ? `${displayEmail.slice(0, 25)}...` : displayEmail}
+                            </span>
+                        </p>
+                    </div>
                 </div>
+                <span className='text-xs text-gray-400 shrink-0'>#{_id?.slice(-6)}</span>
             </div>
-            <p className='text-sm text-gray-500 mb-4'>
-                {user.googleId ? (
-                    <button
-                        onClick={() => navigate(`/user/${user.googleId}`)}
-                        className='text-blue-600 hover:text-blue-800 hover:underline font-medium'
-                    >
-                        {(user.name || '').length > 25 ? `${user.name.slice(0, 25)}...` : user.name}
-                    </button>
-                ) : (
-                    <span className='text-gray-700 font-medium'>
-                        {(user.name || '').length > 25 ? `${user.name.slice(0, 25)}...` : user.name}
-                    </span>
-                )}
-                {' · '}
-                <span>
-                    {(user.email || '').length > 25 ? `${user.email.slice(0, 25)}...` : user.email}
-                </span>
-            </p>
 
             {/* Post content */}
             {truncatedDescription && (
@@ -752,28 +784,45 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
                             <div className='bg-gray-50 rounded-lg p-3 space-y-2'>
                                 <p className='text-xs font-semibold uppercase tracking-wide text-gray-400'>Contact</p>
                                 <div className='flex items-center gap-3'>
-                                    <img
-                                        src={user?.avatar || user?.picture || `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.name || 'User')}&background=e5e7eb&color=374151&size=64`}
-                                        alt={user?.name || 'User'}
-                                        className="w-10 h-10 rounded-full border border-gray-200 object-cover"
-                                        onError={(e) => {
-                                            e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.name || 'User')}&background=e5e7eb&color=374151&size=64`;
-                                        }}
-                                    />
+                                    {user?.googleId ? (
+                                        <button
+                                            onClick={() => navigate(`/user/${user.googleId}`)}
+                                            className='shrink-0 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2'
+                                            aria-label={`View ${displayName}'s profile`}
+                                        >
+                                            <img
+                                                src={avatarSrc}
+                                                alt={displayName}
+                                                className="w-10 h-10 rounded-full border border-gray-200 object-cover"
+                                                onError={(e) => {
+                                                    e.target.src = avatarFallback;
+                                                }}
+                                            />
+                                        </button>
+                                    ) : (
+                                        <img
+                                            src={avatarSrc}
+                                            alt={displayName}
+                                            className="w-10 h-10 rounded-full border border-gray-200 object-cover"
+                                            onError={(e) => {
+                                                e.target.src = avatarFallback;
+                                            }}
+                                        />
+                                    )}
                                     <div className="flex-1 min-w-0">
-                                        {user.googleId ? (
+                                        {user?.googleId ? (
                                             <button
                                                 onClick={() => navigate(`/user/${user.googleId}`)}
                                                 className='text-blue-600 hover:text-blue-800 hover:underline font-medium text-sm break-all'
                                             >
-                                                {user?.name || '—'}
+                                                {displayName}
                                             </button>
                                         ) : (
                                             <span className='text-gray-700 font-medium text-sm break-all cursor-not-allowed'>
-                                                {user?.name || '—'}
+                                                {displayName}
                                             </span>
                                         )}
-                                        <div className='text-xs text-gray-500 break-all'>{user?.email || '—'}</div>
+                                        <div className='text-xs text-gray-500 break-all'>{displayEmail}</div>
                                     </div>
                                 </div>
                                 <div className='flex items-center gap-2 text-gray-700'>
