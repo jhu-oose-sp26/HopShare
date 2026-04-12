@@ -9,6 +9,11 @@ import { MapPin, Calendar, Clock, MessageCircle, Pencil, Trash2, Info, User, Mai
 import { Button } from '@/components/ui/button';
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
+    HoverCard,
+    HoverCardTrigger,
+    HoverCardContent,
+} from '@/components/ui/hover-card';
+import {
     Dialog,
     DialogClose,
     DialogContent,
@@ -20,7 +25,7 @@ import {
 } from '@/components/ui/dialog';
 import SubmitBox from './SubmitBox';
 
-const API_ROOT = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '');
+const API_ROOT = (import.meta.env.VITE_API_BASE_URL || '/api').replace(/\/$/, '');
 const NOTIFICATIONS_ENDPOINT = `${API_ROOT}/notifications`;
 
 const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, routeSearch, distanceFilter, currentUser }) => {
@@ -51,6 +56,7 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
     // Rider list — persisted in post.riderList
     const [listMembers, setListMembers] = useState(() => post.riderList || []);
     const listJoined = currentUser ? listMembers.some(u => u.email === currentUser.email) : false;
+    const isDriverListMember = currentUser ? driverList.some(d => d.email === currentUser.email) : false;
     const [listJoinLoading, setListJoinLoading] = useState(false);
     const [listJoinError, setListJoinError] = useState('');
     const [listRequestSent, setListRequestSent] = useState(() => {
@@ -64,6 +70,22 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
     const openWeatherForecast = (location) => {
         setSelectedWeatherLocation(location);
         setWeatherForecastOpen(true);
+    };
+
+    // Function to handle chatting
+    const handleChatClick = async () => {
+        try {
+            const response = await fetch(`${API_ROOT}/chat/${_id}`);
+            if (!response.ok) {
+                throw new Error('Failed to get/create chat');
+            }
+            const chat = await response.json();
+            navigate("/chat", { state: { chatId: chat._id, postId: _id } });
+        } catch (error) {
+            console.error('Error opening chat:', error);
+            // Fallback to navigate without chat
+            navigate("/chat", { state: { postId: _id } });
+        }
     };
 
     // Calculate distances from user's route to post's locations
@@ -396,6 +418,42 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
 
             {/* Action buttons */}
             <div className='flex flex-wrap gap-2'>
+                {currentUser && (isOwner || listJoined || isDriverListMember) ? (
+                    <Button 
+                        variant='default' 
+                        size='sm' 
+                        className='flex-1' 
+                        onClick={handleChatClick}
+                    >
+                        <MessageCircle className='w-4 h-4 mr-1' />
+                        Chat
+                    </Button>
+                ) : currentUser && !isOwner && !listJoined && !isDriverListMember ? (
+                    <HoverCard openDelay={10} closeDelay={100}>
+                        <HoverCardTrigger asChild>
+                            <div className='flex-1'>
+                                <Button 
+                                variant='default' 
+                                size='sm' 
+                                className='w-full' 
+                                disabled={true}
+                                >
+                                    <MessageCircle className='w-4 h-4 mr-1' />
+                                    Chat
+                                </Button>
+                            </div>
+                        </HoverCardTrigger>
+                        <HoverCardContent className="w-80">
+                            <div className="space-y-2">
+                                <p className="text-sm font-semibold">Chat Unavailable</p>
+                                <p className="text-sm text-gray-600">
+                                    You must be on the rider list or driver list to chat about this ride. Request to join first!
+                                </p>
+                            </div>
+                        </HoverCardContent>
+                    </HoverCard>
+                ) : null}
+
                 {/* Contact Dialog */}
 
                 <Dialog open={contactOpen} onOpenChange={setContactOpen}>
