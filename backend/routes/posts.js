@@ -87,7 +87,7 @@ router.get('/', async (req, res) => {
   res.json(enrichedPosts);
 });
 
-// READ ARCHIVED POSTS (for future profile feature)
+// READ ARCHIVED POSTS
 router.get('/archived', async (req, res) => {
   const posts = await getDB().collection('posts').find({ archived: true }).toArray();
   

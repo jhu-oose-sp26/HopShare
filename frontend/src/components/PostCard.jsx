@@ -4,16 +4,7 @@ import WeatherDisplay from './WeatherDisplay';
 import WeatherForecastDialog from './WeatherForecastDialog';
 import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-
-function formatTime(time) {
-    if (!time) return time;
-    const [hourStr, minute] = time.split(':');
-    const hour = parseInt(hourStr, 10);
-    if (isNaN(hour)) return time;
-    const period = hour >= 12 ? 'PM' : 'AM';
-    const hour12 = hour % 12 || 12;
-    return `${hour12}:${minute} ${period}`;
-}
+import { cn, formatTime, formatDate } from '@/lib/utils';
 import { MapPin, Calendar, Clock, MessageCircle, Pencil, Trash2, Info, User, Mail, Phone, Navigation, ExternalLink, UserPlus, Car, Users, CheckCircle, UserMinus, Hash } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
@@ -359,7 +350,7 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
                                 <div className='flex items-center gap-1 text-sm'>
                                     <Calendar className='w-4 h-4 text-gray-500' />
                                     <span className='text-gray-600'>
-                                        {trip.date}
+                                        {formatDate(trip.date)}
                                     </span>
                                 </div>
                             )}
@@ -1047,7 +1038,7 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
                                             {trip.date && (
                                                 <div className='flex items-center gap-2 text-gray-700'>
                                                     <Calendar className='w-4 h-4 text-gray-400 shrink-0' />
-                                                    <span>{trip.date}</span>
+                                                    <span>{formatDate(trip.date)}</span>
                                                 </div>
                                             )}
                                             {trip.time && (
