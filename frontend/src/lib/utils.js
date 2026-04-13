@@ -95,3 +95,21 @@ export function filterPostsByRouteRadius(posts, route, radiusKm) {
         .sort((left, right) => left.routeDistanceKm - right.routeDistanceKm)
         .map(({ post }) => post);
 }
+
+// Returns 12 hr time instead of 24 hr
+export function formatTime(time) {
+    if (!time) return time;
+    const [hourStr, minute] = time.split(':');
+    const hour = parseInt(hourStr, 10);
+    if (isNaN(hour)) return time;
+    const period = hour >= 12 ? 'PM' : 'AM';
+    const hour12 = hour % 12 || 12;
+    return `${hour12}:${minute} ${period}`;
+}
+
+// Returns format in MM-DD-YYYY
+export function formatDate(date) {
+    if (!date) return date;
+    const [year, month, day] = date.split('-');
+    return `${month}-${day}-${year}`;
+}

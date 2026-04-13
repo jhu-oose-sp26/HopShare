@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState } from 'react';
 import {
   Sheet,
   SheetTrigger,
@@ -6,94 +6,51 @@ import {
   SheetHeader,
   SheetTitle,
   SheetDescription,
-} from "@/components/ui/sheet";
-import { Bell } from "lucide-react";
-
-const API_ROOT = (import.meta.env.VITE_API_BASE_URL || "").replace(/\/$/, "");
+} from '@/components/ui/sheet';
+import { Bell, RefreshCw } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { useNotifications } from '@/hooks/useNotifications';
 
 function NotificationMenu({ currentUser }) {
-  const [notifications, setNotifications] = useState([]);
+  const {
+    notifications,
+    unreadCount,
+    isLoading,
+    isRefreshing,
+    error,
+    lastUpdatedAt,
+    refreshNotifications,
+    markAllAsRead,
+    sendReply: sendNotificationReply,
+    respondToNotification,
+  } = useNotifications(currentUser);
   const [open, setOpen] = useState(false);
   const [replyingTo, setReplyingTo] = useState(null);
   const [replyMessage, setReplyMessage] = useState('');
 
-  // Check if any unread notifications exist
-  const hasUnread = notifications.some((n) => !n.read);
-
-  // Fetch notifications
-  useEffect(() => {
-    if (!currentUser?._id) return;
-
-    const fetchNotifications = async () => {
-      try {
-        const res = await fetch(
-          `${API_ROOT}/notifications/${currentUser._id}`
-        );
-        const data = await res.json();
-        setNotifications(data);
-      } catch (err) {
-        console.error("Failed to fetch notifications", err);
-      }
-    };
-
-    fetchNotifications();
-  }, [currentUser]);
+  const hasUnread = unreadCount > 0;
 
   const handleReply = (notif) => {
     setReplyingTo(notif);
   };
 
   const sendReply = async (notif) => {
-  try {
-    await fetch(`${API_ROOT}/notifications`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        recipientId: notif.senderId, // send back to original sender
-        senderName: currentUser.name,
-        senderId: currentUser._id,
-        message: replyMessage,
-        postId: notif.postId,
-        replyToMessage: notif.message,
-      }),
-    });
+    try {
+      await sendNotificationReply(notif, replyMessage);
+      setReplyMessage('');
+      setReplyingTo(null);
+    } catch (err) {
+      console.error('Failed to send reply', err);
+    }
+  };
 
-    setReplyMessage('');
-    setReplyingTo(null);
-  } catch (err) {
-    console.error("Failed to send reply", err);
-  }
-};
-
-  // mark all as read when sheet opens
   useEffect(() => {
     if (!open) return;
 
-    const markAllAsRead = async () => {
-      try {
-        const unread = notifications.filter((n) => !n.read);
-
-        await Promise.all(
-          unread.map((n) =>
-            fetch(`${API_ROOT}/notifications/${n._id}/read`, {
-              method: "PATCH",
-            })
-          )
-        );
-
-        // update local state 
-        setNotifications((prev) =>
-          prev.map((n) => ({ ...n, read: true }))
-        );
-      } catch (err) {
-        console.error("Failed to mark notifications as read", err);
-      }
-    };
-
-    if (notifications.length > 0) {
-      markAllAsRead();
-    }
-  }, [open]); // when sheet opens
+    markAllAsRead().catch((err) => {
+      console.error('Failed to mark notifications as read', err);
+    });
+  }, [markAllAsRead, open]);
 
   return (
     <Sheet open={open} onOpenChange={setOpen}>
@@ -101,7 +58,6 @@ function NotificationMenu({ currentUser }) {
         <button className="relative p-3 rounded-full hover:bg-gray-100 transition">
           <Bell className="w-7 h-7 text-gray-700" />
 
-          {/* Only show dot if unread exists */}
           {hasUnread && (
             <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-red-500 rounded-full ring-2 ring-white"></span>
           )}
@@ -116,57 +72,143 @@ function NotificationMenu({ currentUser }) {
           </SheetDescription>
         </SheetHeader>
 
-        <div className="mt-4 space-y-3 px-4">
-          {notifications.length === 0 ? (
+        <div className="mt-4 px-4">
+          <div className="mb-3 flex items-center justify-between text-xs text-gray-500">
+            <span>
+              {lastUpdatedAt
+                ? `Updated ${new Date(lastUpdatedAt).toLocaleTimeString()}`
+                : 'Waiting for updates'}
+            </span>
+            <Button
+              variant='ghost'
+              size='sm'
+              onClick={() => refreshNotifications({ silent: true }).catch(() => {})}
+              disabled={isLoading || isRefreshing}
+            >
+              <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+              Refresh
+            </Button>
+          </div>
+
+          {error ? (
+            <p className='mb-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600'>
+              {error}
+            </p>
+          ) : null}
+        </div>
+
+        <div className="space-y-3 px-4 overflow-y-auto max-h-[calc(100vh-10rem)]">
+          {isLoading ? (
+            <p className='text-sm text-gray-500'>Loading notifications...</p>
+          ) : notifications.length === 0 ? (
             <p className="text-sm text-gray-500">
               No notifications yet.
             </p>
           ) : (
-            notifications.map((notif) => (
-              <div
-                key={notif._id}
-                className="p-3 rounded-lg border bg-gray-50"
-              >
-                <p className="text-sm font-medium">
-                  {notif.senderName || "Someone"}
-                </p>
-                {notif.replyToMessage && (
-                  <p className="text-xs text-gray-400 mt-1 italic">
-                    Replying to: "{notif.replyToMessage}"
-                  </p>
-                )}
-                <p className="text-sm text-gray-700">
-                  {notif.message}
-                </p>
-                <p className="text-xs text-gray-400 mt-1">
-                  {new Date(notif.createdAt).toLocaleString()}
-                </p>
+            notifications.map((notif) => {
+              const isLeftListMessage =
+                typeof notif.message === 'string' &&
+                /(left|removed)\b/i.test(notif.message) &&
+                /rid(?:er|ing) list/i.test(notif.message);
+              const displayType = (notif.type === 'left_list' || isLeftListMessage)
+                ? 'left_list'
+                : notif.type;
 
-                <button
-                onClick={() => handleReply(notif)}
-                className="mt-2 text-xs text-blue-600 hover:underline">
-                  Reply
-                </button>
+              const typeStyles = {
+                join_list:            { bg: 'bg-purple-50 border-purple-200', badge: 'bg-purple-100 text-purple-700', label: 'Joined List' },
+                ride_request:         { bg: 'bg-blue-50 border-blue-200',     badge: 'bg-blue-100 text-blue-700',     label: 'Ride Request' },
+                ride_request_response:{ bg: 'bg-gray-50 border-gray-200',     badge: notif.message?.includes('accepted') ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700', label: notif.message?.includes('accepted') ? 'Accepted' : 'Declined' },
+                left_list:            { bg: 'bg-red-50 border-red-200',       badge: 'bg-red-100 text-red-700',       label: 'Left List' },
+                message:              { bg: 'bg-gray-50 border-gray-200',     badge: 'bg-gray-100 text-gray-600',     label: 'Message' },
+              };
+              const style = typeStyles[displayType] || typeStyles.message;
+              const actionableTypes = ['ride_request', 'join_list'];
+              const isActionable = actionableTypes.includes(notif.type) && !notif.response;
+              const hasResponded = actionableTypes.includes(notif.type) && notif.response;
+              const canReply = !actionableTypes.includes(notif.type);
 
-                {replyingTo?._id === notif._id && (
-                  <div className="mt-2 space-y-2">
-                    <textarea
-                      value={replyMessage}
-                      onChange={(e) => setReplyMessage(e.target.value)}
-                      className="w-full border rounded-md p-2 text-sm"
-                      placeholder="Write a reply..."
-                    />
-
-                    <button
-                      onClick={() => sendReply(notif)}
-                      className="text-sm bg-blue-600 text-white px-3 py-1 rounded-md"
-                    >
-                      Send
-                    </button>
+              return (
+                <div
+                  key={notif._id}
+                  className={`p-3 rounded-lg border ${style.bg}`}
+                >
+                  <div className="flex items-center gap-2 mb-1">
+                    <p className="text-sm font-medium">
+                      {notif.senderName || "Someone"}
+                    </p>
+                    <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${style.badge}`}>
+                      {style.label}
+                    </span>
                   </div>
-                )}
-              </div>
-            ))
+                  {notif.replyToMessage && (
+                    <p className="text-xs text-gray-400 mt-1 italic">
+                      Replying to: "{notif.replyToMessage}"
+                    </p>
+                  )}
+                  <p className="text-sm text-gray-700">
+                    {notif.message}
+                  </p>
+                  <p className="text-xs text-gray-400 mt-1">
+                    {new Date(notif.createdAt).toLocaleString()}
+                  </p>
+
+                  {/* Accept/Decline for ride_request and join_list */}
+                  {isActionable && (
+                    <div className="mt-2 flex gap-2">
+                      <button
+                        onClick={() => respondToNotification(notif, 'accepted')}
+                        className="text-sm bg-green-600 text-white px-3 py-1 rounded-md hover:bg-green-700"
+                      >
+                        Accept
+                      </button>
+                      <button
+                        onClick={() => respondToNotification(notif, 'declined')}
+                        className="text-sm bg-red-500 text-white px-3 py-1 rounded-md hover:bg-red-600"
+                      >
+                        Decline
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Response status */}
+                  {hasResponded && (
+                    <p className={`mt-2 text-xs font-medium ${notif.response === 'accepted' ? 'text-green-600' : 'text-red-500'}`}>
+                      You {notif.response} this request.
+                      {notif.type === 'join_list' && notif.response === 'declined' && ' (Removed from list)'}
+                      {notif.type === 'ride_request' && notif.response === 'declined' && ' (Driver removed)'}
+                    </p>
+                  )}
+
+                  {/* Reply for message / invitation / ride_request_response */}
+                  {canReply && (
+                    <>
+                      <button
+                        onClick={() => handleReply(notif)}
+                        className="mt-2 text-xs text-blue-600 hover:underline"
+                      >
+                        Reply
+                      </button>
+                      {replyingTo?._id === notif._id && (
+                        <div className="mt-2 space-y-2">
+                          <textarea
+                            value={replyMessage}
+                            onChange={(e) => setReplyMessage(e.target.value)}
+                            className="w-full border rounded-md p-2 text-sm"
+                            placeholder="Write a reply..."
+                          />
+                          <button
+                            onClick={() => sendReply(notif)}
+                            className="text-sm bg-blue-600 text-white px-3 py-1 rounded-md"
+                          >
+                            Send
+                          </button>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              );
+            })
           )}
         </div>
       </SheetContent>

@@ -12,16 +12,28 @@ import RouteSearchPanel from '@/components/RouteSearchPanel';
 import SubmitBox from '@/components/SubmitBox';
 import NotificationMenu from '@/components/NotificationMenu';
 import { usePosts } from '@/hooks/usePosts';
+import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 import { filterPostsByRouteRadius } from '@/lib/utils';
 
 function HomePage({ currentUser, onLogout }) {
   const navigate = useNavigate();
-  const { posts, addPost, removePost, updatePost, isLoading, error } = usePosts();
+  const {
+    posts,
+    addPost,
+    removePost,
+    updatePost,
+    refreshPosts,
+    isLoading,
+    isRefreshing,
+    error,
+    lastUpdatedAt,
+  } = usePosts();
   const [isOpen, setIsOpen] = useState(false);
   const [coords, setCoords] = useState(null);
   const [routeSearch, setRouteSearch] = useState(null);
   const [hasSearched, setHasSearched] = useState(false);
   const [submitInitialData, setSubmitInitialData] = useState(null);
+  const [activeView, setActiveView] = useState('available');
 
   // Get user's location on load to bias autocomplete results.
   useEffect(() => {
@@ -72,14 +84,54 @@ function HomePage({ currentUser, onLogout }) {
     setIsOpen(true);
   };
 
+  const myPosts = useMemo(
+    () =>
+      visiblePosts.filter((p) => {
+        const userEmail = currentUser?.email;
+        if (!userEmail) return false;
+
+        const isOwner = p.user?.email === userEmail;
+        const isAcceptedRider = Array.isArray(p.riderList)
+          && p.riderList.some((r) => r?.email === userEmail);
+        const isAcceptedDriver = Array.isArray(p.drivers)
+          && p.drivers.some((d) => d?.email === userEmail);
+
+        return isOwner || isAcceptedRider || isAcceptedDriver;
+      }),
+    [visiblePosts, currentUser]
+  );
+
+  const availablePosts = useMemo(
+    () => {
+      const userEmail = currentUser?.email;
+      if (!userEmail) return visiblePosts;
+
+      return visiblePosts.filter((p) => {
+        const isOwner = p.user?.email === userEmail;
+        const isAcceptedRider = Array.isArray(p.riderList)
+          && p.riderList.some((r) => r?.email === userEmail);
+        const isAcceptedDriver = Array.isArray(p.drivers)
+          && p.drivers.some((d) => d?.email === userEmail);
+
+        return !isOwner && !isAcceptedRider && !isAcceptedDriver;
+      });
+    },
+    [visiblePosts, currentUser]
+  );
+
   const isShowingSearchResults = routeSearch !== null;
   const dialogTitle =
     submitInitialData?.startTitle && submitInitialData?.endTitle
       ? 'Request a Ride'
       : 'Create a Ride Request';
 
+  const { handlers, isPulling, progress } = usePullToRefresh(
+    () => refreshPosts({ silent: true }),
+    { enabled: true }
+  );
+
   return (
-    <div className='min-h-screen bg-white'>
+    <div className='min-h-screen bg-white pb-20' {...handlers}>
       <div className='bg-white'>
         <div className="relative">
           <div className="absolute top-6 right-6">
@@ -91,6 +143,15 @@ function HomePage({ currentUser, onLogout }) {
                 <h1 className='text-3xl font-bold text-gray-900 mb-2'>HopShare</h1>
                 <p className='text-gray-600'>
                   Create and find rides with fellow Hopkins students
+                </p>
+                <p className='mt-2 text-xs text-gray-400'>
+                  {isPulling
+                    ? progress >= 1
+                      ? 'Release to refresh rides'
+                      : 'Pull down to refresh rides'
+                    : lastUpdatedAt
+                      ? `Updated ${new Date(lastUpdatedAt).toLocaleTimeString()}`
+                      : 'Waiting for live updates'}
                 </p>
               </div>
 
@@ -114,13 +175,37 @@ function HomePage({ currentUser, onLogout }) {
             <RouteSearchPanel
               coords={coords}
               hasSearched={hasSearched}
-              matchCount={visiblePosts.length}
+              matchCount={activeView === 'my-rides' ? myPosts.length : availablePosts.length}
               searchRadiusKm={routeSearch?.radiusKm ?? ''}
               posts={visiblePosts}
               onClearSearch={clearRouteSearch}
               onRequestRide={requestRide}
               onSearch={routeFizzySearch}
             />
+
+            {/* View tabs */}
+            <div className='flex gap-1 border-b border-gray-200 -mb-6'>
+              <button
+                onClick={() => setActiveView('available')}
+                className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px ${
+                  activeView === 'available'
+                    ? 'border-black text-gray-900'
+                    : 'border-transparent text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                Available Rides
+              </button>
+              <button
+                onClick={() => setActiveView('my-rides')}
+                className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px ${
+                  activeView === 'my-rides'
+                    ? 'border-black text-gray-900'
+                    : 'border-transparent text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                My Rides
+              </button>
+            </div>
 
             <Dialog open={isOpen} onOpenChange={handleDialogOpenChange}>
               <DialogContent className='w-[90%] max-w-[800px] sm:max-w-[800px] max-h-[80vh] overflow-y-auto'>
@@ -143,27 +228,47 @@ function HomePage({ currentUser, onLogout }) {
         </div>
       </div>
 
-      <PostList
-        posts={visiblePosts}
-        isLoading={isLoading}
-        error={error}
-        routeSearch={routeSearch}
-        onDeletePost={removePost}
-        onUpdatePost={updatePost}
-        coords={coords}
-        currentUser={currentUser}
-        heading={isShowingSearchResults ? 'Matching Routes' : 'Available Rides'}
-        subheading={
-          isShowingSearchResults
-            ? `${visiblePosts.length} route${visiblePosts.length === 1 ? '' : 's'} within ${routeSearch.radiusKm} km of the selected route center`
-            : ''
-        }
-        emptyTitle={
-          isShowingSearchResults
-            ? `No routes found within ${routeSearch.radiusKm} km.`
-            : 'No rides available yet.'
-        }
-      />
+      {activeView === 'available' ? (
+        <PostList
+          posts={availablePosts}
+          isLoading={isLoading}
+          error={error}
+          routeSearch={routeSearch}
+          coords={coords}
+          currentUser={currentUser}
+          onRefresh={() => refreshPosts({ silent: true })}
+          isRefreshing={isRefreshing}
+          lastUpdatedAt={lastUpdatedAt}
+          heading={isShowingSearchResults ? 'Matching Routes' : 'Available Rides'}
+          subheading={
+            isShowingSearchResults
+              ? `${availablePosts.length} route${availablePosts.length === 1 ? '' : 's'} within ${routeSearch.radiusKm} km of the selected route center`
+              : ''
+          }
+          emptyTitle={
+            isShowingSearchResults
+              ? `No routes found within ${routeSearch.radiusKm} km.`
+              : 'No rides available yet.'
+          }
+        />
+      ) : (
+        <PostList
+          posts={myPosts}
+          isLoading={isLoading}
+          error={error}
+          onDeletePost={removePost}
+          onUpdatePost={updatePost}
+          coords={coords}
+          currentUser={currentUser}
+          showActions
+          onRefresh={() => refreshPosts({ silent: true })}
+          isRefreshing={isRefreshing}
+          lastUpdatedAt={lastUpdatedAt}
+          heading='My Rides'
+          emptyTitle='You have no rides yet.'
+          emptyDescription='Use the "Create a Request" button above to post your first ride!'
+        />
+      )}
     </div>
   );
 }
