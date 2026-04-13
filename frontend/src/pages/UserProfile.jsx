@@ -163,13 +163,13 @@ function UserProfile({ currentUser }) {
                   <p className="text-gray-900">{profile.email || '—'}</p>
                 </div>
 
-                <div className="space-y-2">
+                {/* <div className="space-y-2">
                   <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
                     <User className="w-4 h-4" />
                     Google ID
                   </label>
                   <p className="text-gray-600 text-sm font-mono break-all">{profile.googleId || '—'}</p>
-                </div>
+                </div> */}
 
                 <div className="space-y-2">
                   <label className="flex items-center gap-2 text-sm font-medium text-gray-700">

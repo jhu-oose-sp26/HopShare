@@ -27,9 +27,10 @@ import placeholderAvatar from '@/user-placeholder.png';
 import { io } from "socket.io-client";
 
 const API_ROOT = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '');
+const CHAT_URL = import.meta.env.VITE_CHAT_URL || API_ROOT;
 const PROFILE_CACHE_KEY = 'profileCache';
 const PROFILE_CACHE_TTL = 1000 * 60 * 60 * 24; // 24 hours
-const socket = io("http://localhost:3000");
+const socket = io(CHAT_URL);
 
 const loadProfileCache = () => {
   if (typeof window === 'undefined') return {};
