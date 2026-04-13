@@ -28,7 +28,9 @@ function UserProfile({ currentUser }) {
       setError('');
 
       try {
-        const response = await fetch(`${API_ROOT}/profile/google/${googleId}`);
+        const response = await fetch(`${API_ROOT}/profile/google/${googleId}`, {
+          cache: 'no-store'
+        });
         
         if (!response.ok) {
           if (response.status === 404) {
