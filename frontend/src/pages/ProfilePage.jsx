@@ -416,7 +416,7 @@ function ProfilePage({ currentUser, onUserUpdate }) {
                   </p>
                 </div>
 
-                <div className="space-y-2">
+                {/* <div className="space-y-2">
                   <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
                     <User className="w-4 h-4" />
                     Google ID
@@ -425,7 +425,7 @@ function ProfilePage({ currentUser, onUserUpdate }) {
                     {currentUser?.googleId || '—'}
                     <span className="ml-2 text-xs">(for user navigation)</span>
                   </p>
-                </div>
+                </div> */}
 
                 <div className="space-y-2">
                   <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
