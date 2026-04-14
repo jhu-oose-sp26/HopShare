@@ -3,6 +3,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
 import { Cloud, Sun, CloudRain, CloudSnow, Wind, Droplets, Thermometer } from 'lucide-react';
 import { getWeatherIconUrl } from '../services/weatherService';
 
+const API_ROOT = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000').replace(/\/$/, '');
+
 export const WeatherForecastDialog = ({ open, onOpenChange, latitude, longitude, location, currentDate }) => {
   const [forecast, setForecast] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -65,7 +67,7 @@ export const WeatherForecastDialog = ({ open, onOpenChange, latitude, longitude,
           
           try {
             const response = await fetch(
-              `http://localhost:3000/weather/forecast?lat=${latitude}&lon=${longitude}&date=${dateStr}`,
+              `${API_ROOT}/weather/forecast?lat=${latitude}&lon=${longitude}&date=${dateStr}`,
               {
                 headers: {
                   'Content-Type': 'application/json',
