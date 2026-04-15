@@ -369,7 +369,7 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
                         </p>
                     </div>
                 </div>
-                <span className='text-xs text-gray-400 shrink-0'>#{_id?.slice(-6)}</span>
+                {/* <span className='text-xs text-gray-400 shrink-0'>#{_id?.slice(-6)}</span> */}
             </div>
 
             {/* Post content */}
