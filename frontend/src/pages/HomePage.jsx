@@ -167,7 +167,7 @@ function HomePage({ currentUser, onLogout }) {
                   <Button variant='outline' size='sm' onClick={onLogout}>
                     Log out
                   </Button>
-                  <Button onClick={openCreateRequest}>Create a Request</Button>
+                  <Button size='sm' onClick={openCreateRequest}>Create a Request</Button>
                 </div>
               </div>
             </div>
