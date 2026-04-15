@@ -45,6 +45,7 @@ function createPostPayload(formData) {
             date: formData.date,
             time: formData.time,
         },
+        ...(formData.maxRiders != null ? { maxRiders: formData.maxRiders } : {}),
         createdAt: new Date().toISOString(),
     };
 }

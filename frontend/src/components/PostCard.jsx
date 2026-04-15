@@ -68,6 +68,8 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
         return (post.pendingJoins || []).includes(currentUser.email);
     });
 
+    const maxRiders = post.maxRiders ?? null;
+    const isFull = maxRiders != null && listMembers.length >= maxRiders;
     const isOwner = currentUser && post.user?.email && currentUser.email === post.user.email;
     const canManagePost = showActions && isOwner;
     const riderRequestStatus = !currentUser || isOwner || !isOffer
@@ -234,7 +236,8 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
         date: trip?.date ?? '',
         time: trip?.time ?? '',
         description: description ?? '',
-    }), [type, user, trip, description]);
+        maxRiders: post.maxRiders ?? '',
+    }), [type, user, trip, description, post.maxRiders]);
 
     const handleEditSubmit = async (formData) => {
         await onUpdate?.(formData);
@@ -498,7 +501,15 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
             <div className='flex items-center gap-2 mb-4 text-sm'>
                 <Users className='w-4 h-4 text-gray-400 shrink-0' />
                 {listMembers.length === 0 ? (
-                    <span className='text-gray-400 italic'>No sharing people yet</span>
+                    maxRiders != null ? (
+                        <span className='text-gray-400 italic'>0 / {maxRiders} riders</span>
+                    ) : (
+                        <span className='text-gray-400 italic'>No sharing people yet</span>
+                    )
+                ) : maxRiders != null ? (
+                    <span className={isFull ? 'text-red-600 font-medium' : 'text-gray-700'}>
+                        {listMembers.length} / {maxRiders} riders{isFull ? ' — Full' : ''}
+                    </span>
                 ) : listMembers.length > 1 ? (
                     <span className='text-gray-700'>{listMembers.length} riders sharing this trip</span>
                 ) : (
@@ -615,10 +626,10 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
                 {currentUser && !isOwner && (
                     <div className='flex-1 flex flex-col gap-1'>
                         {!listJoined && <Button
-                            variant={listJoined || listRequestSent ? 'outline' : 'default'}
+                            variant={listJoined || listRequestSent || isFull ? 'outline' : 'default'}
                             size='sm'
-                            className={`w-full ${listJoined || listRequestSent ? 'text-gray-400' : 'bg-green-600 hover:bg-green-700'}`}
-                            disabled={listJoined || listRequestSent || listJoinLoading}
+                            className={`w-full ${listJoined || listRequestSent || isFull ? 'text-gray-400' : 'bg-green-600 hover:bg-green-700'}`}
+                            disabled={listJoined || listRequestSent || listJoinLoading || isFull}
                             onClick={async () => {
                                 setListJoinError('');
                                 setListJoinLoading(true);
@@ -660,6 +671,8 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
                                 <><CheckCircle className='w-4 h-4 mr-1' />Request Accepted</>
                             ) : listRequestSent ? (
                                 <><CheckCircle className='w-4 h-4 mr-1' />Awaiting Approval</>
+                            ) : isFull ? (
+                                <><Users className='w-4 h-4 mr-1' />Ride Full</>
                             ) : (
                                 <><Users className='w-4 h-4 mr-1' />Join the Rider List</>
                             )}

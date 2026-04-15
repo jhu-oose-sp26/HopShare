@@ -10,6 +10,7 @@ import {
     Phone,
     MessageCircle,
     CarFront,
+    Users,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -37,6 +38,7 @@ function SubmitBox({ onSubmit, coords, initialData = null, isEdit = false }) {
     const [time, setTime] = useState(initialData?.time ?? '');
     const [description, setDescription] = useState(initialData?.description ?? '');
     const [type, setType] = useState(initialData?.type ?? 'request');
+    const [maxRiders, setMaxRiders] = useState(initialData?.maxRiders ?? '');
     const [submitError, setSubmitError] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -54,6 +56,7 @@ function SubmitBox({ onSubmit, coords, initialData = null, isEdit = false }) {
         setTime(initialData?.time ?? '');
         setDescription(initialData?.description ?? '');
         setType(initialData?.type ?? 'request');
+        setMaxRiders(initialData?.maxRiders ?? '');
         setSubmitError('');
         setIsSubmitting(false);
     }, [initialData]);
@@ -92,6 +95,7 @@ function SubmitBox({ onSubmit, coords, initialData = null, isEdit = false }) {
             time,
             description,
             type,
+            maxRiders: type === 'offer' && maxRiders !== '' ? Number(maxRiders) : undefined,
         };
 
         setSubmitError('');
@@ -115,6 +119,7 @@ function SubmitBox({ onSubmit, coords, initialData = null, isEdit = false }) {
                 setTime('');
                 setDescription('');
                 setType('request');
+                setMaxRiders('');
             }
         } catch (err) {
             setSubmitError(
@@ -250,7 +255,7 @@ function SubmitBox({ onSubmit, coords, initialData = null, isEdit = false }) {
                     />
                 </div>
 
-                <div className='grid gap-4 sm:grid-cols-2'>
+                <div className={`grid gap-4 ${type === 'offer' ? 'sm:grid-cols-3' : 'sm:grid-cols-2'}`}>
                     <div className='space-y-2'>
                         <label
                             htmlFor='submit-date'
@@ -284,7 +289,7 @@ function SubmitBox({ onSubmit, coords, initialData = null, isEdit = false }) {
                             <PopoverContent
                                 side='bottom'
                                 sideOffset={4}
-                                align='center' 
+                                align='center'
                                 className="p-0 w-full"
                                 style={{ minWidth: '100%' }}
                             >
@@ -318,6 +323,27 @@ function SubmitBox({ onSubmit, coords, initialData = null, isEdit = false }) {
                             required
                         />
                     </div>
+                    {type === 'offer' && (
+                        <div className='space-y-2'>
+                            <label
+                                htmlFor='submit-max-riders'
+                                className='flex items-center gap-2 text-sm font-medium text-foreground'
+                            >
+                                <Users className='size-4 text-muted-foreground' />
+                                Max riders
+                            </label>
+                            <input
+                                id='submit-max-riders'
+                                type='number'
+                                min='1'
+                                max='20'
+                                className={inputBase}
+                                placeholder='No limit'
+                                value={maxRiders}
+                                onChange={(e) => setMaxRiders(e.target.value)}
+                            />
+                        </div>
+                    )}
                 </div>
 
                 <div className='space-y-2'>

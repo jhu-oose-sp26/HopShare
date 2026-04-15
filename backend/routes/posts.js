@@ -290,6 +290,10 @@ router.post('/:id/join', async (req, res) => {
       return res.json({ success: true, alreadyJoined: true });
     }
 
+    if (post.maxRiders != null && riderList.length >= post.maxRiders) {
+      return res.status(400).json({ error: 'This ride is full.' });
+    }
+
     await db.collection('posts').updateOne(
       { _id: postId },
       { $push: { pendingJoins: email } }
