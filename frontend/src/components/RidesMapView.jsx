@@ -1,7 +1,15 @@
-import { useEffect, useRef } from 'react';
-import { MapContainer, TileLayer, Marker, Polyline, Popup, useMap } from 'react-leaflet';
+import { useEffect, useRef, useState } from 'react';
+import { MapContainer, TileLayer, Marker, Polyline, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import { format, parse } from 'date-fns';
+import { Calendar as CalendarIcon } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
+import { Calendar } from '@/components/ui/calendar';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import PostCard from '@/components/PostCard';
 
 // Fix default marker icons
 import icon from 'leaflet/dist/images/marker-icon.png';
@@ -66,6 +74,7 @@ function makeArrow(color, deg) {
   });
 }
 
+
 function AutoFit({ points }) {
   const map = useMap();
   const fitted = useRef(false);
@@ -86,12 +95,25 @@ function AutoFit({ points }) {
   return null;
 }
 
-function RidesMapView({ posts }) {
-  const rides = posts.filter(
+function RidesMapView({ posts, currentUser, coords, onDeletePost, onUpdatePost }) {
+  const [fromDate, setFromDate] = useState('');
+  const [toDate, setToDate] = useState('');
+  const [fromOpen, setFromOpen] = useState(false);
+  const [toOpen, setToOpen] = useState(false);
+  const [selectedPost, setSelectedPost] = useState(null);
+
+  const ridesWithCoords = posts.filter(
     (p) =>
       p.trip?.startLocation?.gps_coordinates?.latitude &&
       p.trip?.endLocation?.gps_coordinates?.latitude,
   );
+
+  const rides = ridesWithCoords.filter((p) => {
+    const date = p.trip?.date ?? '';
+    if (fromDate && date < fromDate) return false;
+    if (toDate   && date > toDate)   return false;
+    return true;
+  });
 
   const allPoints = rides.flatMap((p) => [
     [p.trip.startLocation.gps_coordinates.latitude, p.trip.startLocation.gps_coordinates.longitude],
@@ -104,13 +126,76 @@ function RidesMapView({ posts }) {
 
   return (
     <div className='container mx-auto px-6 py-8 max-w-6xl'>
-      <div className='mb-4'>
-        <h2 className='text-xl font-semibold text-gray-900'>Map View</h2>
-        <p className='text-sm text-gray-500 mt-1'>
-          {rides.length} ride{rides.length === 1 ? '' : 's'} with location data
-          {posts.length - rides.length > 0 &&
-            ` · ${posts.length - rides.length} hidden (no coordinates)`}
-        </p>
+      <div className='mb-4 flex flex-wrap items-end justify-between gap-4'>
+        <div>
+          <h2 className='text-xl font-semibold text-gray-900'>Map View</h2>
+          <p className='text-sm text-gray-500 mt-1'>
+            {rides.length} ride{rides.length === 1 ? '' : 's'} shown
+            {ridesWithCoords.length - rides.length > 0 &&
+              ` · ${ridesWithCoords.length - rides.length} filtered out`}
+          </p>
+        </div>
+        <div className='flex flex-wrap items-center gap-3 text-sm'>
+          <div className='flex items-center gap-2'>
+            <label className='text-gray-600 whitespace-nowrap'>From</label>
+            <Popover open={fromOpen} onOpenChange={setFromOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant='outline'
+                  className={cn('w-36 justify-start text-left font-normal h-9', !fromDate && 'text-muted-foreground')}
+                >
+                  <CalendarIcon className='mr-2 h-4 w-4' />
+                  {fromDate ? format(parse(fromDate, 'yyyy-MM-dd', new Date()), 'MMM d, yyyy') : 'Pick a date'}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent side='bottom' align='start' className='p-0 w-auto' style={{ zIndex: 1000 }}>
+                <Calendar
+                  mode='single'
+                  selected={fromDate ? parse(fromDate, 'yyyy-MM-dd', new Date()) : undefined}
+                  onSelect={(d) => {
+                    if (!d) return;
+                    setFromDate(format(d, 'yyyy-MM-dd'));
+                    setFromOpen(false);
+                    setToOpen(true);
+                  }}
+                />
+              </PopoverContent>
+            </Popover>
+          </div>
+          <div className='flex items-center gap-2'>
+            <label className='text-gray-600 whitespace-nowrap'>To</label>
+            <Popover open={toOpen} onOpenChange={setToOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant='outline'
+                  className={cn('w-36 justify-start text-left font-normal h-9', !toDate && 'text-muted-foreground')}
+                >
+                  <CalendarIcon className='mr-2 h-4 w-4' />
+                  {toDate ? format(parse(toDate, 'yyyy-MM-dd', new Date()), 'MMM d, yyyy') : 'Pick a date'}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent side='bottom' align='start' className='p-0 w-auto' style={{ zIndex: 1000 }}>
+                <Calendar
+                  mode='single'
+                  selected={toDate ? parse(toDate, 'yyyy-MM-dd', new Date()) : undefined}
+                  onSelect={(d) => {
+                    if (!d) return;
+                    setToDate(format(d, 'yyyy-MM-dd'));
+                    setToOpen(false);
+                  }}
+                />
+              </PopoverContent>
+            </Popover>
+          </div>
+          {(fromDate || toDate) && (
+            <button
+              onClick={() => { setFromDate(''); setToDate(''); }}
+              className='text-xs text-gray-500 hover:text-gray-800 underline'
+            >
+              Clear
+            </button>
+          )}
+        </div>
       </div>
 
       {rides.length === 0 ? (
@@ -118,7 +203,7 @@ function RidesMapView({ posts }) {
           <p className='text-gray-500 text-lg'>No rides with location data to display.</p>
         </div>
       ) : (
-        <div className='rounded-xl overflow-hidden border border-gray-200 shadow-sm' style={{ height: '520px' }}>
+        <div className='rounded-xl overflow-hidden border border-gray-200 shadow-sm' style={{ height: '520px', position: 'relative', zIndex: 0 }}>
           <MapContainer
             center={center}
             zoom={11}
@@ -137,43 +222,27 @@ function RidesMapView({ posts }) {
               const startLatLng = [start.latitude, start.longitude];
               const endLatLng   = [end.latitude,   end.longitude];
               const color = LINE_COLORS[idx % LINE_COLORS.length];
-              const label = post.trip?.startLocation?.title
-                ? `${post.trip.startLocation.title} → ${post.trip.endLocation?.title ?? '?'}`
-                : post.title ?? 'Ride';
-              const dateTime = [post.trip?.date, post.trip?.time].filter(Boolean).join(' · ');
-
-              // Midpoint for the arrowhead
-              const midLat = (start.latitude  + end.latitude)  / 2;
-              const midLng = (start.longitude + end.longitude) / 2;
               const arrowBearing = bearing(start.latitude, start.longitude, end.latitude, end.longitude);
               const arrowIcon = makeArrow(color, arrowBearing);
+              const arrowPositions = [0.25, 0.5, 0.75].map((t) => [
+                start.latitude  + t * (end.latitude  - start.latitude),
+                start.longitude + t * (end.longitude - start.longitude),
+              ]);
+
+              const open = () => setSelectedPost(post);
 
               return (
                 <span key={post._id}>
                   <Polyline
                     positions={[startLatLng, endLatLng]}
-                    pathOptions={{ color, weight: 3, opacity: 0.75 }}
+                    pathOptions={{ color, weight: 4, opacity: 0.8 }}
+                    eventHandlers={{ click: open }}
                   />
-                  {/* Directional arrow at midpoint */}
-                  <Marker position={[midLat, midLng]} icon={arrowIcon} interactive={false} />
-                  <Marker position={startLatLng} icon={START_ICON}>
-                    <Popup>
-                      <div className='text-sm'>
-                        <p className='font-semibold'>{label}</p>
-                        {dateTime && <p className='text-gray-500'>{dateTime}</p>}
-                        <p className='text-green-700 mt-1'>Start: {post.trip.startLocation.title}</p>
-                      </div>
-                    </Popup>
-                  </Marker>
-                  <Marker position={endLatLng} icon={END_ICON}>
-                    <Popup>
-                      <div className='text-sm'>
-                        <p className='font-semibold'>{label}</p>
-                        {dateTime && <p className='text-gray-500'>{dateTime}</p>}
-                        <p className='text-red-700 mt-1'>End: {post.trip.endLocation.title}</p>
-                      </div>
-                    </Popup>
-                  </Marker>
+                  {arrowPositions.map((pos, i) => (
+                    <Marker key={i} position={pos} icon={arrowIcon} interactive={false} />
+                  ))}
+                  <Marker position={startLatLng} icon={START_ICON} eventHandlers={{ click: open }} />
+                  <Marker position={endLatLng} icon={END_ICON} eventHandlers={{ click: open }} />
                 </span>
               );
             })}
@@ -190,9 +259,30 @@ function RidesMapView({ posts }) {
           <span className='inline-block w-3 h-3 rounded-full bg-red-600'></span> End
         </span>
         <span className='flex items-center gap-1'>
-          <span className='inline-block w-4 h-0.5 bg-blue-600'></span> Route (arrow shows direction)
+          <span className='inline-block w-4 h-0.5 bg-blue-600'></span> Route (click to view details)
         </span>
       </div>
+
+      {/* Ride detail sheet */}
+      <Sheet open={!!selectedPost} onOpenChange={(open) => !open && setSelectedPost(null)}>
+        <SheetContent side='right' className='w-105 sm:w-120 overflow-y-auto'>
+          <SheetHeader>
+            <SheetTitle>Ride Details</SheetTitle>
+          </SheetHeader>
+          <div className='mt-4'>
+            {selectedPost && (
+              <PostCard
+                post={selectedPost}
+                coords={coords}
+                currentUser={currentUser}
+                showActions={currentUser?.email === selectedPost?.user?.email}
+                onDelete={() => { onDeletePost?.(selectedPost._id); setSelectedPost(null); }}
+                onUpdate={(formData) => onUpdatePost?.(selectedPost._id, formData)}
+              />
+            )}
+          </div>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }

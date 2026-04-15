@@ -282,7 +282,7 @@ function HomePage({ currentUser, onLogout }) {
         />
       )}
       {activeView === 'map' && (
-        <RidesMapView posts={visiblePosts} />
+        <RidesMapView posts={visiblePosts} currentUser={currentUser} coords={coords} onDeletePost={removePost} onUpdatePost={updatePost} />
       )}
     </div>
   );
