@@ -1,6 +1,8 @@
 // Weather service that calls our backend API
 // Backend handles weather API calls securely with server-side caching
 
+const API_ROOT = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000').replace(/\/$/, '');
+
 // Simple cache to avoid redundant requests within the same session
 const cache = new Map();
 const CACHE_DURATION = 30 * 60 * 1000; // 30 minutes
@@ -53,7 +55,7 @@ export async function getWeatherForecast(latitude, longitude, date, time = '12:0
       time: time
     });
 
-    const response = await fetch(`http://localhost:3000/weather/forecast?${params}`);
+    const response = await fetch(`${API_ROOT}/weather/forecast?${params}`);
     
     if (!response.ok) {
       // Handle different error types

@@ -23,7 +23,7 @@ import {
 const inputBase =
     'flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50';
 
-function SubmitBox({ onSubmit, coords, initialData = null }) {
+function SubmitBox({ onSubmit, coords, initialData = null, isEdit = false }) {
     const [name, setName] = useState(initialData?.name ?? '');
     const [email, setEmail] = useState(initialData?.email ?? '');
     const [phone, setPhone] = useState(initialData?.phone ?? '');
@@ -170,6 +170,7 @@ function SubmitBox({ onSubmit, coords, initialData = null }) {
                         value={name}
                         onChange={(e) => setName(e.target.value)}
                         required
+                        disabled={isEdit}
                     />
                 </div>
 
@@ -189,6 +190,7 @@ function SubmitBox({ onSubmit, coords, initialData = null }) {
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
                         required
+                        disabled={isEdit}
                     />
                 </div>
 

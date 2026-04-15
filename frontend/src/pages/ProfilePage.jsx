@@ -73,6 +73,15 @@ function ProfilePage({ currentUser, onUserUpdate }) {
   const [archivedPosts, setArchivedPosts] = useState([]);
   const [archivedLoading, setArchivedLoading] = useState(true);
 
+  // Fetch fresh profile data from backend on mount
+  useEffect(() => {
+    if (!currentUser?._id) return;
+    fetch(`${API_ROOT}/profile/${currentUser._id}`)
+      .then(res => res.ok ? res.json() : null)
+      .then(data => { if (data?.user) onUserUpdate(data.user); })
+      .catch(() => {});
+  }, []);
+
   // Reset form when currentUser changes or edit mode is cancelled
   useEffect(() => {
     setFormData({
@@ -416,7 +425,7 @@ function ProfilePage({ currentUser, onUserUpdate }) {
                   </p>
                 </div>
 
-                <div className="space-y-2">
+                {/* <div className="space-y-2">
                   <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
                     <User className="w-4 h-4" />
                     Google ID
@@ -425,7 +434,7 @@ function ProfilePage({ currentUser, onUserUpdate }) {
                     {currentUser?.googleId || '—'}
                     <span className="ml-2 text-xs">(for user navigation)</span>
                   </p>
-                </div>
+                </div> */}
 
                 <div className="space-y-2">
                   <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
