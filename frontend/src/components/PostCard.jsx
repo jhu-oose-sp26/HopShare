@@ -25,7 +25,7 @@ const API_ROOT = (import.meta.env.VITE_API_BASE_URL || '/api').replace(/\/$/, ''
 const NOTIFICATIONS_ENDPOINT = `${API_ROOT}/notifications`;
 
 const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, routeSearch, distanceFilter, currentUser }) => {
-    const { _id, title, description, user, trip, type = 'request', createdAt } = post;
+    const { _id, title, description, user, trip, type = 'request', createdAt, suggestedPrice } = post;
     const navigate = useNavigate();
     const isOffer = type === 'offer';
     const truncatedDescription = description 
@@ -462,6 +462,16 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
                         <p className='text-sm font-medium text-gray-900'>{riderRequestStatus.title}</p>
                     </div>
                     <p className='mt-1 text-sm text-gray-600'>{riderRequestStatus.description}</p>
+                </div>
+            )}
+
+            {/* Suggested price — offers only */}
+            {isOffer && suggestedPrice != null && suggestedPrice !== '' && (
+                <div className='flex items-center gap-2 mb-4 text-sm'>
+                    <span className='text-gray-400 shrink-0 font-medium'>$</span>
+                    <span className='text-gray-700'>
+                        Suggested price: <span className='font-medium text-green-700'>${Number(suggestedPrice).toFixed(2)}</span>
+                    </span>
                 </div>
             )}
 

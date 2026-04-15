@@ -22,6 +22,7 @@ function createPostPayload(formData) {
         }`,
         description: formData.description,
         type: formData.type,
+        suggestedPrice: formData.type === 'offer' && formData.suggestedPrice ? Number(formData.suggestedPrice) : null,
         user: {
             name: formData.name,
             email: formData.email,

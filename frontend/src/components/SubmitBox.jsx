@@ -10,6 +10,8 @@ import {
     Phone,
     MessageCircle,
     CarFront,
+    DollarSign,
+    Info,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -19,6 +21,7 @@ import {
     PopoverContent,
     PopoverTrigger,
 } from '@/components/ui/popover';
+import { HoverCard, HoverCardTrigger, HoverCardContent } from '@/components/ui/hover-card';
 
 const inputBase =
     'flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50';
@@ -37,6 +40,7 @@ function SubmitBox({ onSubmit, coords, initialData = null, isEdit = false }) {
     const [time, setTime] = useState(initialData?.time ?? '');
     const [description, setDescription] = useState(initialData?.description ?? '');
     const [type, setType] = useState(initialData?.type ?? 'request');
+    const [suggestedPrice, setSuggestedPrice] = useState(initialData?.suggestedPrice ?? '');
     const [submitError, setSubmitError] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -54,6 +58,7 @@ function SubmitBox({ onSubmit, coords, initialData = null, isEdit = false }) {
         setTime(initialData?.time ?? '');
         setDescription(initialData?.description ?? '');
         setType(initialData?.type ?? 'request');
+        setSuggestedPrice(initialData?.suggestedPrice ?? '');
         setSubmitError('');
         setIsSubmitting(false);
     }, [initialData]);
@@ -92,6 +97,7 @@ function SubmitBox({ onSubmit, coords, initialData = null, isEdit = false }) {
             time,
             description,
             type,
+            suggestedPrice: type === 'offer' ? suggestedPrice : '',
         };
 
         setSubmitError('');
@@ -115,6 +121,7 @@ function SubmitBox({ onSubmit, coords, initialData = null, isEdit = false }) {
                 setTime('');
                 setDescription('');
                 setType('request');
+                setSuggestedPrice('');
             }
         } catch (err) {
             setSubmitError(
@@ -340,6 +347,42 @@ function SubmitBox({ onSubmit, coords, initialData = null, isEdit = false }) {
                         {description.length}/500
                     </p>
                 </div>
+                {type === 'offer' && (
+                    <div className='space-y-2'>
+                        <label
+                            htmlFor='submit-price'
+                            className='flex items-center gap-2 text-sm font-medium text-foreground'
+                        >
+                            <DollarSign className='size-4 text-muted-foreground' />
+                            Suggested total price
+                            <span className='text-xs text-muted-foreground font-normal'>(optional)</span>
+                            <HoverCard openDelay={100} closeDelay={100}>
+                                <HoverCardTrigger asChild>
+                                    <span className='cursor-pointer text-muted-foreground hover:text-foreground'>
+                                        <Info className='size-3.5' />
+                                    </span>
+                                </HoverCardTrigger>
+                                <HoverCardContent className='w-64 text-sm text-muted-foreground font-normal'>
+                                    Total price you are requesting for the ride. This will be split between the riders.
+                                </HoverCardContent>
+                            </HoverCard>
+                        </label>
+                        <div className='relative'>
+                            <span className='absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm'>$</span>
+                            <input
+                                id='submit-price'
+                                type='number'
+                                min='0'
+                                step='0.01'
+                                className={`${inputBase} pl-7`}
+                                placeholder='0.00'
+                                value={suggestedPrice}
+                                onChange={(e) => setSuggestedPrice(e.target.value)}
+                            />
+                        </div>
+                    </div>
+                )}
+
                 {submitError && (
                     <p className='text-sm text-red-600'>{submitError}</p>
                 )}
