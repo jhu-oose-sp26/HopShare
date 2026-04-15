@@ -71,7 +71,9 @@ async function readErrorMessage(response) {
 export const usePosts = () => {
     const [posts, setPosts] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
+    const [isRefreshing, setIsRefreshing] = useState(false);
     const [error, setError] = useState('');
+    const [lastUpdatedAt, setLastUpdatedAt] = useState(null);
 
     const fetchPosts = useCallback(async () => {
         const response = await fetch(POSTS_ENDPOINT);
@@ -83,38 +85,62 @@ export const usePosts = () => {
         return Array.isArray(payload) ? payload : [];
     }, []);
 
-    useEffect(() => {
-        let isMounted = true;
+    const refreshPosts = useCallback(
+        async ({ silent = false } = {}) => {
+            if (silent) {
+                setIsRefreshing(true);
+            } else {
+                setIsLoading(true);
+            }
 
-        const loadPosts = async () => {
-            setIsLoading(true);
             try {
                 const loadedPosts = await fetchPosts();
-                if (isMounted) {
-                    setPosts(loadedPosts);
-                    setError('');
-                }
+                setPosts(loadedPosts);
+                setError('');
+                setLastUpdatedAt(new Date().toISOString());
+                return loadedPosts;
             } catch (err) {
-                if (isMounted) {
-                    setError(
-                        err instanceof Error
-                            ? err.message
-                            : 'Failed to load rides'
-                    );
-                }
+                setError(
+                    err instanceof Error ? err.message : 'Failed to load rides'
+                );
+                throw err;
             } finally {
-                if (isMounted) {
+                if (silent) {
+                    setIsRefreshing(false);
+                } else {
                     setIsLoading(false);
                 }
             }
+        },
+        [fetchPosts]
+    );
+
+    useEffect(() => {
+        refreshPosts().catch(() => {});
+
+        const intervalId = window.setInterval(() => {
+            refreshPosts({ silent: true }).catch(() => {});
+        }, 15000);
+
+        const handleWindowFocus = () => {
+            refreshPosts({ silent: true }).catch(() => {});
         };
 
-        loadPosts();
+        const handleVisibilityChange = () => {
+            if (!document.hidden) {
+                refreshPosts({ silent: true }).catch(() => {});
+            }
+        };
+
+        window.addEventListener('focus', handleWindowFocus);
+        document.addEventListener('visibilitychange', handleVisibilityChange);
 
         return () => {
-            isMounted = false;
+            window.clearInterval(intervalId);
+            window.removeEventListener('focus', handleWindowFocus);
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
         };
-    }, [fetchPosts]);
+    }, [refreshPosts]);
 
 
     const addPost = useCallback(async (formData) => {
@@ -145,6 +171,7 @@ export const usePosts = () => {
 
         setPosts((prevPosts) => [createdPost, ...prevPosts]);
         setError('');
+        setLastUpdatedAt(new Date().toISOString());
         return createdPost;
     }, []);
 
@@ -160,6 +187,7 @@ export const usePosts = () => {
         setPosts((prevPosts) =>
             prevPosts.filter((post) => String(post._id) !== String(postId))
         );
+        setLastUpdatedAt(new Date().toISOString());
     }, []);
 
     const updatePost = useCallback(async (postId, formData) => {
@@ -184,6 +212,7 @@ export const usePosts = () => {
                     : post
             )
         );
+        setLastUpdatedAt(new Date().toISOString());
     }, []);
 
     return {
@@ -191,8 +220,11 @@ export const usePosts = () => {
         addPost,
         removePost,
         updatePost,
+        refreshPosts,
         postCount: posts.length,
         isLoading,
+        isRefreshing,
         error,
+        lastUpdatedAt,
     };
 };

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+const API_ROOT = (import.meta.env.VITE_API_BASE_URL || '/api').replace(/\/$/, '');
 
 const inputBase =
     'flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50';
@@ -31,7 +32,7 @@ function LocationAutocomplete({ id, value, onChange, onSelect, placeholder, requ
                     params.set('lat', coords.lat);
                     params.set('lng', coords.lng);
                 }
-                const res = await fetch(`/api/places/autocomplete?${params}`);
+                const res = await fetch(`${API_ROOT}/places/autocomplete?${params}`);
                 if (!res.ok) {
                     setSuggestions([]);
                     setIsOpen(false);

@@ -2,21 +2,17 @@ import { calculateDistance } from './RouteMap';
 import RouteMap from './RouteMap';
 import WeatherDisplay from './WeatherDisplay';
 import WeatherForecastDialog from './WeatherForecastDialog';
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-
-function formatTime(time) {
-    if (!time) return time;
-    const [hourStr, minute] = time.split(':');
-    const hour = parseInt(hourStr, 10);
-    if (isNaN(hour)) return time;
-    const period = hour >= 12 ? 'PM' : 'AM';
-    const hour12 = hour % 12 || 12;
-    return `${hour12}:${minute} ${period}`;
-}
-import { MapPin, Calendar, Clock, MessageCircle, Pencil, Trash2, Info, User, Mail, Phone, Navigation, ExternalLink } from 'lucide-react';
+import { cn, formatTime, formatDate } from '@/lib/utils';
+import { MapPin, Calendar, Clock, MessageCircle, Pencil, Trash2, Info, User, Mail, Phone, Navigation, ExternalLink, UserPlus, Car, Users, CheckCircle, UserMinus, Hash } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import {
+    HoverCard,
+    HoverCardTrigger,
+    HoverCardContent,
+} from '@/components/ui/hover-card';
 import {
     Dialog,
     DialogClose,
@@ -29,29 +25,104 @@ import {
 } from '@/components/ui/dialog';
 import SubmitBox from './SubmitBox';
 
-const API_ROOT = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '');
+const API_ROOT = (import.meta.env.VITE_API_BASE_URL || '/api').replace(/\/$/, '');
 const NOTIFICATIONS_ENDPOINT = `${API_ROOT}/notifications`;
 
-const PostCard = ({ post, onDelete, onUpdate, coords, routeSearch, distanceFilter,  currentUser }) => {
+const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, routeSearch, distanceFilter, currentUser }) => {
     const { _id, title, description, user, trip, type = 'request', createdAt } = post;
     const navigate = useNavigate();
     const isOffer = type === 'offer';
-
+    const truncatedDescription = description 
+    ? (description.length > 50 ? `${description.slice(0, 50)}...` : description)
+    : '';
+    const displayName = user?.name || 'User';
+    const displayEmail = user?.email || '—';
+    const avatarFallback = `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=e5e7eb&color=374151&size=64`;
+    const avatarSrc = user?.avatar || user?.picture || avatarFallback;
     const [editOpen, setEditOpen] = useState(false);
     const [detailsOpen, setDetailsOpen] = useState(false);
     const [deleteOpen, setDeleteOpen] = useState(false);
     const [contactOpen, setContactOpen] = useState(false);
+    const [codeOpen, setCodeOpen] = useState(false);
     const [weatherForecastOpen, setWeatherForecastOpen] = useState(false);
     const [selectedWeatherLocation, setSelectedWeatherLocation] = useState(null);
     const [message, setMessage] = useState('');
     const [isDeleting, setIsDeleting] = useState(false);
     const [deleteError, setDeleteError] = useState('');
     const [activeMapTab, setActiveMapTab] = useState("route"); // "route" or "distance"
+    // "Take" button — persisted in post.pendingDrivers / post.drivers
+    const [driverList, setDriverList] = useState(() => post.drivers || []);
+    const [joinRequested, setJoinRequested] = useState(() => {
+        if (!currentUser) return false;
+        return (post.drivers || []).some(d => d.email === currentUser.email)
+            || (post.pendingDrivers || []).some(d => d.email === currentUser.email);
+    });
+    // Rider list — persisted in post.riderList
+    const [listMembers, setListMembers] = useState(() => post.riderList || []);
+    const listJoined = currentUser ? listMembers.some(u => u.email === currentUser.email) : false;
+    const isDriverListMember = currentUser ? driverList.some(d => d.email === currentUser.email) : false;
+    const [listJoinLoading, setListJoinLoading] = useState(false);
+    const [listJoinError, setListJoinError] = useState('');
+    const [listRequestSent, setListRequestSent] = useState(() => {
+        if (!currentUser) return false;
+        return (post.pendingJoins || []).includes(currentUser.email);
+    });
+
+    const isOwner = currentUser && post.user?.email && currentUser.email === post.user.email;
+    const canManagePost = showActions && isOwner;
+    const riderRequestStatus = !currentUser || isOwner || !isOffer
+        ? null
+        : listJoined
+            ? {
+                badgeClassName: 'bg-green-100 text-green-700',
+                title: 'Request accepted',
+                description: 'You are on the rider list for this trip.',
+            }
+            : listRequestSent
+                ? {
+                    badgeClassName: 'bg-amber-100 text-amber-700',
+                    title: 'Awaiting poster approval',
+                    description: 'Your join request has been sent and is waiting for the poster to respond.',
+                }
+                : null;
+
+    useEffect(() => {
+        setDriverList(post.drivers || []);
+        setListMembers(post.riderList || []);
+
+        if (!currentUser) {
+            setJoinRequested(false);
+            setListRequestSent(false);
+            return;
+        }
+
+        setJoinRequested(
+            (post.drivers || []).some(d => d.email === currentUser.email)
+            || (post.pendingDrivers || []).some(d => d.email === currentUser.email)
+        );
+        setListRequestSent((post.pendingJoins || []).includes(currentUser.email));
+    }, [post.drivers, post.pendingDrivers, post.pendingJoins, post.riderList, currentUser]);
 
     // Function to handle weather forecast dialog opening
     const openWeatherForecast = (location) => {
         setSelectedWeatherLocation(location);
         setWeatherForecastOpen(true);
+    };
+
+    // Function to handle chatting
+    const handleChatClick = async () => {
+        try {
+            const response = await fetch(`${API_ROOT}/chat/${_id}`);
+            if (!response.ok) {
+                throw new Error('Failed to get/create chat');
+            }
+            const chat = await response.json();
+            navigate("/chat", { state: { chatId: chat._id, postId: _id } });
+        } catch (error) {
+            console.error('Error opening chat:', error);
+            // Fallback to navigate without chat
+            navigate("/chat", { state: { postId: _id } });
+        }
     };
 
     // Calculate distances from user's route to post's locations
@@ -187,92 +258,126 @@ const PostCard = ({ post, onDelete, onUpdate, coords, routeSearch, distanceFilte
     };
 
     return (
-        <div className='relative rounded-xl border border-gray-200 bg-white px-6 pt-10 pb-6 shadow-sm hover:shadow-md transition-shadow'>
-            {/* Edit button — top left */}
-            <Dialog open={editOpen} onOpenChange={setEditOpen}>
-                <DialogTrigger asChild>
-                    <button className='absolute top-3 left-3 p-1.5 rounded-md text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors'>
-                        <Pencil className='w-4 h-4' />
-                    </button>
-                </DialogTrigger>
-                <DialogContent className="w-[90%] max-w-[800px] sm:max-w-[800px] max-h-[80vh] overflow-y-auto">
-                    <DialogDescription className="sr-only">
-                        Edit ride post form
-                    </DialogDescription>
-                    <DialogHeader>
-                        <DialogTitle>Edit Ride</DialogTitle>
-                    </DialogHeader>
-                    <SubmitBox
-                        onSubmit={handleEditSubmit}
-                        coords={coords}
-                        initialData={initialData}
-                    />
-                </DialogContent>
-            </Dialog>
+        <div className={`relative rounded-xl border border-gray-200 bg-white px-6 pb-6 shadow-sm hover:shadow-md transition-shadow ${canManagePost ? 'pt-10' : 'pt-6'}`}>
+            {canManagePost && (
+                <>
+                    {/* Edit button — top left */}
+                    <Dialog open={editOpen} onOpenChange={setEditOpen}>
+                        <DialogTrigger asChild>
+                            <button className='absolute top-3 left-3 p-1.5 rounded-md text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors'>
+                                <Pencil className='w-4 h-4' />
+                            </button>
+                        </DialogTrigger>
+                        <DialogContent className="w-[90%] max-w-[800px] sm:max-w-[800px] max-h-[80vh] overflow-y-auto">
+                            <DialogDescription className="sr-only">
+                                Edit ride post form
+                            </DialogDescription>
+                            <DialogHeader>
+                                <DialogTitle>Edit Ride</DialogTitle>
+                            </DialogHeader>
+                            <SubmitBox
+                                onSubmit={handleEditSubmit}
+                                coords={coords}
+                                initialData={initialData}
+                                isEdit={true}
+                            />
+                        </DialogContent>
+                    </Dialog>
 
-            {/* Delete button — top right */}
-            <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
-                <DialogTrigger asChild>
-                    <button className='absolute top-3 right-3 p-1.5 rounded-md text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors'>
-                        <Trash2 className='w-4 h-4' />
-                    </button>
-                </DialogTrigger>
-                <DialogContent className="sm:max-w-[425px]">
-                    <DialogHeader>
-                        <DialogTitle>Delete Ride</DialogTitle>
-                        <DialogDescription>
-                            Are you sure you want to delete this ride? This action cannot be undone.
-                        </DialogDescription>
-                    </DialogHeader>
-                    {deleteError && (
-                        <p className='text-sm text-red-600'>{deleteError}</p>
+                    {/* Delete button — top right */}
+                    <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+                        <DialogTrigger asChild>
+                            <button className='absolute top-3 right-3 p-1.5 rounded-md text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors'>
+                                <Trash2 className='w-4 h-4' />
+                            </button>
+                        </DialogTrigger>
+                        <DialogContent className="sm:max-w-[425px]">
+                            <DialogHeader>
+                                <DialogTitle>Delete Ride</DialogTitle>
+                                <DialogDescription>
+                                    Are you sure you want to delete this ride? This action cannot be undone.
+                                </DialogDescription>
+                            </DialogHeader>
+                            {deleteError && (
+                                <p className='text-sm text-red-600'>{deleteError}</p>
+                            )}
+                            <DialogFooter>
+                                <Button variant='outline' onClick={() => setDeleteOpen(false)} disabled={isDeleting}>
+                                    Cancel
+                                </Button>
+                                <Button variant='destructive' onClick={handleDelete} disabled={isDeleting}>
+                                    {isDeleting ? 'Deleting...' : 'Delete'}
+                                </Button>
+                            </DialogFooter>
+                        </DialogContent>
+                    </Dialog>
+                </>
+            )}
+
+            {/* Header: poster info + badge + title + ID */}
+            <div className='flex items-start justify-between gap-3 mb-3'>
+                <div className='flex items-start gap-3 min-w-0 flex-1'>
+                    {user?.googleId ? (
+                        <button
+                            onClick={() => navigate(`/user/${user.googleId}`)}
+                            className='shrink-0 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2'
+                            aria-label={`View ${displayName}'s profile`}
+                        >
+                            <img
+                                src={avatarSrc}
+                                alt={displayName}
+                                className='w-11 h-11 rounded-full border border-gray-200 object-cover'
+                                onError={(e) => {
+                                    e.target.src = avatarFallback;
+                                }}
+                            />
+                        </button>
+                    ) : (
+                        <img
+                            src={avatarSrc}
+                            alt={displayName}
+                            className='w-11 h-11 rounded-full border border-gray-200 object-cover shrink-0'
+                            onError={(e) => {
+                                e.target.src = avatarFallback;
+                            }}
+                        />
                     )}
-                    <DialogFooter>
-                        <Button variant='outline' onClick={() => setDeleteOpen(false)} disabled={isDeleting}>
-                            Cancel
-                        </Button>
-                        <Button variant='destructive' onClick={handleDelete} disabled={isDeleting}>
-                            {isDeleting ? 'Deleting...' : 'Delete'}
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
-
-            {/* Header: badge + title + ID */}
-            <div className='flex items-start justify-between mb-3'>
-                <div className='flex items-center gap-2 flex-wrap'>
-                    <span className={`text-xs font-medium px-2.5 py-0.5 rounded-full ${isOffer ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}`}>
-                        {isOffer ? 'Offering' : 'Requesting'}
-                    </span>
-                    <h3 className='font-semibold text-gray-900 break-words'>{title}</h3>
+                    <div className='min-w-0 flex-1'>
+                        <div className='flex items-center gap-2 flex-wrap mb-1'>
+                            <span className={`text-xs font-medium px-2.5 py-0.5 rounded-full ${isOffer ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}`}>
+                                {isOffer ? 'Offering' : 'Requesting'}
+                            </span>
+                            <h3 className='font-semibold text-gray-900 break-words'>{title || 'Untitled'}</h3>
+                        </div>
+                        <p className='text-sm text-gray-500 wrap-break-word'>
+                            {user?.googleId ? (
+                                <button
+                                    onClick={() => navigate(`/user/${user.googleId}`)}
+                                    className='text-blue-600 hover:text-blue-800 hover:underline font-medium break-all'
+                                >
+                                    {displayName.length > 25 ? `${displayName.slice(0, 25)}...` : displayName}
+                                </button>
+                            ) : (
+                                <span className='text-gray-700 font-medium break-all cursor-not-allowed'>
+                                    {displayName.length > 25 ? `${displayName.slice(0, 25)}...` : displayName}
+                                </span>
+                            )}
+                            {' · '}
+                            <span className='break-all'>
+                                {displayEmail.length > 25 ? `${displayEmail.slice(0, 25)}...` : displayEmail}
+                            </span>
+                        </p>
+                    </div>
                 </div>
-                <span className='text-xs text-gray-400 shrink-0 ml-2'>#{_id?.slice(-6)}</span>
+                <span className='text-xs text-gray-400 shrink-0'>#{_id?.slice(-6)}</span>
             </div>
-            <p className='text-sm text-gray-500 mb-4 wrap-break-word'>
-                {user.googleId ? (
-                    <button
-                        onClick={() => navigate(`/user/${user.googleId}`)}
-                        className='text-blue-600 hover:text-blue-800 hover:underline font-medium break-all'
-                    >
-                        {user.name.length > 40 ? `${user.name.slice(0, 40)}...` : user.name}
-                    </button>
-                ) : (
-                    <span className='text-gray-700 font-medium break-all cursor-not-allowed'>
-                        {user.name}
-                    </span>
-                )}
-                {' · '}
-                <span className='break-all'>
-                    {user.email.length > 40 ? `${user.email.slice(0, 40)}...` : user.email}
-                </span>
-            </p>
 
             {/* Post content */}
-            <p className='text-gray-700 mb-4 break-words'>
-                {description.length > 100
-                ? `${description.slice(0, 100)}...`
-                : description}
-            </p>
+            {truncatedDescription && (
+                <p className='text-gray-700 mb-4 break-all'>
+                    {truncatedDescription}
+                </p>
+            )}
 
             {/* Trip details (if exists) */}
             {trip && (
@@ -333,7 +438,7 @@ const PostCard = ({ post, onDelete, onUpdate, coords, routeSearch, distanceFilte
                                 <div className='flex items-center gap-1 text-sm'>
                                     <Calendar className='w-4 h-4 text-gray-500' />
                                     <span className='text-gray-600'>
-                                        {trip.date}
+                                        {formatDate(trip.date)}
                                     </span>
                                 </div>
                             )}
@@ -350,8 +455,95 @@ const PostCard = ({ post, onDelete, onUpdate, coords, routeSearch, distanceFilte
                 </div>
             )}
 
+            {riderRequestStatus && (
+                <div className='mb-4 rounded-lg border border-gray-200 bg-slate-50 px-4 py-3'>
+                    <div className='flex items-center gap-2'>
+                        <span className={`text-xs font-medium px-2.5 py-0.5 rounded-full ${riderRequestStatus.badgeClassName}`}>
+                            Rider Request Status
+                        </span>
+                        <p className='text-sm font-medium text-gray-900'>{riderRequestStatus.title}</p>
+                    </div>
+                    <p className='mt-1 text-sm text-gray-600'>{riderRequestStatus.description}</p>
+                </div>
+            )}
+
+            {/* Driver status */}
+            {(() => {
+                const driver = driverList[0];
+                return (
+                    <div className='flex items-center gap-2 mb-4 text-sm'>
+                        <User className='w-4 h-4 text-gray-400 shrink-0' />
+                        {driver ? (
+                            <span className='text-gray-700'>
+                                Driver:{' '}
+                                {driver.googleId ? (
+                                    <button
+                                        onClick={() => navigate(`/user/${driver.googleId}`)}
+                                        className='font-medium text-blue-600 hover:underline hover:text-blue-800'
+                                    >
+                                        {driver.name || driver.email}
+                                    </button>
+                                ) : (
+                                    <span className='font-medium'>{driver.name || driver.email}</span>
+                                )}
+                            </span>
+                        ) : (
+                            <span className='text-gray-400 italic'>No driver yet - use Uber/Lyft</span>
+                        )}
+                    </div>
+                );
+            })()}
+
+            {/* Sharing status */}
+            <div className='flex items-center gap-2 mb-4 text-sm'>
+                <Users className='w-4 h-4 text-gray-400 shrink-0' />
+                {listMembers.length === 0 ? (
+                    <span className='text-gray-400 italic'>No sharing people yet</span>
+                ) : listMembers.length > 1 ? (
+                    <span className='text-gray-700'>{listMembers.length} riders sharing this trip</span>
+                ) : (
+                    <span className='text-gray-700'>1 rider sharing this trip</span>
+                )}
+            </div>
+
             {/* Action buttons */}
             <div className='flex flex-wrap gap-2'>
+                {currentUser && (isOwner || listJoined || isDriverListMember) ? (
+                    <Button 
+                        variant='default' 
+                        size='sm' 
+                        className='flex-1' 
+                        onClick={handleChatClick}
+                    >
+                        <MessageCircle className='w-4 h-4 mr-1' />
+                        Chat
+                    </Button>
+                ) : currentUser && !isOwner && !listJoined && !isDriverListMember ? (
+                    <HoverCard openDelay={10} closeDelay={100}>
+                        <HoverCardTrigger asChild>
+                            <div className='flex-1'>
+                                <Button 
+                                variant='default' 
+                                size='sm' 
+                                className='w-full' 
+                                disabled={true}
+                                >
+                                    <MessageCircle className='w-4 h-4 mr-1' />
+                                    Chat
+                                </Button>
+                            </div>
+                        </HoverCardTrigger>
+                        <HoverCardContent className="w-80">
+                            <div className="space-y-2">
+                                <p className="text-sm font-semibold">Chat Unavailable</p>
+                                <p className="text-sm text-gray-600">
+                                    You must be on the rider list or driver list to chat about this ride. Request to join first!
+                                </p>
+                            </div>
+                        </HoverCardContent>
+                    </HoverCard>
+                ) : null}
+
                 {/* Contact Dialog */}
 
                 <Dialog open={contactOpen} onOpenChange={setContactOpen}>
@@ -419,6 +611,210 @@ const PostCard = ({ post, onDelete, onUpdate, coords, routeSearch, distanceFilte
                     </DialogContent>
                 </Dialog>
 
+                {/* Join the rider list — only for non-owners */}
+                {currentUser && !isOwner && (
+                    <div className='flex-1 flex flex-col gap-1'>
+                        {!listJoined && <Button
+                            variant={listJoined || listRequestSent ? 'outline' : 'default'}
+                            size='sm'
+                            className={`w-full ${listJoined || listRequestSent ? 'text-gray-400' : 'bg-green-600 hover:bg-green-700'}`}
+                            disabled={listJoined || listRequestSent || listJoinLoading}
+                            onClick={async () => {
+                                setListJoinError('');
+                                setListJoinLoading(true);
+                                try {
+                                    const res = await fetch(`${API_ROOT}/posts/${post._id}/join`, {
+                                        method: 'POST',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({ email: currentUser.email }),
+                                    });
+                                    if (res.ok) {
+                                        const msg = `${currentUser.name} wants to join your rider list for the ride from ${post.trip?.startLocation?.title || 'start'} to ${post.trip?.endLocation?.title || 'destination'}.`;
+                                        await fetch(NOTIFICATIONS_ENDPOINT, {
+                                            method: 'POST',
+                                            headers: { 'Content-Type': 'application/json' },
+                                            body: JSON.stringify({
+                                                recipientEmail: post.user.email,
+                                                senderName: currentUser.name,
+                                                senderId: currentUser._id,
+                                                message: msg,
+                                                postId: post._id,
+                                                type: 'join_list',
+                                            }),
+                                        });
+                                        setListRequestSent(true);
+                                    } else {
+                                        const data = await res.json().catch(() => ({}));
+                                        setListJoinError(data.error || 'Failed to send request. Please try again.');
+                                    }
+                                } catch (err) {
+                                    setListJoinError('Network error. Please try again.');
+                                } finally {
+                                    setListJoinLoading(false);
+                                }
+                            }}
+                        >
+                            {listJoinLoading ? (
+                                'Sending...'
+                            ) : listJoined ? (
+                                <><CheckCircle className='w-4 h-4 mr-1' />Request Accepted</>
+                            ) : listRequestSent ? (
+                                <><CheckCircle className='w-4 h-4 mr-1' />Awaiting Approval</>
+                            ) : (
+                                <><Users className='w-4 h-4 mr-1' />Join the Rider List</>
+                            )}
+                        </Button>}
+                        {listJoined && (
+                            <Button
+                                variant='outline'
+                                size='sm'
+                                className='w-full text-xs text-red-600 border-red-300 hover:bg-red-50 hover:text-red-700'
+                                onClick={async () => {
+                                    const res = await fetch(`${API_ROOT}/posts/${post._id}/remove-member`, {
+                                        method: 'POST',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({
+                                            email: currentUser.email,
+                                            name: currentUser.name,
+                                            actorEmail: currentUser.email,
+                                            actorName: currentUser.name,
+                                            actorId: currentUser._id,
+                                        }),
+                                    });
+                                    if (res.ok) {
+                                        setListMembers(prev => prev.filter(m => m.email !== currentUser.email));
+                                    }
+                                }}
+                            >
+                                <UserMinus className='w-3 h-3 mr-1' />Leave Rider List
+                            </Button>
+                        )}
+                        {listJoinError && <p className='text-xs text-red-500'>{listJoinError}</p>}
+                    </div>
+                )}
+
+                {/* Take button — only for non-owners on request posts (driver offering to take) */}
+                {currentUser && !isOwner && !isOffer && !driverList.some(d => d.email === currentUser.email) && (
+                    <Button
+                        variant={joinRequested ? 'outline' : 'default'}
+                        size='sm'
+                        className={`flex-1 ${joinRequested ? 'text-gray-400' : 'bg-blue-600 hover:bg-blue-700'}`}
+                        disabled={joinRequested}
+                        onClick={async () => {
+                            // Persist the take on the post so it survives refresh
+                            const takeRes = await fetch(`${API_ROOT}/posts/${post._id}/take`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    name: currentUser.name,
+                                    email: currentUser.email,
+                                    picture: currentUser.picture || null,
+                                    avatar: currentUser.avatar || null,
+                                    googleId: currentUser.googleId || null,
+                                }),
+                            });
+                            const takeData = await takeRes.json().catch(() => ({}));
+                            // If already taken, just update UI silently
+                            if (takeData.alreadyTaken) {
+                                setJoinRequested(true);
+                                return;
+                            }
+                            if (!takeRes.ok) return;
+
+                            const msg = `${currentUser.name} can take you from ${post.trip?.startLocation?.title || 'start'} to ${post.trip?.endLocation?.title || 'destination'}.`;
+                            // Notify post owner
+                            await fetch(NOTIFICATIONS_ENDPOINT, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    recipientEmail: post.user.email,
+                                    senderName: currentUser.name,
+                                    senderId: currentUser._id,
+                                    message: msg,
+                                    postId: post._id,
+                                    type: 'ride_request',
+                                }),
+                            });
+                            // Also notify all rider list members
+                            for (const member of listMembers) {
+                                if (member.email !== currentUser.email) {
+                                    await fetch(NOTIFICATIONS_ENDPOINT, {
+                                        method: 'POST',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({
+                                            recipientEmail: member.email,
+                                            senderName: currentUser.name,
+                                            senderId: currentUser._id,
+                                            message: `${currentUser.name} is offering to drive from ${post.trip?.startLocation?.title || 'start'} to ${post.trip?.endLocation?.title || 'destination'}. Check the post for details!`,
+                                            postId: post._id,
+                                            type: 'ride_request',
+                                        }),
+                                    });
+                                }
+                            }
+                            setJoinRequested(true);
+                        }}
+                    >
+                        {joinRequested ? (
+                            <><CheckCircle className='w-4 h-4 mr-1' />Request Sent</>
+                        ) : (
+                            <><Car className='w-4 h-4 mr-1' />Offer to Be a Driver</>
+                        )}
+                    </Button>
+                )}
+
+                {/* Leave as driver — only if current user is an accepted driver */}
+                {currentUser && !isOwner && driverList.some(d => d.email === currentUser.email) && (
+                    <Button
+                        variant='outline'
+                        size='sm'
+                        className='flex-1 text-red-600 border-red-300 hover:bg-red-50 hover:text-red-700'
+                        onClick={async () => {
+                            const res = await fetch(`${API_ROOT}/posts/${post._id}/remove-driver`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ email: currentUser.email }),
+                            });
+                            if (res.ok) {
+                                setDriverList(prev => prev.filter(d => d.email !== currentUser.email));
+                                setJoinRequested(false);
+                            }
+                        }}
+                    >
+                        <UserMinus className='w-4 h-4 mr-1' />Leave as Driver
+                    </Button>
+                )}
+
+                {/* Confirmation Code — only for the owner in My Rides */}
+                {canManagePost && (
+                    <Dialog open={codeOpen} onOpenChange={setCodeOpen}>
+                        <DialogTrigger asChild>
+                            <Button variant='outline' size='sm'>
+                                <Hash className='w-4 h-4 mr-1' />
+                                Show Code
+                            </Button>
+                        </DialogTrigger>
+                        <DialogContent className='sm:max-w-xs'>
+                            <DialogHeader>
+                                <DialogTitle>Confirmation Code</DialogTitle>
+                                <DialogDescription>
+                                    Share this code with your riders to confirm the trip.
+                                </DialogDescription>
+                            </DialogHeader>
+                            <div className='flex items-center justify-center py-4'>
+                                <span className='text-3xl font-bold tracking-widest text-gray-900 font-mono'>
+                                    {post.confirmationCode || '—'}
+                                </span>
+                            </div>
+                            <DialogFooter>
+                                <DialogClose asChild>
+                                    <Button variant='outline'>Close</Button>
+                                </DialogClose>
+                            </DialogFooter>
+                        </DialogContent>
+                    </Dialog>
+                )}
+
                 {/* Details Dialog */}
                 <Dialog open={detailsOpen} onOpenChange={setDetailsOpen}>
                     <DialogTrigger asChild>
@@ -452,28 +848,45 @@ const PostCard = ({ post, onDelete, onUpdate, coords, routeSearch, distanceFilte
                             <div className='bg-gray-50 rounded-lg p-3 space-y-2'>
                                 <p className='text-xs font-semibold uppercase tracking-wide text-gray-400'>Contact</p>
                                 <div className='flex items-center gap-3'>
-                                    <img
-                                        src={user?.avatar || user?.picture || `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.name || 'User')}&background=e5e7eb&color=374151&size=64`}
-                                        alt={user?.name || 'User'}
-                                        className="w-10 h-10 rounded-full border border-gray-200 object-cover"
-                                        onError={(e) => {
-                                            e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.name || 'User')}&background=e5e7eb&color=374151&size=64`;
-                                        }}
-                                    />
+                                    {user?.googleId ? (
+                                        <button
+                                            onClick={() => navigate(`/user/${user.googleId}`)}
+                                            className='shrink-0 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2'
+                                            aria-label={`View ${displayName}'s profile`}
+                                        >
+                                            <img
+                                                src={avatarSrc}
+                                                alt={displayName}
+                                                className="w-10 h-10 rounded-full border border-gray-200 object-cover"
+                                                onError={(e) => {
+                                                    e.target.src = avatarFallback;
+                                                }}
+                                            />
+                                        </button>
+                                    ) : (
+                                        <img
+                                            src={avatarSrc}
+                                            alt={displayName}
+                                            className="w-10 h-10 rounded-full border border-gray-200 object-cover"
+                                            onError={(e) => {
+                                                e.target.src = avatarFallback;
+                                            }}
+                                        />
+                                    )}
                                     <div className="flex-1 min-w-0">
-                                        {user.googleId ? (
+                                        {user?.googleId ? (
                                             <button
                                                 onClick={() => navigate(`/user/${user.googleId}`)}
                                                 className='text-blue-600 hover:text-blue-800 hover:underline font-medium text-sm break-all'
                                             >
-                                                {user?.name || '—'}
+                                                {displayName}
                                             </button>
                                         ) : (
                                             <span className='text-gray-700 font-medium text-sm break-all cursor-not-allowed'>
-                                                {user?.name || '—'}
+                                                {displayName}
                                             </span>
                                         )}
-                                        <div className='text-xs text-gray-500 break-all'>{user?.email || '—'}</div>
+                                        <div className='text-xs text-gray-500 break-all'>{displayEmail}</div>
                                     </div>
                                 </div>
                                 <div className='flex items-center gap-2 text-gray-700'>
@@ -482,11 +895,127 @@ const PostCard = ({ post, onDelete, onUpdate, coords, routeSearch, distanceFilte
                                 </div>
                             </div>
 
+                            {/* Driver */}
+                            <div className='bg-gray-50 rounded-lg p-3 space-y-2'>
+                                <p className='text-xs font-semibold uppercase tracking-wide text-gray-400'>Driver</p>
+                                {driverList.length > 0 ? driverList.map((driver) => (
+                                    <div key={driver.email} className='flex items-center gap-3'>
+                                        <img
+                                            src={driver.avatar || driver.picture || `https://ui-avatars.com/api/?name=${encodeURIComponent(driver.name || 'Driver')}&background=e5e7eb&color=374151&size=64`}
+                                            alt={driver.name || 'Driver'}
+                                            className='w-10 h-10 rounded-full border border-gray-200 object-cover'
+                                            onError={(e) => { e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(driver.name || 'Driver')}&background=e5e7eb&color=374151&size=64`; }}
+                                        />
+                                        <div className='flex-1 min-w-0'>
+                                            <p className='font-medium text-sm break-all'>{driver.name || '—'}</p>
+                                            <p className='text-xs text-gray-500 break-all'>{driver.email || '—'}</p>
+                                        </div>
+                                        {isOwner && (
+                                            <Button
+                                                variant='outline'
+                                                size='sm'
+                                                className='shrink-0 text-xs text-red-600 border-red-300 hover:bg-red-50 hover:text-red-700'
+                                                onClick={async () => {
+                                                    const res = await fetch(`${API_ROOT}/posts/${post._id}/remove-driver`, {
+                                                        method: 'POST',
+                                                        headers: { 'Content-Type': 'application/json' },
+                                                        body: JSON.stringify({ email: driver.email }),
+                                                    });
+                                                    if (res.ok) setDriverList(prev => prev.filter(d => d.email !== driver.email));
+                                                }}
+                                            >
+                                                <UserMinus className='w-3 h-3 mr-1' />Remove
+                                            </Button>
+                                        )}
+                                    </div>
+                                )) : (
+                                    <p className='text-gray-400 italic text-sm'>No driver yet</p>
+                                )}
+                            </div>
+
                             {/* Description */}
                             {description && (
                                 <div className='bg-gray-50 rounded-lg p-3 space-y-2'>
                                     <p className='text-xs font-semibold uppercase tracking-wide text-gray-400'>Description</p>
-                                    <p className='text-gray-700 break-words whitespace-pre-wrap'>{description}</p>
+                                    <p className='text-gray-700 break-all whitespace-pre-wrap'>{description}</p>
+                                </div>
+                            )}
+
+                            {/* Rider List */}
+                            <div className='bg-gray-50 rounded-lg p-3 space-y-2'>
+                                <p className='text-xs font-semibold uppercase tracking-wide text-gray-400'>
+                                    Rider List
+                                    {listMembers.length > 1 && (
+                                        <span className='ml-2 text-gray-500 font-normal normal-case'>({listMembers.length} people sharing)</span>
+                                    )}
+                                </p>
+                                {listMembers.length === 0 ? (
+                                    <p className='text-xs text-gray-400 italic'>No sharing people yet.</p>
+                                ) : (
+                                    <div className='space-y-2'>
+                                        {listMembers.map((member, idx) => (
+                                            <div key={idx} className='flex items-center justify-between gap-3'>
+                                                <div className='flex items-center gap-2'>
+                                                    <img
+                                                        src={member.avatar || member.picture || `https://ui-avatars.com/api/?name=${encodeURIComponent(member.name || 'User')}&background=e5e7eb&color=374151&size=64`}
+                                                        alt={member.name || 'User'}
+                                                        className='w-8 h-8 rounded-full border border-gray-200 object-cover shrink-0'
+                                                        onError={(e) => { e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(member.name || 'User')}&background=e5e7eb&color=374151&size=64`; }}
+                                                    />
+                                                    <div className='min-w-0'>
+                                                        {member.googleId ? (
+                                                            <button
+                                                                onClick={() => navigate(`/user/${member.googleId}`)}
+                                                                className='text-blue-600 hover:text-blue-800 hover:underline font-medium text-sm truncate block'
+                                                            >
+                                                                {member.name || '—'}
+                                                            </button>
+                                                        ) : (
+                                                            <span className='text-gray-800 font-medium text-sm'>{member.name || '—'}</span>
+                                                        )}
+                                                        <div className='text-xs text-gray-500 truncate'>{member.email}</div>
+                                                    </div>
+                                                </div>
+                                                {/* Remove button — for post owner on both offer and request */}
+                                                {isOwner && (
+                                                    <Button
+                                                        variant='outline'
+                                                        size='sm'
+                                                        className='shrink-0 text-xs text-red-600 border-red-300 hover:bg-red-50 hover:text-red-700'
+                                                        onClick={async () => {
+                                                            const res = await fetch(`${API_ROOT}/posts/${post._id}/remove-member`, {
+                                                                method: 'POST',
+                                                                headers: { 'Content-Type': 'application/json' },
+                                                                body: JSON.stringify({
+                                                                    email: member.email,
+                                                                    name: member.name,
+                                                                    actorEmail: currentUser?.email,
+                                                                    actorName: currentUser?.name,
+                                                                    actorId: currentUser?._id,
+                                                                }),
+                                                            });
+                                                            if (!res.ok) return;
+                                                            setListMembers(prev => prev.filter(m => m.email !== member.email));
+                                                        }}
+                                                    >
+                                                        <UserMinus className='w-3 h-3 mr-1' />Remove
+                                                    </Button>
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+
+                            {riderRequestStatus && (
+                                <div className='bg-gray-50 rounded-lg p-3 space-y-2'>
+                                    <p className='text-xs font-semibold uppercase tracking-wide text-gray-400'>Your Request Status</p>
+                                    <div className='flex items-center gap-2'>
+                                        <span className={`text-xs font-medium px-2.5 py-0.5 rounded-full ${riderRequestStatus.badgeClassName}`}>
+                                            {riderRequestStatus.title}
+                                        </span>
+                                    </div>
+                                    <p className='text-sm text-gray-600'>{riderRequestStatus.description}</p>
                                 </div>
                             )}
 
@@ -700,7 +1229,7 @@ const PostCard = ({ post, onDelete, onUpdate, coords, routeSearch, distanceFilte
                                             {trip.date && (
                                                 <div className='flex items-center gap-2 text-gray-700'>
                                                     <Calendar className='w-4 h-4 text-gray-400 shrink-0' />
-                                                    <span>{trip.date}</span>
+                                                    <span>{formatDate(trip.date)}</span>
                                                 </div>
                                             )}
                                             {trip.time && (

@@ -60,7 +60,7 @@ function UserProfile({ currentUser }) {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-gray-50 pb-20">
         <div className="container mx-auto px-6 py-8 max-w-4xl">
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8">
             <div className="animate-pulse space-y-4">
@@ -85,7 +85,7 @@ function UserProfile({ currentUser }) {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-gray-50 pb-20">
         <div className="container mx-auto px-6 py-8 max-w-4xl">
           <Button
             variant="outline"
@@ -112,7 +112,7 @@ function UserProfile({ currentUser }) {
   if (!profile) return null;
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 pb-20">
       <div className="container mx-auto px-6 py-8 max-w-4xl">
         <Button
           variant="outline"
@@ -163,13 +163,13 @@ function UserProfile({ currentUser }) {
                   <p className="text-gray-900">{profile.email || '—'}</p>
                 </div>
 
-                <div className="space-y-2">
+                {/* <div className="space-y-2">
                   <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
                     <User className="w-4 h-4" />
                     Google ID
                   </label>
                   <p className="text-gray-600 text-sm font-mono break-all">{profile.googleId || '—'}</p>
-                </div>
+                </div> */}
 
                 <div className="space-y-2">
                   <label className="flex items-center gap-2 text-sm font-medium text-gray-700">

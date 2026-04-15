@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { User, Mail, Phone, BookOpen, Calendar, MapPin, Edit3, Save, X, Camera, Upload, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { formatTime, formatDate } from '@/lib/utils';
 
 const API_ROOT = (import.meta.env.VITE_API_BASE_URL || '/api').replace(/\/$/, '');
 
@@ -17,6 +18,10 @@ function normalizeUSPhoneDigits(phone) {
 
 function isValidUSPhoneNumber(phone) {
   return normalizeUSPhoneDigits(phone).length === 10;
+}
+
+function isValidUsername(username) {
+  return username.length >= 3 && username.length <= 20;
 }
 
 function formatUSPhoneNumber(phone) {
@@ -50,7 +55,9 @@ function ProfilePage({ currentUser, onUserUpdate }) {
   const [success, setSuccess] = useState('');
   const [phoneWarning, setPhoneWarning] = useState('');
   const fileInputRef = useRef(null);
-  
+  const [visibleCount, setVisibleCount] = useState(3);
+  const [expandedPostId, setExpandedPostId] = useState(null);
+
   // Form state
   const [formData, setFormData] = useState({
     name: currentUser?.name || '',
@@ -63,6 +70,8 @@ function ProfilePage({ currentUser, onUserUpdate }) {
 
   // Avatar preview state
   const [avatarPreview, setAvatarPreview] = useState(null);
+  const [archivedPosts, setArchivedPosts] = useState([]);
+  const [archivedLoading, setArchivedLoading] = useState(true);
 
   // Reset form when currentUser changes or edit mode is cancelled
   useEffect(() => {
@@ -78,8 +87,37 @@ function ProfilePage({ currentUser, onUserUpdate }) {
     setPhoneWarning('');
   }, [currentUser, isEditing]);
 
+  useEffect(() => {
+    const fetchArchived = async () => {
+      try {
+        const res = await fetch(`${API_ROOT}/posts/archived`);
+        const data = await res.json();
+        const mine = data.filter(p => p.user?.email === currentUser?.email);
+        setArchivedPosts(mine);
+      } catch (err) {
+        console.error('Failed to load archived posts', err);
+      } finally {
+        setArchivedLoading(false);
+      }
+    };
+    fetchArchived();
+  }, [currentUser?.email]);
+
   const handleInputChange = (field, value) => {
     setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleNameChange = (value) => {
+    setFormData(prev => ({ ...prev, name: value }));
+
+    const trimmed = value.trim();
+    if (!trimmed) {
+      setError('Name cannot be empty.');
+    } else if (!isValidUsername(trimmed)) {
+      setError('Name must be between 3 and 20 characters.');
+    } else {
+      setError('');
+    }
   };
 
   const handlePhoneChange = (value) => {
@@ -156,6 +194,16 @@ function ProfilePage({ currentUser, onUserUpdate }) {
   const handleSave = async () => {
     if (!currentUser?._id) return;
 
+    const trimmedName = formData.name.trim();
+    if (!trimmedName) {
+      setError('Name cannot be empty.');
+      return;
+    }
+    if (!isValidUsername(trimmedName)) {
+      setError('Name must be between 3 and 20 characters.');
+      return;
+    }
+
     const trimmedPhone = formData.phone.trim();
     if (trimmedPhone && !isValidUSPhoneNumber(trimmedPhone)) {
       setPhoneWarning('Enter a valid US phone number (10 digits).');
@@ -163,7 +211,7 @@ function ProfilePage({ currentUser, onUserUpdate }) {
       return;
     }
     const formattedPhone = trimmedPhone ? formatUSPhoneNumber(trimmedPhone) : '';
-    
+
     setIsLoading(true);
     setError('');
     setSuccess('');
@@ -189,13 +237,13 @@ function ProfilePage({ currentUser, onUserUpdate }) {
       }
 
       const { user } = payload;
-      
+
       // Update the user in app state and localStorage
       onUserUpdate(user);
-      
+
       setIsEditing(false);
       setSuccess('Profile updated successfully!');
-      
+
       // Clear success message after 3 seconds
       setTimeout(() => setSuccess(''), 3000);
     } catch (err) {
@@ -224,7 +272,7 @@ function ProfilePage({ currentUser, onUserUpdate }) {
   const years = Array.from({ length: 10 }, (_, i) => currentYear + i);
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 pb-20">
       <div className="container mx-auto px-6 py-8 max-w-4xl">
         <Button
           variant="outline"
@@ -260,7 +308,7 @@ function ProfilePage({ currentUser, onUserUpdate }) {
                     </button>
                   )}
                 </div>
-                
+
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-3 mb-2">
                     <h1 className="text-2xl font-bold text-gray-900">
@@ -296,7 +344,7 @@ function ProfilePage({ currentUser, onUserUpdate }) {
                   )}
                 </div>
               </div>
-              
+
               <div className="flex gap-2 sm:flex-col sm:items-end">
                 {isEditing && (
                   <div className="flex gap-2">
@@ -328,7 +376,7 @@ function ProfilePage({ currentUser, onUserUpdate }) {
                 <p className="text-red-700 text-sm">{error}</p>
               </div>
             )}
-            
+
             {success && (
               <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-md">
                 <p className="text-green-700 text-sm">{success}</p>
@@ -348,7 +396,7 @@ function ProfilePage({ currentUser, onUserUpdate }) {
                     <input
                       type="text"
                       value={formData.name}
-                      onChange={(e) => handleInputChange('name', e.target.value)}
+                      onChange={(e) => handleNameChange(e.target.value)}
                       className={inputBase}
                       placeholder="Your full name"
                     />
@@ -368,7 +416,7 @@ function ProfilePage({ currentUser, onUserUpdate }) {
                   </p>
                 </div>
 
-                <div className="space-y-2">
+                {/* <div className="space-y-2">
                   <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
                     <User className="w-4 h-4" />
                     Google ID
@@ -377,7 +425,7 @@ function ProfilePage({ currentUser, onUserUpdate }) {
                     {currentUser?.googleId || '—'}
                     <span className="ml-2 text-xs">(for user navigation)</span>
                   </p>
-                </div>
+                </div> */}
 
                 <div className="space-y-2">
                   <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
@@ -463,6 +511,69 @@ function ProfilePage({ currentUser, onUserUpdate }) {
                 )}
               </div>
             </div>
+          </div>
+        </div>
+        {/* Past Trips */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 mt-6">
+          <div className="px-6 py-6">
+            <h2 className="text-lg font-semibold text-gray-900 mb-4">Past Trips</h2>
+            {archivedLoading ? (
+              <p className="text-gray-500 text-sm">Loading...</p>
+            ) : archivedPosts.length === 0 ? (
+              <p className="text-gray-500 text-sm">No past trips yet.</p>
+            ) : (
+              <>
+                <div className="space-y-3">
+                  {archivedPosts.slice(0, visibleCount).map(post => (
+                    <div key={post._id} className="border border-gray-100 rounded-lg p-4 bg-gray-50">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
+                          post.type === 'offer'
+                            ? 'bg-green-100 text-green-700'
+                            : 'bg-blue-100 text-blue-700'
+                        }`}>
+                          {post.type === 'offer' ? 'Offered Ride' : 'Requested Ride'}
+                        </span>
+                        <span className="text-xs text-gray-400">{formatDate(post.trip?.date)}</span>
+                      </div>
+                      <p className="text-sm font-medium text-gray-800">
+                        {post.title || 'Unknown route'}
+                      </p>
+                      {post.trip?.time && (
+                        <p className="text-xs text-gray-500 mt-0.5">
+                          {formatTime(post.trip?.time)}
+                        </p>
+                      )}
+                      {post.description && (
+                        <>
+                          {expandedPostId === post._id && (
+                            <p className="text-sm text-gray-600 mt-2 border-t border-gray-200 pt-2">
+                              {post.description}
+                            </p>
+                          )}
+                          <button
+                            onClick={() => setExpandedPostId(
+                              expandedPostId === post._id ? null : post._id
+                            )}
+                            className="mt-2 text-xs text-blue-600 hover:text-blue-800 font-medium"
+                          >
+                            {expandedPostId === post._id ? 'Show less' : 'View details'}
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                {visibleCount < archivedPosts.length && (
+                  <button
+                    onClick={() => setVisibleCount(archivedPosts.length)}
+                    className="mt-4 text-sm text-blue-600 hover:text-blue-800 font-medium"
+                  >
+                    See all ({archivedPosts.length} trips)
+                  </button>
+                )}
+              </>
+            )}
           </div>
         </div>
       </div>
