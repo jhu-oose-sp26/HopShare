@@ -5,7 +5,7 @@ import WeatherForecastDialog from './WeatherForecastDialog';
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { cn, formatTime, formatDate } from '@/lib/utils';
-import { MapPin, Calendar, Clock, MessageCircle, Pencil, Trash2, Info, User, Mail, Phone, Navigation, ExternalLink, UserPlus, Car, Users, CheckCircle, UserMinus, Hash } from 'lucide-react';
+import { MapPin, Calendar, Clock, MessageCircle, Pencil, Trash2, Info, User, Mail, Phone, Navigation, ExternalLink, UserPlus, Users, CheckCircle, UserMinus, Hash } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
@@ -483,7 +483,68 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
                                 )}
                             </span>
                         ) : (
-                            <span className='text-gray-400 italic'>No driver yet - use Uber/Lyft</span>
+                            <span className='flex items-center gap-2'>
+                                <span className='text-gray-400 italic'>No driver yet - use Uber/Lyft</span>
+                                {currentUser && !isOwner && !isOffer && !driverList.some(d => d.email === currentUser.email) && (
+                                    <button
+                                        className={`text-xs px-2 py-0.5 rounded border font-medium transition-colors ${
+                                            joinRequested
+                                                ? 'text-gray-400 border-gray-200 cursor-default'
+                                                : 'text-blue-600 border-blue-300 hover:bg-blue-50'
+                                        }`}
+                                        disabled={joinRequested}
+                                        onClick={async () => {
+                                            const takeRes = await fetch(`${API_ROOT}/posts/${post._id}/take`, {
+                                                method: 'POST',
+                                                headers: { 'Content-Type': 'application/json' },
+                                                body: JSON.stringify({
+                                                    name: currentUser.name,
+                                                    email: currentUser.email,
+                                                    picture: currentUser.picture || null,
+                                                    avatar: currentUser.avatar || null,
+                                                    googleId: currentUser.googleId || null,
+                                                }),
+                                            });
+                                            const takeData = await takeRes.json().catch(() => ({}));
+                                            if (takeData.alreadyTaken) { setJoinRequested(true); return; }
+                                            if (!takeRes.ok) return;
+
+                                            const msg = `${currentUser.name} can take you from ${post.trip?.startLocation?.title || 'start'} to ${post.trip?.endLocation?.title || 'destination'}.`;
+                                            await fetch(NOTIFICATIONS_ENDPOINT, {
+                                                method: 'POST',
+                                                headers: { 'Content-Type': 'application/json' },
+                                                body: JSON.stringify({
+                                                    recipientEmail: post.user.email,
+                                                    senderName: currentUser.name,
+                                                    senderId: currentUser._id,
+                                                    message: msg,
+                                                    postId: post._id,
+                                                    type: 'ride_request',
+                                                }),
+                                            });
+                                            for (const member of listMembers) {
+                                                if (member.email !== currentUser.email) {
+                                                    await fetch(NOTIFICATIONS_ENDPOINT, {
+                                                        method: 'POST',
+                                                        headers: { 'Content-Type': 'application/json' },
+                                                        body: JSON.stringify({
+                                                            recipientEmail: member.email,
+                                                            senderName: currentUser.name,
+                                                            senderId: currentUser._id,
+                                                            message: `${currentUser.name} is offering to drive from ${post.trip?.startLocation?.title || 'start'} to ${post.trip?.endLocation?.title || 'destination'}. Check the post for details!`,
+                                                            postId: post._id,
+                                                            type: 'ride_request',
+                                                        }),
+                                                    });
+                                                }
+                                            }
+                                            setJoinRequested(true);
+                                        }}
+                                    >
+                                        {joinRequested ? 'Request Sent' : 'Offer to drive'}
+                                    </button>
+                                )}
+                            </span>
                         )}
                     </div>
                 );
@@ -662,76 +723,6 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
                         )}
                         {listJoinError && <p className='text-xs text-red-500'>{listJoinError}</p>}
                     </div>
-                )}
-
-                {/* Take button — only for non-owners on request posts (driver offering to take) */}
-                {currentUser && !isOwner && !isOffer && !driverList.some(d => d.email === currentUser.email) && (
-                    <Button
-                        variant={joinRequested ? 'outline' : 'default'}
-                        size='sm'
-                        className={`flex-1 ${joinRequested ? 'text-gray-400' : 'bg-blue-600 hover:bg-blue-700'}`}
-                        disabled={joinRequested}
-                        onClick={async () => {
-                            // Persist the take on the post so it survives refresh
-                            const takeRes = await fetch(`${API_ROOT}/posts/${post._id}/take`, {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({
-                                    name: currentUser.name,
-                                    email: currentUser.email,
-                                    picture: currentUser.picture || null,
-                                    avatar: currentUser.avatar || null,
-                                    googleId: currentUser.googleId || null,
-                                }),
-                            });
-                            const takeData = await takeRes.json().catch(() => ({}));
-                            // If already taken, just update UI silently
-                            if (takeData.alreadyTaken) {
-                                setJoinRequested(true);
-                                return;
-                            }
-                            if (!takeRes.ok) return;
-
-                            const msg = `${currentUser.name} can take you from ${post.trip?.startLocation?.title || 'start'} to ${post.trip?.endLocation?.title || 'destination'}.`;
-                            // Notify post owner
-                            await fetch(NOTIFICATIONS_ENDPOINT, {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({
-                                    recipientEmail: post.user.email,
-                                    senderName: currentUser.name,
-                                    senderId: currentUser._id,
-                                    message: msg,
-                                    postId: post._id,
-                                    type: 'ride_request',
-                                }),
-                            });
-                            // Also notify all rider list members
-                            for (const member of listMembers) {
-                                if (member.email !== currentUser.email) {
-                                    await fetch(NOTIFICATIONS_ENDPOINT, {
-                                        method: 'POST',
-                                        headers: { 'Content-Type': 'application/json' },
-                                        body: JSON.stringify({
-                                            recipientEmail: member.email,
-                                            senderName: currentUser.name,
-                                            senderId: currentUser._id,
-                                            message: `${currentUser.name} is offering to drive from ${post.trip?.startLocation?.title || 'start'} to ${post.trip?.endLocation?.title || 'destination'}. Check the post for details!`,
-                                            postId: post._id,
-                                            type: 'ride_request',
-                                        }),
-                                    });
-                                }
-                            }
-                            setJoinRequested(true);
-                        }}
-                    >
-                        {joinRequested ? (
-                            <><CheckCircle className='w-4 h-4 mr-1' />Request Sent</>
-                        ) : (
-                            <><Car className='w-4 h-4 mr-1' />Offer to Be a Driver</>
-                        )}
-                    </Button>
                 )}
 
                 {/* Leave as driver — only if current user is an accepted driver */}
