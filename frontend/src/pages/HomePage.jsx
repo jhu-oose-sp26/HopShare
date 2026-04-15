@@ -8,6 +8,7 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import PostList from '@/components/PostList';
+import RidesMapView from '@/components/RidesMapView';
 import RouteSearchPanel from '@/components/RouteSearchPanel';
 import SubmitBox from '@/components/SubmitBox';
 import NotificationMenu from '@/components/NotificationMenu';
@@ -205,6 +206,16 @@ function HomePage({ currentUser, onLogout }) {
               >
                 My Rides
               </button>
+              <button
+                onClick={() => setActiveView('map')}
+                className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px ${
+                  activeView === 'map'
+                    ? 'border-black text-gray-900'
+                    : 'border-transparent text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                Map
+              </button>
             </div>
 
             <Dialog open={isOpen} onOpenChange={handleDialogOpenChange}>
@@ -228,7 +239,7 @@ function HomePage({ currentUser, onLogout }) {
         </div>
       </div>
 
-      {activeView === 'available' ? (
+      {activeView === 'available' && (
         <PostList
           posts={availablePosts}
           isLoading={isLoading}
@@ -251,7 +262,8 @@ function HomePage({ currentUser, onLogout }) {
               : 'No rides available yet.'
           }
         />
-      ) : (
+      )}
+      {activeView === 'my-rides' && (
         <PostList
           posts={myPosts}
           isLoading={isLoading}
@@ -268,6 +280,9 @@ function HomePage({ currentUser, onLogout }) {
           emptyTitle='You have no rides yet.'
           emptyDescription='Use the "Create a Request" button above to post your first ride!'
         />
+      )}
+      {activeView === 'map' && (
+        <RidesMapView posts={visiblePosts} />
       )}
     </div>
   );
