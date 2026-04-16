@@ -120,9 +120,12 @@ function RidesMapView({ posts, currentUser, coords, onDeletePost, onUpdatePost }
     [p.trip.endLocation.gps_coordinates.latitude,   p.trip.endLocation.gps_coordinates.longitude],
   ]);
 
-  const center = allPoints.length > 0
-    ? [allPoints[0][0], allPoints[0][1]]
-    : [39.3289, -76.6205]; // JHU Homewood campus
+  const center = coords
+    ? [coords.lat, coords.lng]
+    : allPoints.length > 0
+      ? [allPoints[0][0], allPoints[0][1]]
+      : [39.3289, -76.6205]; // JHU Homewood campus fallback
+  const initialZoom = coords ? 9 : 11; // zoom 9 ≈ 100 km radius
 
   return (
     <div className='container mx-auto px-6 py-8 max-w-6xl'>
@@ -206,7 +209,7 @@ function RidesMapView({ posts, currentUser, coords, onDeletePost, onUpdatePost }
         <div className='rounded-xl overflow-hidden border border-gray-200 shadow-sm' style={{ height: '520px', position: 'relative', zIndex: 0 }}>
           <MapContainer
             center={center}
-            zoom={11}
+            zoom={initialZoom}
             style={{ height: '100%', width: '100%' }}
             scrollWheelZoom={true}
           >
@@ -265,11 +268,11 @@ function RidesMapView({ posts, currentUser, coords, onDeletePost, onUpdatePost }
 
       {/* Ride detail sheet */}
       <Sheet open={!!selectedPost} onOpenChange={(open) => !open && setSelectedPost(null)}>
-        <SheetContent side='right' className='w-105 sm:w-120 overflow-y-auto'>
-          <SheetHeader>
+        <SheetContent side='right' className='w-[92vw] sm:w-120 overflow-y-auto px-2'>
+          <SheetHeader className='px-2'>
             <SheetTitle>Ride Details</SheetTitle>
           </SheetHeader>
-          <div className='mt-4'>
+          <div className='mt-4 px-2 pb-6'>
             {selectedPost && (
               <PostCard
                 post={selectedPost}
