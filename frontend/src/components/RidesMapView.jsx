@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
-import { MapContainer, TileLayer, Marker, Polyline, useMap } from 'react-leaflet';
+import { useState } from 'react';
+import { MapContainer, TileLayer, Marker, Polyline } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { format, parse } from 'date-fns';
@@ -75,25 +75,6 @@ function makeArrow(color, deg) {
 }
 
 
-function AutoFit({ points }) {
-  const map = useMap();
-  const fitted = useRef(false);
-
-  useEffect(() => {
-    if (fitted.current || points.length === 0) return;
-    try {
-      const bounds = L.latLngBounds(points);
-      if (bounds.isValid()) {
-        map.fitBounds(bounds, { padding: [40, 40], maxZoom: 14, animate: false });
-        fitted.current = true;
-      }
-    } catch {
-      // ignore
-    }
-  }, [map, points]);
-
-  return null;
-}
 
 function RidesMapView({ posts, currentUser, coords, onDeletePost, onUpdatePost }) {
   const [fromDate, setFromDate] = useState('');
@@ -217,7 +198,6 @@ function RidesMapView({ posts, currentUser, coords, onDeletePost, onUpdatePost }
               attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
               url='https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'
             />
-            <AutoFit points={allPoints} />
 
             {rides.map((post, idx) => {
               const start = post.trip.startLocation.gps_coordinates;
