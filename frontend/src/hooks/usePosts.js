@@ -121,7 +121,7 @@ export const usePosts = () => {
 
         const intervalId = window.setInterval(() => {
             refreshPosts({ silent: true }).catch(() => {});
-        }, 15000);
+        }, 30000);
 
         const handleWindowFocus = () => {
             refreshPosts({ silent: true }).catch(() => {});
