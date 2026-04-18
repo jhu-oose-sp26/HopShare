@@ -38,13 +38,15 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
     const [editOpen, setEditOpen] = useState(false);
     const [detailsOpen, setDetailsOpen] = useState(false);
     const [deleteOpen, setDeleteOpen] = useState(false);
-    const [contactOpen, setContactOpen] = useState(false);
+    const [joinListMessageOpen, setJoinListMessageOpen] = useState(false);
+    const [offerMessageOpen, setOfferMessageOpen] = useState(false);
     const [codeOpen, setCodeOpen] = useState(false);
     const [weatherForecastOpen, setWeatherForecastOpen] = useState(false);
     const [offerConfirmOpen, setOfferConfirmOpen] = useState(false);
     const [removeConfirm, setRemoveConfirm] = useState({ open: false, title: '', message: '', onConfirm: null });
     const [selectedWeatherLocation, setSelectedWeatherLocation] = useState(null);
-    const [message, setMessage] = useState('');
+    const [joinListMessage, setJoinListMessage] = useState('');
+    const [offerMessage, setOfferMessage] = useState('');
     const [isDeleting, setIsDeleting] = useState(false);
     const [deleteError, setDeleteError] = useState('');
     const [activeMapTab, setActiveMapTab] = useState("route"); // "route" or "distance"
@@ -507,7 +509,12 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
                                                     : 'text-blue-600 border-blue-300 hover:bg-blue-50'
                                             }`}
                                             disabled={joinRequested}
-                                            onClick={() => { if (!joinRequested) setOfferConfirmOpen(true); }}
+                                            onClick={() => {
+                                                if (!joinRequested) {
+                                                    setOfferMessage('');
+                                                    setOfferConfirmOpen(true);
+                                                }
+                                            }}
                                         >
                                             {joinRequested ? 'Request Sent' : 'Offer to drive'}
                                         </button>
@@ -523,8 +530,19 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
                                                     <span className='font-medium'>{post.trip?.endLocation?.title || 'destination'}</span>.
                                                     The ride poster will be notified and can accept or decline.
                                                 </p>
+                                                <div className="space-y-3">
+                                                    <textarea
+                                                        value={offerMessage}
+                                                        onChange={(e) => setOfferMessage(e.target.value)}
+                                                        placeholder="Optional message (e.g., 'I can pick you up early', leave blank to skip)"
+                                                        className="w-full min-h-[80px] rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                    />
+                                                </div>
                                                 <DialogFooter className='gap-2'>
-                                                    <Button variant='outline' size='sm' onClick={() => setOfferConfirmOpen(false)}>
+                                                    <Button variant='outline' size='sm' onClick={() => {
+                                                        setOfferConfirmOpen(false);
+                                                        setOfferMessage('');
+                                                    }}>
                                                         Cancel
                                                     </Button>
                                                     <Button
@@ -547,7 +565,8 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
                                                             if (takeData.alreadyTaken) { setJoinRequested(true); return; }
                                                             if (!takeRes.ok) return;
 
-                                                            const msg = `${currentUser.name} can take you from ${post.trip?.startLocation?.title || 'start'} to ${post.trip?.endLocation?.title || 'destination'}.`;
+                                                            const baseMsg = `${currentUser.name} can take you from ${post.trip?.startLocation?.title || 'start'} to ${post.trip?.endLocation?.title || 'destination'}.`;
+                                                            const finalMsg = offerMessage.trim() ? `${baseMsg}\n\nMessage: _${offerMessage}_` : baseMsg;
                                                             await fetch(NOTIFICATIONS_ENDPOINT, {
                                                                 method: 'POST',
                                                                 headers: { 'Content-Type': 'application/json' },
@@ -555,7 +574,7 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
                                                                     recipientEmail: post.user.email,
                                                                     senderName: currentUser.name,
                                                                     senderId: currentUser._id,
-                                                                    message: msg,
+                                                                    message: finalMsg,
                                                                     postId: post._id,
                                                                     type: 'ride_request',
                                                                 }),
@@ -569,7 +588,7 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
                                                                             recipientEmail: member.email,
                                                                             senderName: currentUser.name,
                                                                             senderId: currentUser._id,
-                                                                            message: `${currentUser.name} is offering to drive from ${post.trip?.startLocation?.title || 'start'} to ${post.trip?.endLocation?.title || 'destination'}. Check the post for details!`,
+                                                                            message: `${currentUser.name} is offering to drive from ${post.trip?.startLocation?.title || 'start'} to ${post.trip?.endLocation?.title || 'destination'}.${offerMessage.trim() ? ` _${currentUser.name} says: ${offerMessage}_` : ''} Check the post for details!`,
                                                                             postId: post._id,
                                                                             type: 'ride_request',
                                                                         }),
@@ -577,6 +596,7 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
                                                                 }
                                                             }
                                                             setJoinRequested(true);
+                                                            setOfferMessage('');
                                                         }}
                                                     >
                                                         Confirm
@@ -618,73 +638,6 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
                     </Button>
                 ) : null}
 
-                {/* Contact Dialog */}
-
-                <Dialog open={contactOpen} onOpenChange={setContactOpen}>
-                    <DialogTrigger asChild>
-                        <Button variant='default' size='sm' className='flex-1'>
-                            <MessageCircle className='w-4 h-4 mr-1' />
-                            Contact
-                        </Button>
-                    </DialogTrigger>
-
-                    <DialogContent className="sm:max-w-md">
-                        <DialogHeader>
-                            <DialogTitle className="truncate max-w-[20rem]">
-                                Contact {user?.name}
-                            </DialogTitle>
-                            <DialogDescription>
-                                Send a message about this ride.
-                            </DialogDescription>
-                        </DialogHeader>
-
-                        <div className="space-y-3">
-                        <textarea
-                            value={message}
-                            onChange={(e) => setMessage(e.target.value)}
-                            placeholder="Write your message..."
-                            className="w-full min-h-[100px] rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        />
-                        </div>
-
-                        <DialogFooter>
-                            <Button
-                                variant="outline"
-                                onClick={() => {
-                                setContactOpen(false);
-                                setMessage('');
-                                }}
-                            >
-                                Cancel
-                            </Button>
-
-                            <Button
-                                onClick={async () => {
-                                    await fetch(NOTIFICATIONS_ENDPOINT, {
-                                        method: 'POST',
-                                        headers: {
-                                            'Content-Type': 'application/json',
-                                        },
-                                        body: JSON.stringify({
-                                            recipientEmail: post.user.email,
-                                            senderName: currentUser.name,
-                                            senderId: currentUser._id,
-                                            message,
-                                            postId: post._id,
-                                        }),
-                                    });
-
-                                    setContactOpen(false);
-                                    setMessage('');
-                                }}
-                                disabled={!message.trim()}
-                            >
-                                Send Message
-                            </Button>
-                        </DialogFooter>
-                    </DialogContent>
-                </Dialog>
-
                 {/* Join the rider list — only for non-owners */}
                 {currentUser && !isOwner && (
                     <div className='flex-1 flex flex-col gap-1'>
@@ -693,39 +646,9 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
                             size='sm'
                             className={`w-full ${listJoined || listRequestSent ? 'text-gray-400' : 'bg-green-600 hover:bg-green-700'}`}
                             disabled={listJoined || listRequestSent || listJoinLoading}
-                            onClick={async () => {
-                                setListJoinError('');
-                                setListJoinLoading(true);
-                                try {
-                                    const res = await fetch(`${API_ROOT}/posts/${post._id}/join`, {
-                                        method: 'POST',
-                                        headers: { 'Content-Type': 'application/json' },
-                                        body: JSON.stringify({ email: currentUser.email }),
-                                    });
-                                    if (res.ok) {
-                                        const msg = `${currentUser.name} wants to join your rider list for the ride from ${post.trip?.startLocation?.title || 'start'} to ${post.trip?.endLocation?.title || 'destination'}.`;
-                                        await fetch(NOTIFICATIONS_ENDPOINT, {
-                                            method: 'POST',
-                                            headers: { 'Content-Type': 'application/json' },
-                                            body: JSON.stringify({
-                                                recipientEmail: post.user.email,
-                                                senderName: currentUser.name,
-                                                senderId: currentUser._id,
-                                                message: msg,
-                                                postId: post._id,
-                                                type: 'join_list',
-                                            }),
-                                        });
-                                        setListRequestSent(true);
-                                    } else {
-                                        const data = await res.json().catch(() => ({}));
-                                        setListJoinError(data.error || 'Failed to send request. Please try again.');
-                                    }
-                                } catch (err) {
-                                    setListJoinError('Network error. Please try again.');
-                                } finally {
-                                    setListJoinLoading(false);
-                                }
+                            onClick={() => {
+                                setJoinListMessage('');
+                                setJoinListMessageOpen(true);
                             }}
                         >
                             {listJoinLoading ? (
@@ -771,6 +694,85 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
                         {listJoinError && <p className='text-xs text-red-500'>{listJoinError}</p>}
                     </div>
                 )}
+
+                {/* Join Rider List Message Dialog */}
+                <Dialog open={joinListMessageOpen} onOpenChange={setJoinListMessageOpen}>
+                    <DialogContent className="sm:max-w-md">
+                        <DialogHeader>
+                            <DialogTitle className="truncate max-w-[20rem]">
+                                Join Rider List
+                            </DialogTitle>
+                            <DialogDescription>
+                                Add an optional message with your request.
+                            </DialogDescription>
+                        </DialogHeader>
+
+                        <div className="space-y-3">
+                            <textarea
+                                value={joinListMessage}
+                                onChange={(e) => setJoinListMessage(e.target.value)}
+                                placeholder="Optional message (e.g., 'I'm flexible with pickup time')"
+                                className="w-full min-h-[100px] rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            />
+                        </div>
+
+                        <DialogFooter>
+                            <Button
+                                variant="outline"
+                                onClick={() => {
+                                    setJoinListMessageOpen(false);
+                                    setJoinListMessage('');
+                                }}
+                            >
+                                Cancel
+                            </Button>
+
+                            <Button
+                                onClick={async () => {
+                                    setListJoinError('');
+                                    setListJoinLoading(true);
+                                    try {
+                                        const res = await fetch(`${API_ROOT}/posts/${post._id}/join`, {
+                                            method: 'POST',
+                                            headers: { 'Content-Type': 'application/json' },
+                                            body: JSON.stringify({ email: currentUser.email }),
+                                        });
+                                        if (res.ok) {
+                                            const baseMsg = `${currentUser.name} wants to join your rider list for the ride from ${post.trip?.startLocation?.title || 'start'} to ${post.trip?.endLocation?.title || 'destination'}.`;
+                                            const finalMsg = joinListMessage.trim() ? `${baseMsg}\n\nMessage: _${joinListMessage}_` : baseMsg;
+                                            await fetch(NOTIFICATIONS_ENDPOINT, {
+                                                method: 'POST',
+                                                headers: { 'Content-Type': 'application/json' },
+                                                body: JSON.stringify({
+                                                    recipientEmail: post.user.email,
+                                                    senderName: currentUser.name,
+                                                    senderId: currentUser._id,
+                                                    message: finalMsg,
+                                                    postId: post._id,
+                                                    type: 'join_list',
+                                                }),
+                                            });
+                                            setListRequestSent(true);
+                                            setJoinListMessageOpen(false);
+                                            setJoinListMessage('');
+                                        } else {
+                                            const data = await res.json().catch(() => ({}));
+                                            setListJoinError(data.error || 'Failed to send request. Please try again.');
+                                        }
+                                    } catch (err) {
+                                        setListJoinError('Network error. Please try again.');
+                                    } finally {
+                                        setListJoinLoading(false);
+                                    }
+                                }}
+                                disabled={listJoinLoading}
+                                className='bg-green-600 hover:bg-green-700'
+                            >
+                                {listJoinLoading ? 'Sending...' : 'Send Request'}
+                            </Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
 
                 {/* Leave as driver — only if current user is an accepted driver */}
                 {currentUser && !isOwner && driverList.some(d => d.email === currentUser.email) && (
