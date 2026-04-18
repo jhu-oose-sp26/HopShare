@@ -323,17 +323,6 @@ function ProfilePage({ currentUser, onUserUpdate }) {
                     <h1 className="text-2xl font-bold text-gray-900">
                       {isEditing ? 'Edit Profile' : 'My Profile'}
                     </h1>
-                    {/* Edit Toggle Switch */}
-                    <label className="relative inline-flex items-center cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={isEditing}
-                        onChange={(e) => setIsEditing(e.target.checked)}
-                        className="sr-only peer"
-                      />
-                      <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-                      <span className="ml-2 text-sm font-medium text-gray-700">Edit</span>
-                    </label>
                   </div>
                   <p className="text-sm text-gray-600">
                     Joined {formatJoinDate(currentUser?.createdAt)}
@@ -355,7 +344,7 @@ function ProfilePage({ currentUser, onUserUpdate }) {
               </div>
 
               <div className="flex gap-2 sm:flex-col sm:items-end">
-                {isEditing && (
+                {isEditing ? (
                   <div className="flex gap-2">
                     <Button variant="outline" onClick={handleCancel} disabled={isLoading}>
                       <X className="w-4 h-4 mr-2" />
@@ -366,6 +355,11 @@ function ProfilePage({ currentUser, onUserUpdate }) {
                       {isLoading ? 'Saving...' : 'Save Changes'}
                     </Button>
                   </div>
+                ) : (
+                  <Button variant="outline" onClick={() => setIsEditing(true)}>
+                    <Edit3 className="w-4 h-4 mr-2" />
+                    Edit
+                  </Button>
                 )}
               </div>
             </div>
