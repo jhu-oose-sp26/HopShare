@@ -30,6 +30,9 @@ async function connectDB() {
       { unique: true, sparse: true }
     );
 
+    // Index for fast post lookups by archived status
+    await db.collection('posts').createIndex({ archived: 1 });
+
     console.log('Connected to MongoDB');
   } catch (err) {
     console.error('Failed to connect to MongoDB', err);

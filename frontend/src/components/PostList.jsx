@@ -19,11 +19,11 @@ const PostList = ({
     showActions = false,
     currentUser,
     onRefresh,
-    isRefreshing = false,
     lastUpdatedAt = null,
 }) => {
     const [dateOrder, setDateOrder] = useState('asc');
     const [timeOrder, setTimeOrder] = useState('asc');
+    const [isManualRefreshing, setIsManualRefreshing] = useState(false);
     const locationEnabled = coords !== null;
 
     const filteredPosts = [...posts].sort((a, b) => {
@@ -55,10 +55,14 @@ const PostList = ({
                             <Button
                                 variant='outline'
                                 size='sm'
-                                onClick={() => onRefresh().catch(() => {})}
-                                disabled={isLoading || isRefreshing}
+                                onClick={async () => {
+                                    setIsManualRefreshing(true);
+                                    try { await onRefresh(); } catch { /* ignore */ }
+                                    setIsManualRefreshing(false);
+                                }}
+                                disabled={isLoading || isManualRefreshing}
                             >
-                                <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+                                <RefreshCw className={`w-4 h-4 ${isManualRefreshing ? 'animate-spin' : ''}`} />
                                 Refresh Posts
                             </Button>
                         ) : null}

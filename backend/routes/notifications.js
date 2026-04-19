@@ -1,6 +1,7 @@
 const express = require('express');
 const { getDB } = require('../db');
 const { ObjectId } = require('mongodb');
+const { invalidatePostsCache } = require('./posts');
 
 const router = express.Router();
 
@@ -194,6 +195,7 @@ router.patch('/:id/respond', async (req, res) => {
       });
     }
 
+    invalidatePostsCache();
     res.json({ success: true });
   } catch (err) {
     console.error('Respond to ride request error:', err);
