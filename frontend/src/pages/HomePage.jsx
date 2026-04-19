@@ -34,7 +34,7 @@ function HomePage({ currentUser, onLogout }) {
   const [routeSearch, setRouteSearch] = useState(null);
   const [hasSearched, setHasSearched] = useState(false);
   const [submitInitialData, setSubmitInitialData] = useState(null);
-  const [activeView, setActiveView] = useState('available');
+  const [activeView, setActiveView] = useState('map');
 
   // Get user's location on load to bias autocomplete results.
   useEffect(() => {
@@ -187,6 +187,16 @@ function HomePage({ currentUser, onLogout }) {
             {/* View tabs */}
             <div className='flex gap-1 border-b border-gray-200 -mb-6'>
               <button
+                onClick={() => setActiveView('map')}
+                className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px ${
+                  activeView === 'map'
+                    ? 'border-black text-gray-900'
+                    : 'border-transparent text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                Map
+              </button>
+              <button
                 onClick={() => setActiveView('available')}
                 className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px ${
                   activeView === 'available'
@@ -205,16 +215,6 @@ function HomePage({ currentUser, onLogout }) {
                 }`}
               >
                 My Rides
-              </button>
-              <button
-                onClick={() => setActiveView('map')}
-                className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px ${
-                  activeView === 'map'
-                    ? 'border-black text-gray-900'
-                    : 'border-transparent text-gray-500 hover:text-gray-700'
-                }`}
-              >
-                Map
               </button>
             </div>
 
@@ -277,6 +277,7 @@ function HomePage({ currentUser, onLogout }) {
           isRefreshing={isRefreshing}
           lastUpdatedAt={lastUpdatedAt}
           heading='My Rides'
+          subheading={isLoading ? 'Loading rides...' : `${myPosts.length} upcoming ride${myPosts.length === 1 ? '' : 's'}`}
           emptyTitle='You have no rides yet.'
           emptyDescription='Use the "Create a Request" button above to post your first ride!'
         />

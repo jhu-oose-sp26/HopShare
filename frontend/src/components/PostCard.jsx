@@ -5,7 +5,7 @@ import WeatherForecastDialog from './WeatherForecastDialog';
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { formatTime, formatDate } from '@/lib/utils';
-import { MapPin, Calendar, Clock, MessageCircle, Pencil, Trash2, Info, User, Mail, Phone, Navigation, ExternalLink, UserPlus, Users, CheckCircle, UserMinus, Hash } from 'lucide-react';
+import { MapPin, Calendar, Clock, MessageCircle, Pencil, Trash2, Info, User, Mail, Phone, Navigation, ExternalLink, UserPlus, Users, UserMinus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { HoverCard, HoverCardTrigger, HoverCardContent } from '@/components/ui/hover-card';
@@ -37,10 +37,10 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
     const avatarSrc = user?.avatar || user?.picture || avatarFallback;
     const [editOpen, setEditOpen] = useState(false);
     const [detailsOpen, setDetailsOpen] = useState(false);
+    const [showCode, setShowCode] = useState(false);
     const [deleteOpen, setDeleteOpen] = useState(false);
     const [joinListMessageOpen, setJoinListMessageOpen] = useState(false);
     const [offerMessageOpen, setOfferMessageOpen] = useState(false);
-    const [codeOpen, setCodeOpen] = useState(false);
     const [weatherForecastOpen, setWeatherForecastOpen] = useState(false);
     const [offerConfirmOpen, setOfferConfirmOpen] = useState(false);
     const [removeConfirm, setRemoveConfirm] = useState({ open: false, title: '', message: '', onConfirm: null });
@@ -623,7 +623,7 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
             })()}
 
             {/* Sharing status */}
-            <div className='flex items-center gap-2 mb-4 text-sm'>
+            <div className='flex items-center gap-2 mb-4 text-sm flex-wrap'>
                 <Users className='w-4 h-4 text-gray-400 shrink-0' />
                 {listMembers.length === 0 ? (
                     <span className='text-gray-400 italic'>No sharing people yet</span>
@@ -631,6 +631,51 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
                     <span className='text-gray-700'>{listMembers.length} riders sharing this trip</span>
                 ) : (
                     <span className='text-gray-700'>1 rider sharing this trip</span>
+                )}
+                {currentUser && !isOwner && !listJoined && (
+                    <button
+                        className={`text-xs px-2 py-0.5 rounded border font-medium transition-colors ${
+                            listRequestSent
+                                ? 'border-gray-300 text-gray-400 cursor-default'
+                                : 'border-green-500 text-green-600 hover:bg-green-50'
+                        }`}
+                        disabled={listRequestSent || listJoinLoading}
+                        onClick={() => {
+                            if (listRequestSent) return;
+                            setJoinListMessage('');
+                            setJoinListMessageOpen(true);
+                        }}
+                    >
+                        {listJoinLoading ? 'Sending…' : listRequestSent ? 'Awaiting Approval' : '+ Join'}
+                    </button>
+                )}
+                {currentUser && !isOwner && listJoined && (
+                    <button
+                        className='text-xs px-2 py-0.5 rounded border font-medium transition-colors border-red-300 text-red-500 hover:bg-red-50'
+                        onClick={() => setRemoveConfirm({
+                            open: true,
+                            title: 'Leave Rider List?',
+                            message: 'Are you sure you want to leave the rider list for this ride? You will need to be re-accepted if you request to join the ride again.',
+                            onConfirm: async () => {
+                                const res = await fetch(`${API_ROOT}/posts/${post._id}/remove-member`, {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({
+                                        email: currentUser.email,
+                                        name: currentUser.name,
+                                        actorEmail: currentUser.email,
+                                        actorName: currentUser.name,
+                                        actorId: currentUser._id,
+                                    }),
+                                });
+                                if (res.ok) {
+                                    setListMembers(prev => prev.filter(m => m.email !== currentUser.email));
+                                }
+                            },
+                        })}
+                    >
+                        − Leave
+                    </button>
                 )}
             </div>
 
@@ -648,62 +693,7 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
                     </Button>
                 ) : null}
 
-                {/* Join the rider list — only for non-owners */}
-                {currentUser && !isOwner && (
-                    <div className='flex-1 flex flex-col gap-1'>
-                        {!listJoined && <Button
-                            variant={listJoined || listRequestSent ? 'outline' : 'default'}
-                            size='sm'
-                            className={`w-full ${listJoined || listRequestSent ? 'text-gray-400' : 'bg-green-600 hover:bg-green-700'}`}
-                            disabled={listJoined || listRequestSent || listJoinLoading}
-                            onClick={() => {
-                                setJoinListMessage('');
-                                setJoinListMessageOpen(true);
-                            }}
-                        >
-                            {listJoinLoading ? (
-                                'Sending...'
-                            ) : listJoined ? (
-                                <><CheckCircle className='w-4 h-4 mr-1' />Request Accepted</>
-                            ) : listRequestSent ? (
-                                <><CheckCircle className='w-4 h-4 mr-1' />Awaiting Approval</>
-                            ) : (
-                                <><Users className='w-4 h-4 mr-1' />Join the Rider List</>
-                            )}
-                        </Button>}
-                        {listJoined && (
-                            <Button
-                                variant='outline'
-                                size='sm'
-                                className='w-full text-xs text-red-600 border-red-300 hover:bg-red-50 hover:text-red-700'
-                                onClick={() => setRemoveConfirm({
-                                    open: true,
-                                    title: 'Leave Rider List?',
-                                    message: 'Are you sure you want to leave the rider list for this ride? You will need to be re-accepted if you request to join the ride again.',
-                                    onConfirm: async () => {
-                                        const res = await fetch(`${API_ROOT}/posts/${post._id}/remove-member`, {
-                                            method: 'POST',
-                                            headers: { 'Content-Type': 'application/json' },
-                                            body: JSON.stringify({
-                                                email: currentUser.email,
-                                                name: currentUser.name,
-                                                actorEmail: currentUser.email,
-                                                actorName: currentUser.name,
-                                                actorId: currentUser._id,
-                                            }),
-                                        });
-                                        if (res.ok) {
-                                            setListMembers(prev => prev.filter(m => m.email !== currentUser.email));
-                                        }
-                                    },
-                                })}
-                            >
-                                <UserMinus className='w-3 h-3 mr-1' />Leave Rider List
-                            </Button>
-                        )}
-                        {listJoinError && <p className='text-xs text-red-500'>{listJoinError}</p>}
-                    </div>
-                )}
+                {listJoinError && <p className='text-xs text-red-500 w-full'>{listJoinError}</p>}
 
                 {/* Join Rider List Message Dialog */}
                 <Dialog open={joinListMessageOpen} onOpenChange={setJoinListMessageOpen}>
@@ -811,40 +801,11 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
                     </Button>
                 )}
 
-                {/* Confirmation Code — only for the owner in My Rides */}
-                {canManagePost && (
-                    <Dialog open={codeOpen} onOpenChange={setCodeOpen}>
-                        <DialogTrigger asChild>
-                            <Button variant='outline' size='sm'>
-                                <Hash className='w-4 h-4 mr-1' />
-                                Show Code
-                            </Button>
-                        </DialogTrigger>
-                        <DialogContent className='sm:max-w-xs'>
-                            <DialogHeader>
-                                <DialogTitle>Confirmation Code</DialogTitle>
-                                <DialogDescription>
-                                    Share this code with your riders to confirm the trip.
-                                </DialogDescription>
-                            </DialogHeader>
-                            <div className='flex items-center justify-center py-4'>
-                                <span className='text-3xl font-bold tracking-widest text-gray-900 font-mono'>
-                                    {post.confirmationCode || '—'}
-                                </span>
-                            </div>
-                            <DialogFooter>
-                                <DialogClose asChild>
-                                    <Button variant='outline'>Close</Button>
-                                </DialogClose>
-                            </DialogFooter>
-                        </DialogContent>
-                    </Dialog>
-                )}
 
                 {/* Details Dialog */}
-                <Dialog open={detailsOpen} onOpenChange={setDetailsOpen}>
+                <Dialog open={detailsOpen} onOpenChange={(open) => { setDetailsOpen(open); if (!open) setShowCode(false); }}>
                     <DialogTrigger asChild>
-                        <Button variant='outline' size='sm'>
+                        <Button variant='outline' size='sm' className='w-full'>
                             <Info className='w-4 h-4 mr-1' />
                             Details
                         </Button>
@@ -1042,6 +1003,28 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
                                     </div>
                                 )}
                             </div>
+
+                            {/* Confirmation Code — only visible to the post owner */}
+                            {canManagePost && post.confirmationCode && (
+                                <div className='bg-gray-50 rounded-lg p-3 space-y-2'>
+                                    <p className='text-xs font-semibold uppercase tracking-wide text-gray-400'>Confirmation Code</p>
+                                    <p className='text-xs text-gray-500'>Share this code with your riders to confirm the trip.</p>
+                                    {showCode ? (
+                                        <>
+                                            <span className='text-3xl font-bold tracking-widest text-gray-900 font-mono block text-center py-2'>
+                                                {post.confirmationCode}
+                                            </span>
+                                            <Button variant='outline' size='sm' className='w-full' onClick={() => setShowCode(false)}>
+                                                Hide Code
+                                            </Button>
+                                        </>
+                                    ) : (
+                                        <Button variant='outline' size='sm' className='w-full' onClick={() => setShowCode(true)}>
+                                            Show Code
+                                        </Button>
+                                    )}
+                                </div>
+                            )}
 
                             {riderRequestStatus && (
                                 <div className='bg-gray-50 rounded-lg p-3 space-y-2'>
