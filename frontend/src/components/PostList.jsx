@@ -19,11 +19,11 @@ const PostList = ({
     showActions = false,
     currentUser,
     onRefresh,
-    isRefreshing = false,
     lastUpdatedAt = null,
 }) => {
     const [dateOrder, setDateOrder] = useState('asc');
     const [timeOrder, setTimeOrder] = useState('asc');
+    const [isManualRefreshing, setIsManualRefreshing] = useState(false);
     const locationEnabled = coords !== null;
 
     const filteredPosts = [...posts].sort((a, b) => {
@@ -55,10 +55,14 @@ const PostList = ({
                             <Button
                                 variant='outline'
                                 size='sm'
-                                onClick={() => onRefresh().catch(() => {})}
-                                disabled={isLoading || isRefreshing}
+                                onClick={async () => {
+                                    setIsManualRefreshing(true);
+                                    try { await onRefresh(); } catch { /* ignore */ }
+                                    setIsManualRefreshing(false);
+                                }}
+                                disabled={isLoading || isManualRefreshing}
                             >
-                                <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+                                <RefreshCw className={`w-4 h-4 ${isManualRefreshing ? 'animate-spin' : ''}`} />
                                 Refresh Posts
                             </Button>
                         ) : null}
@@ -97,8 +101,9 @@ const PostList = ({
             )}
 
             {isLoading ? (
-                <div className='text-center py-12'>
-                    <p className='text-gray-500 text-lg'>Loading rides...</p>
+                <div className='flex flex-col items-center justify-center py-20 gap-4'>
+                    <div className='w-10 h-10 rounded-full border-4 border-gray-200 border-t-gray-800 animate-spin' />
+                    <p className='text-sm text-gray-400 animate-pulse'>Loading rides...</p>
                 </div>
             ) : posts.length === 0 ? (
                 <div className='text-center py-12'>

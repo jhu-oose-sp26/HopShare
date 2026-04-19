@@ -20,7 +20,7 @@ async function parseNotificationResponse(response) {
 }
 
 export function useNotifications(currentUser, options = {}) {
-    const pollingIntervalMs = options.pollingIntervalMs ?? 15000;
+    const pollingIntervalMs = options.pollingIntervalMs ?? 30000;
     const [notifications, setNotifications] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isRefreshing, setIsRefreshing] = useState(false);
