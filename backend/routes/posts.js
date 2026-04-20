@@ -31,8 +31,32 @@ function getTodayDateString() {
   return `${year}-${month}-${day}`;
 }
 
-// Archive all posts where trip.date is in the past
+// In-memory cache for non-archived posts (avoids repeated slow Atlas queries)
+let postsCache = null;       // { data: [...], fetchedAt: timestamp }
+const CACHE_TTL_MS = 30000;  // serve cached data for up to 30 s
+
+async function getActivePosts() {
+  const now = Date.now();
+  if (postsCache && now - postsCache.fetchedAt < CACHE_TTL_MS) {
+    return postsCache.data;
+  }
+  const posts = await getDB().collection('posts').find({ archived: false }).toArray();
+  const enriched = await enrichPostsWithGoogleIds(posts);
+  postsCache = { data: enriched, fetchedAt: Date.now() };
+  return enriched;
+}
+
+function invalidatePostsCache() {
+  postsCache = null;
+}
+
+// Archive all posts where trip.date is in the past (throttled to once per 5 minutes)
+let lastArchiveRun = 0;
 async function archivePastRides() {
+  const now = Date.now();
+  if (now - lastArchiveRun < 5 * 60 * 1000) return 0;
+  lastArchiveRun = now;
+
   const today = getTodayDateString();
   const result = await getDB().collection('posts').updateMany(
     {
@@ -46,48 +70,51 @@ async function archivePastRides() {
   return result.modifiedCount;
 }
 
-// Enrich posts with Google IDs for user navigation
+// Enrich posts with Google IDs for user navigation (single batched query)
 async function enrichPostsWithGoogleIds(posts) {
   if (!posts || posts.length === 0) return posts;
 
-  const usersCollection = getDB().collection('users');
-  
+  // Collect emails that are missing a googleId
+  const emails = [
+    ...new Set(
+      posts
+        .filter(p => p.user?.email && !p.user?.googleId)
+        .map(p => p.user.email)
+    ),
+  ];
+
+  if (emails.length === 0) return posts;
+
+  const userDocs = await getDB().collection('users')
+    .find({ email: { $in: emails } }, { projection: { email: 1, googleId: 1 } })
+    .toArray();
+
+  const googleIdByEmail = {};
+  for (const doc of userDocs) {
+    if (doc.email && doc.googleId) googleIdByEmail[doc.email] = doc.googleId;
+  }
+
   for (const post of posts) {
-    // Check if the post has a user object but missing googleId
-    if (post.user && post.user.email && !post.user.googleId) {
-      try {
-        // Look up the user by email to get their googleId
-        const userDoc = await usersCollection.findOne(
-          { email: post.user.email },
-          { projection: { googleId: 1 } }
-        );
-        
-        // Add googleId to the embedded user data if found
-        if (userDoc && userDoc.googleId) {
-          post.user.googleId = userDoc.googleId;
-        }
-      } catch (error) {
-        console.error('Error enriching post with googleId:', error);
-        // Continue processing other posts even if one fails
-      }
+    if (post.user?.email && !post.user?.googleId) {
+      const gid = googleIdByEmail[post.user.email];
+      if (gid) post.user.googleId = gid;
     }
   }
-  
+
   return posts;
 }
 
 
 // READ ALL POSTS (non-archived only)
 router.get('/', async (req, res) => {
-  // Archive past rides first
+  const t0 = Date.now();
   await archivePastRides();
+  const t1 = Date.now();
 
-  // Return only non-archived posts
-  const posts = await getDB().collection('posts').find({ archived: { $ne: true } }).toArray();
-  
-  // Enrich posts with Google IDs for user navigation
-  const enrichedPosts = await enrichPostsWithGoogleIds(posts);
-  
+  const enrichedPosts = await getActivePosts();
+  const t2 = Date.now();
+
+  console.log(`[GET /posts] archive=${t1-t0}ms  total=${t2-t0}ms`);
   res.json(enrichedPosts);
 });
 
@@ -152,6 +179,7 @@ router.post('/', async (req, res) => {
       );
     }
 
+    invalidatePostsCache();
     res.status(201).json({
       acknowledged: postResult.acknowledged,
       postId: postResult.insertedId,
@@ -178,6 +206,7 @@ router.delete('/:id', async (req, res) => {
   }
   // delete the related trips
   await getDB().collection('trips').deleteMany({ postId });
+  invalidatePostsCache();
   res.json({ success: true });
 });
 
@@ -264,6 +293,7 @@ router.put('/:id', async (req, res) => {
       tripId = post?.tripId || null;
     }
 
+    invalidatePostsCache();
     res.json({ success: true, updatedCount: result.modifiedCount, postId, tripId });
   } catch (err) {
     res.status(500).json({ error: 'Failed to update post' });
@@ -299,6 +329,7 @@ router.post('/:id/join', async (req, res) => {
       { $push: { pendingJoins: email } }
     );
 
+    invalidatePostsCache();
     res.json({ success: true });
   } catch (err) {
     console.error('Join list error:', err);
@@ -330,6 +361,7 @@ router.post('/:id/take', async (req, res) => {
       { $push: { pendingDrivers: { name, email, picture, avatar, googleId, requestedAt: new Date().toISOString() } } }
     );
 
+    invalidatePostsCache();
     res.json({ success: true });
   } catch (err) {
     console.error('Take ride error:', err);
@@ -443,6 +475,7 @@ router.post('/:id/remove-member', async (req, res) => {
       notifiedCount = result.insertedCount || 0;
     }
 
+    invalidatePostsCache();
     res.json({ success: true, notifiedCount });
   } catch (err) {
     console.error('Remove member error:', err);
@@ -465,6 +498,7 @@ router.post('/:id/remove-driver', async (req, res) => {
       { $pull: { drivers: { email }, pendingDrivers: { email } } }
     );
 
+    invalidatePostsCache();
     res.json({ success: true });
   } catch (err) {
     console.error('Remove driver error:', err);
@@ -473,3 +507,4 @@ router.post('/:id/remove-driver', async (req, res) => {
 });
 
 module.exports = router;
+module.exports.invalidatePostsCache = invalidatePostsCache;

@@ -11,6 +11,30 @@ import { Bell, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useNotifications } from '@/hooks/useNotifications';
 
+// Function to parse and render formatted message text
+const renderFormattedMessage = (text) => {
+  if (!text) return '';
+  
+  // Split by double newlines for paragraphs
+  const paragraphs = text.split('\n\n');
+  
+  return paragraphs.map((paragraph, pIdx) => (
+    <div key={pIdx} className={pIdx > 0 ? 'mt-2' : ''}>
+      {paragraph.split(/(_[^_]+_)/g).map((segment, idx) => {
+        // Check if this is an italicized segment
+        if (segment.startsWith('_') && segment.endsWith('_')) {
+          return (
+            <em key={idx} className="italic">
+              {segment.slice(1, -1)}
+            </em>
+          );
+        }
+        return <span key={idx}>{segment}</span>;
+      })}
+    </div>
+  ));
+};
+
 function NotificationMenu({ currentUser }) {
   const {
     notifications,
@@ -141,13 +165,13 @@ function NotificationMenu({ currentUser }) {
                     </span>
                   </div>
                   {notif.replyToMessage && (
-                    <p className="text-xs text-gray-400 mt-1 italic">
-                      Replying to: "{notif.replyToMessage}"
-                    </p>
+                    <div className="text-xs text-gray-400 mt-1 italic">
+                      Replying to: <div className="inline">{renderFormattedMessage(notif.replyToMessage)}</div>
+                    </div>
                   )}
-                  <p className="text-sm text-gray-700">
-                    {notif.message}
-                  </p>
+                  <div className="text-sm text-gray-700">
+                    {renderFormattedMessage(notif.message)}
+                  </div>
                   <p className="text-xs text-gray-400 mt-1">
                     {new Date(notif.createdAt).toLocaleString()}
                   </p>

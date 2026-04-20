@@ -22,6 +22,7 @@ function createPostPayload(formData) {
         }`,
         description: formData.description,
         type: formData.type,
+        suggestedPrice: formData.type === 'offer' && formData.suggestedPrice ? Number(formData.suggestedPrice) : null,
         user: {
             name: formData.name,
             email: formData.email,
@@ -121,7 +122,7 @@ export const usePosts = () => {
 
         const intervalId = window.setInterval(() => {
             refreshPosts({ silent: true }).catch(() => {});
-        }, 15000);
+        }, 30000);
 
         const handleWindowFocus = () => {
             refreshPosts({ silent: true }).catch(() => {});
