@@ -7,16 +7,16 @@ const router = express.Router();
 // Helper to get or create friends document for a user
 async function getFriendsDoc(userId) {
   const friends = getDB().collection('friends');
-  let doc = await friends.findOne({ odUserId: userId });
+  let doc = await friends.findOne({ userId: userId });
   
   if (!doc) {
     await friends.insertOne({
-      odUserId: userId,
+      userId: userId,
       friendIds: [],
       createdAt: new Date(),
       updatedAt: new Date()
     });
-    doc = await friends.findOne({ odUserId: userId });
+    doc = await friends.findOne({ userId: userId });
   }
   
   return doc;
@@ -90,7 +90,7 @@ router.post('/:userId/add', async (req, res) => {
     
     // Add friend to user's list (if not already there)
     await friends.updateOne(
-      { odUserId: userId },
+      { userId: userId },
       { 
         $addToSet: { friendIds: friendId },
         $set: { updatedAt: new Date() },
@@ -101,7 +101,7 @@ router.post('/:userId/add', async (req, res) => {
 
     // Also add reverse relationship (mutual friendship)
     await friends.updateOne(
-      { odUserId: friendId },
+      { userId: friendId },
       { 
         $addToSet: { friendIds: userId },
         $set: { updatedAt: new Date() },
@@ -142,7 +142,7 @@ router.delete('/:userId/remove/:friendId', async (req, res) => {
 
     // Remove from user's list
     await friends.updateOne(
-      { odUserId: userId },
+      { userId: userId },
       { 
         $pull: { friendIds: friendId },
         $set: { updatedAt: new Date() }
@@ -151,7 +151,7 @@ router.delete('/:userId/remove/:friendId', async (req, res) => {
 
     // Remove reverse relationship
     await friends.updateOne(
-      { odUserId: friendId },
+      { userId: friendId },
       { 
         $pull: { friendIds: userId },
         $set: { updatedAt: new Date() }
@@ -175,7 +175,7 @@ router.get('/:userId/check/:friendId', async (req, res) => {
     }
 
     const friends = getDB().collection('friends');
-    const doc = await friends.findOne({ odUserId: userId });
+    const doc = await friends.findOne({ userId: userId });
     
     const isFriend = doc?.friendIds?.includes(friendId) || false;
 
