@@ -560,6 +560,7 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
                                                         className='bg-blue-600 hover:bg-blue-700'
                                                         onClick={async () => {
                                                             setOfferConfirmOpen(false);
+                                                            setJoinRequested(true);
                                                             const takeRes = await fetch(`${API_ROOT}/posts/${post._id}/take`, {
                                                                 method: 'POST',
                                                                 headers: { 'Content-Type': 'application/json' },
@@ -605,7 +606,6 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
                                                                     });
                                                                 }
                                                             }
-                                                            setJoinRequested(true);
                                                             setOfferMessage('');
                                                         }}
                                                     >
@@ -735,23 +735,14 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
                                         const res = await fetch(`${API_ROOT}/posts/${post._id}/join`, {
                                             method: 'POST',
                                             headers: { 'Content-Type': 'application/json' },
-                                            body: JSON.stringify({ email: currentUser.email }),
+                                            body: JSON.stringify({
+                                                email: currentUser.email,
+                                                senderName: currentUser.name,
+                                                senderId: currentUser._id,
+                                                message: joinListMessage.trim() || '',
+                                            }),
                                         });
                                         if (res.ok) {
-                                            const baseMsg = `${currentUser.name} wants to join your rider list for the ride from ${post.trip?.startLocation?.title || 'start'} to ${post.trip?.endLocation?.title || 'destination'}.`;
-                                            const finalMsg = joinListMessage.trim() ? `${baseMsg}\n\nMessage: _${joinListMessage}_` : baseMsg;
-                                            await fetch(NOTIFICATIONS_ENDPOINT, {
-                                                method: 'POST',
-                                                headers: { 'Content-Type': 'application/json' },
-                                                body: JSON.stringify({
-                                                    recipientEmail: post.user.email,
-                                                    senderName: currentUser.name,
-                                                    senderId: currentUser._id,
-                                                    message: finalMsg,
-                                                    postId: post._id,
-                                                    type: 'join_list',
-                                                }),
-                                            });
                                             setListRequestSent(true);
                                             setJoinListMessageOpen(false);
                                             setJoinListMessage('');

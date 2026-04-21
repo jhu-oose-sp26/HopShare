@@ -16,16 +16,16 @@ const BottomNav = () => {
           <NavLink
             key={to}
             to={to}
-            className={({ isActive }) =>
-              `flex flex-col items-center justify-center w-full h-full transition-colors ${
-                isActive
-                  ? 'text-black'
-                  : 'text-gray-400 hover:text-gray-600'
-              }`
-            }
+            className={() => 'flex flex-col items-center justify-center w-full h-full'}
           >
-            <Icon className="w-6 h-6 mb-1" strokeWidth={1.5} />
-            <span className="text-xs font-medium">{label}</span>
+            {({ isActive }) => (
+              <div className={`flex flex-col items-center justify-center w-full py-2.5 transition-colors ${
+                isActive ? 'bg-gray-400 text-white' : 'text-gray-400 hover:text-gray-600'
+              }`}>
+                <Icon className="w-6 h-6 mb-1" strokeWidth={isActive ? 2 : 1.5} />
+                <span className="text-xs font-semibold w-14 text-center">{label}</span>
+              </div>
+            )}
           </NavLink>
         ))}
       </div>

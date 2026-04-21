@@ -1,5 +1,4 @@
 import { useState, useEffect, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
 import {
   Dialog,
   DialogContent,
@@ -17,7 +16,6 @@ import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 import { filterPostsByRouteRadius } from '@/lib/utils';
 
 function HomePage({ currentUser, onLogout }) {
-  const navigate = useNavigate();
   const {
     posts,
     addPost,
@@ -161,14 +159,11 @@ function HomePage({ currentUser, onLogout }) {
                   <p className='text-sm text-gray-700'>{currentUser?.name}</p>
                   <p className='text-xs text-gray-500'>{currentUser?.email}</p>
                 </div>
-                <div className='flex gap-2'>
-                  <Button variant='outline' size='sm' onClick={() => navigate('/profile')}>
-                    My Profile
-                  </Button>
-                  <Button variant='outline' size='sm' onClick={onLogout}>
+                <div className='flex gap-2 items-center'>
+                  <Button size='sm' onClick={openCreateRequest}>Create a Request</Button>
+                  <Button size='sm' onClick={onLogout} className='bg-rose-600/70 hover:bg-rose-600/90 text-white border-0'>
                     Log out
                   </Button>
-                  <Button size='sm' onClick={openCreateRequest}>Create a Request</Button>
                 </div>
               </div>
             </div>
