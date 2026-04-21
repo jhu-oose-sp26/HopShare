@@ -1,5 +1,4 @@
 import { useState, useEffect, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
 import {
   Dialog,
   DialogContent,
@@ -17,7 +16,6 @@ import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 import { filterPostsByRouteRadius } from '@/lib/utils';
 
 function HomePage({ currentUser, onLogout }) {
-  const navigate = useNavigate();
   const {
     posts,
     addPost,
@@ -34,7 +32,7 @@ function HomePage({ currentUser, onLogout }) {
   const [routeSearch, setRouteSearch] = useState(null);
   const [hasSearched, setHasSearched] = useState(false);
   const [submitInitialData, setSubmitInitialData] = useState(null);
-  const [activeView, setActiveView] = useState('available');
+  const [activeView, setActiveView] = useState('map');
 
   // Get user's location on load to bias autocomplete results.
   useEffect(() => {
@@ -161,14 +159,11 @@ function HomePage({ currentUser, onLogout }) {
                   <p className='text-sm text-gray-700'>{currentUser?.name}</p>
                   <p className='text-xs text-gray-500'>{currentUser?.email}</p>
                 </div>
-                <div className='flex gap-2'>
-                  <Button variant='outline' size='sm' onClick={() => navigate('/profile')}>
-                    My Profile
-                  </Button>
-                  <Button variant='outline' size='sm' onClick={onLogout}>
+                <div className='flex gap-2 items-center'>
+                  <Button size='sm' onClick={openCreateRequest}>Create a Request</Button>
+                  <Button size='sm' onClick={onLogout} className='bg-rose-600/70 hover:bg-rose-600/90 text-white border-0'>
                     Log out
                   </Button>
-                  <Button size='sm' onClick={openCreateRequest}>Create a Request</Button>
                 </div>
               </div>
             </div>
@@ -186,6 +181,16 @@ function HomePage({ currentUser, onLogout }) {
 
             {/* View tabs */}
             <div className='flex gap-1 border-b border-gray-200 -mb-6'>
+              <button
+                onClick={() => setActiveView('map')}
+                className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px ${
+                  activeView === 'map'
+                    ? 'border-black text-gray-900'
+                    : 'border-transparent text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                Map
+              </button>
               <button
                 onClick={() => setActiveView('available')}
                 className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px ${
@@ -205,16 +210,6 @@ function HomePage({ currentUser, onLogout }) {
                 }`}
               >
                 My Rides
-              </button>
-              <button
-                onClick={() => setActiveView('map')}
-                className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px ${
-                  activeView === 'map'
-                    ? 'border-black text-gray-900'
-                    : 'border-transparent text-gray-500 hover:text-gray-700'
-                }`}
-              >
-                Map
               </button>
             </div>
 
@@ -277,6 +272,7 @@ function HomePage({ currentUser, onLogout }) {
           isRefreshing={isRefreshing}
           lastUpdatedAt={lastUpdatedAt}
           heading='My Rides'
+          subheading={isLoading ? 'Loading rides...' : `${myPosts.length} upcoming ride${myPosts.length === 1 ? '' : 's'}`}
           emptyTitle='You have no rides yet.'
           emptyDescription='Use the "Create a Request" button above to post your first ride!'
         />

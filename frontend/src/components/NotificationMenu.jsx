@@ -51,6 +51,7 @@ function NotificationMenu({ currentUser }) {
   const [open, setOpen] = useState(false);
   const [replyingTo, setReplyingTo] = useState(null);
   const [replyMessage, setReplyMessage] = useState('');
+  const [visibleCount, setVisibleCount] = useState(10);
 
   const hasUnread = unreadCount > 0;
 
@@ -77,7 +78,7 @@ function NotificationMenu({ currentUser }) {
   }, [markAllAsRead, open]);
 
   return (
-    <Sheet open={open} onOpenChange={setOpen}>
+    <Sheet open={open} onOpenChange={(o) => { setOpen(o); if (!o) setVisibleCount(10); }}>
       <SheetTrigger asChild>
         <button className="relative p-3 rounded-full hover:bg-gray-100 transition">
           <Bell className="w-7 h-7 text-gray-700" />
@@ -129,7 +130,8 @@ function NotificationMenu({ currentUser }) {
               No notifications yet.
             </p>
           ) : (
-            notifications.map((notif) => {
+            <>
+            {notifications.slice(0, visibleCount).map((notif) => {
               const isLeftListMessage =
                 typeof notif.message === 'string' &&
                 /(left|removed)\b/i.test(notif.message) &&
@@ -232,7 +234,26 @@ function NotificationMenu({ currentUser }) {
                   )}
                 </div>
               );
-            })
+            })}
+            <div className='flex justify-center gap-4 py-2'>
+              {visibleCount < notifications.length && (
+                <button
+                  onClick={() => setVisibleCount(c => c + 10)}
+                  className='text-sm text-blue-600 hover:underline'
+                >
+                  See more ({notifications.length - visibleCount} remaining)
+                </button>
+              )}
+              {visibleCount > 10 && (
+                <button
+                  onClick={() => setVisibleCount(c => Math.max(10, c - 10))}
+                  className='text-sm text-gray-500 hover:underline'
+                >
+                  See less
+                </button>
+              )}
+            </div>
+            </>
           )}
         </div>
       </SheetContent>

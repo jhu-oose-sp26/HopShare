@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
-import { User, Mail, Phone, BookOpen, Calendar, MapPin, ArrowLeft } from 'lucide-react';
+import { User, Mail, Phone, BookOpen, Calendar, MapPin, ArrowLeft, UserPlus, UserMinus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useFriends } from '@/hooks/useFriends';
 
 const API_ROOT = (import.meta.env.VITE_API_BASE_URL || '/api').replace(/\/$/, '');
 
@@ -11,8 +12,26 @@ function UserProfile({ currentUser }) {
   const [profile, setProfile] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
+  const { isFriend, addFriend, removeFriend } = useFriends(currentUser?._id);
+  const [friendLoading, setFriendLoading] = useState(false);
 
-  // If viewing your own profile, redirect to the main profile page
+  const handleToggleFriend = async () => {
+    if (!profile?._id) return;
+    
+    setFriendLoading(true);
+    try {
+      if (isFriend(profile._id)) {
+        await removeFriend(profile._id);
+      } else {
+        await addFriend(profile._id);
+      }
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setFriendLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (googleId === currentUser?.googleId) {
       navigate('/profile', { replace: true });
@@ -128,21 +147,44 @@ function UserProfile({ currentUser }) {
         <div className="bg-white rounded-lg shadow-sm border border-gray-200">
           <div className="px-6 py-8">
             {/* Header */}
-            <div className="flex items-center gap-4 mb-8">
-              <img
-                src={profile.avatar || profile.picture || `https://ui-avatars.com/api/?name=${encodeURIComponent(profile.name || 'User')}&background=e5e7eb&color=374151&size=128`}
-                alt={profile.name}
-                className="w-16 h-16 rounded-full border-2 border-gray-200 object-cover"
-                onError={(e) => {
-                  e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(profile.name || 'User')}&background=e5e7eb&color=374151&size=128`;
-                }}
-              />
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900">{profile.name}</h1>
-                <p className="text-sm text-gray-600">
-                  Member since {formatJoinDate(profile.createdAt)}
-                </p>
+            <div className="flex items-center justify-between mb-8">
+              <div className="flex items-center gap-4">
+                <img
+                  src={profile.avatar || profile.picture || `https://ui-avatars.com/api/?name=${encodeURIComponent(profile.name || 'User')}&background=e5e7eb&color=374151&size=128`}
+                  alt={profile.name}
+                  className="w-16 h-16 rounded-full border-2 border-gray-200 object-cover"
+                  onError={(e) => {
+                    e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(profile.name || 'User')}&background=e5e7eb&color=374151&size=128`;
+                  }}
+                />
+                <div>
+                  <h1 className="text-2xl font-bold text-gray-900">{profile.name}</h1>
+                  <p className="text-sm text-gray-600">
+                    Member since {formatJoinDate(profile.createdAt)}
+                  </p>
+                </div>
               </div>
+
+              <Button
+                onClick={handleToggleFriend}
+                disabled={friendLoading}
+                variant={isFriend(profile._id) ? "outline" : "default"}
+                className={isFriend(profile._id) ? "text-red-600 hover:bg-red-50" : ""}
+              >
+                {friendLoading ? (
+                  'Loading...'
+                ) : isFriend(profile._id) ? (
+                  <>
+                    <UserMinus className="w-4 h-4 mr-2" />
+                    Remove Friend
+                  </>
+                ) : (
+                  <>
+                    <UserPlus className="w-4 h-4 mr-2" />
+                    Add Friend
+                  </>
+                )}
+              </Button>
             </div>
 
             {/* Profile Information */}
@@ -164,14 +206,6 @@ function UserProfile({ currentUser }) {
                   </label>
                   <p className="text-gray-900">{profile.email || '—'}</p>
                 </div>
-
-                {/* <div className="space-y-2">
-                  <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
-                    <User className="w-4 h-4" />
-                    Google ID
-                  </label>
-                  <p className="text-gray-600 text-sm font-mono break-all">{profile.googleId || '—'}</p>
-                </div> */}
 
                 <div className="space-y-2">
                   <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
