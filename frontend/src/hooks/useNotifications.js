@@ -201,16 +201,21 @@ export function useNotifications(currentUser) {
 
     const respondToNotification = useCallback(
         async (notification, response) => {
-            await parseNotificationResponse(
-                await fetch(`${API_ROOT}/notifications/${notification._id}/respond`, {
-                    method: 'PATCH',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        response,
-                        responderName: currentUser?.name,
-                    }),
-                })
-            );
+            try {
+                await parseNotificationResponse(
+                    await fetch(`${API_ROOT}/notifications/${notification._id}/respond`, {
+                        method: 'PATCH',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            response,
+                            responderName: currentUser?.name,
+                        }),
+                    })
+                );
+            } catch (err) {
+                alert(err instanceof Error ? err.message : 'Failed to respond to notification');
+                return;
+            }
 
             // Change Stream will broadcast the update
         },

@@ -10,6 +10,7 @@ import {
     Phone,
     MessageCircle,
     CarFront,
+    Users,
     DollarSign,
     Info,
 } from 'lucide-react';
@@ -26,6 +27,21 @@ import { HoverCard, HoverCardTrigger, HoverCardContent } from '@/components/ui/h
 const inputBase =
     'flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50';
 
+const getTodayDateString = () => {
+    const today = new Date();
+    return format(today, 'yyyy-MM-dd');
+};
+
+const isPastDateString = (dateString) => {
+    if (!dateString) return false;
+    return dateString < getTodayDateString();
+};
+
+const toFiniteCoord = (value) => {
+    const num = Number(value);
+    return Number.isFinite(num) ? num : null;
+};
+
 function SubmitBox({ onSubmit, coords, initialData = null, isEdit = false }) {
     const [name, setName] = useState(initialData?.name ?? '');
     const [email, setEmail] = useState(initialData?.email ?? '');
@@ -40,6 +56,7 @@ function SubmitBox({ onSubmit, coords, initialData = null, isEdit = false }) {
     const [time, setTime] = useState(initialData?.time ?? '');
     const [description, setDescription] = useState(initialData?.description ?? '');
     const [type, setType] = useState(initialData?.type ?? 'request');
+    const [maxRiders, setMaxRiders] = useState(initialData?.maxRiders ?? 4);
     const [suggestedPrice, setSuggestedPrice] = useState(initialData?.suggestedPrice ?? '');
     const [submitError, setSubmitError] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -58,10 +75,22 @@ function SubmitBox({ onSubmit, coords, initialData = null, isEdit = false }) {
         setTime(initialData?.time ?? '');
         setDescription(initialData?.description ?? '');
         setType(initialData?.type ?? 'request');
+        setMaxRiders(initialData?.maxRiders ?? 4);
         setSuggestedPrice(initialData?.suggestedPrice ?? '');
         setSubmitError('');
         setIsSubmitting(false);
     }, [initialData]);
+
+    useEffect(() => {
+        if (date && isPastDateString(date)) {
+            setSubmitError('You cannot input a past date.');
+            return;
+        }
+
+        if (submitError === 'You cannot input a past date.') {
+            setSubmitError('');
+        }
+    }, [date, submitError]);
 
     const handleStartChange = (nextValue) => {
         setStartTitle(nextValue);
@@ -78,8 +107,54 @@ function SubmitBox({ onSubmit, coords, initialData = null, isEdit = false }) {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
+        
+        // Validation: date is required
         if (!date) {
             setSubmitError('Please select a date.');
+            return;
+        }
+
+        // Validation: ensure title and description are not empty
+        if (!startTitle || !startTitle.trim()) {
+            setSubmitError('Please select a start location.');
+            return;
+        }
+        if (!endTitle || !endTitle.trim()) {
+            setSubmitError('Please select an end location.');
+            return;
+        }
+
+        // Validation: require selecting suggestions (or current location) with coordinates
+        const startLat = toFiniteCoord(startLatitude);
+        const startLng = toFiniteCoord(startLongitude);
+        const endLat = toFiniteCoord(endLatitude);
+        const endLng = toFiniteCoord(endLongitude);
+
+        if (
+            startLat === null ||
+            startLng === null ||
+            endLat === null ||
+            endLng === null
+        ) {
+            setSubmitError('Please select start and end from location suggestions.');
+            return;
+        }
+
+        // Validation: block same start/end route
+        if (Math.abs(startLat - endLat) < 1e-7 && Math.abs(startLng - endLng) < 1e-7) {
+            setSubmitError('Start and end locations cannot be the same.');
+            return;
+        }
+
+        if (!description || !description.trim()) {
+            setSubmitError('Please enter a description.');
+            return;
+        }
+
+        // Validation: check for XSS patterns (basic check)
+        const xssPatterns = /<script|javascript:|on\w+\s*=/i;
+        if (xssPatterns.test(description) || xssPatterns.test(startTitle) || xssPatterns.test(endTitle)) {
+            setSubmitError('Invalid characters in input. Please avoid HTML tags or scripts.');
             return;
         }
 
@@ -97,6 +172,7 @@ function SubmitBox({ onSubmit, coords, initialData = null, isEdit = false }) {
             time,
             description,
             type,
+            maxRiders: Number(maxRiders),
             suggestedPrice: type === 'offer' ? suggestedPrice : '',
         };
 
@@ -121,6 +197,7 @@ function SubmitBox({ onSubmit, coords, initialData = null, isEdit = false }) {
                 setTime('');
                 setDescription('');
                 setType('request');
+                setMaxRiders(4);
                 setSuggestedPrice('');
             }
         } catch (err) {
@@ -257,7 +334,7 @@ function SubmitBox({ onSubmit, coords, initialData = null, isEdit = false }) {
                     />
                 </div>
 
-                <div className='grid gap-4 sm:grid-cols-2'>
+                <div className='grid gap-4 sm:grid-cols-3'>
                     <div className='space-y-2'>
                         <label
                             htmlFor='submit-date'
@@ -291,7 +368,7 @@ function SubmitBox({ onSubmit, coords, initialData = null, isEdit = false }) {
                             <PopoverContent
                                 side='bottom'
                                 sideOffset={4}
-                                align='center' 
+                                align='center'
                                 className="p-0 w-full"
                                 style={{ minWidth: '100%' }}
                             >
@@ -300,8 +377,16 @@ function SubmitBox({ onSubmit, coords, initialData = null, isEdit = false }) {
                                         mode='single'
                                         selected={date ? parse(date,'yyyy-MM-dd', new Date()): undefined}
                                         onSelect={(selected) => {
-                                            if (selected) setDate(format(selected, 'yyyy-MM-dd'));
+                                            if (!selected) return;
+                                            const selectedDate = format(selected, 'yyyy-MM-dd');
+                                            if (isPastDateString(selectedDate)) {
+                                                setSubmitError('You cannot input a past date.');
+                                                return;
+                                            }
+                                            setSubmitError('');
+                                            setDate(selectedDate);
                                         }}
+                                        disabled={(day) => day < new Date(new Date().setHours(0, 0, 0, 0))}
                                         numberOfWeeks={7}
                                     />
                                 </div>
@@ -322,6 +407,25 @@ function SubmitBox({ onSubmit, coords, initialData = null, isEdit = false }) {
                             className={inputBase}
                             value={time}
                             onChange={(e) => setTime(e.target.value)}
+                            required
+                        />
+                    </div>
+                    <div className='space-y-2'>
+                        <label
+                            htmlFor='submit-max-riders'
+                            className='flex items-center gap-2 text-sm font-medium text-foreground'
+                        >
+                            <Users className='size-4 text-muted-foreground' />
+                            Max riders <span className='text-red-500'>*</span>
+                        </label>
+                        <input
+                            id='submit-max-riders'
+                            type='number'
+                            min='1'
+                            max='20'
+                            className={inputBase}
+                            value={maxRiders}
+                            onChange={(e) => setMaxRiders(e.target.value)}
                             required
                         />
                     </div>

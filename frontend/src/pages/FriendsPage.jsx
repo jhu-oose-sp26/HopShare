@@ -1,7 +1,14 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Users, UserPlus, UserMinus, Search, X } from 'lucide-react';
+import { Users, UserPlus, UserMinus, Search, X, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from '@/components/ui/dialog';
 import { useFriends, useFriendPosts } from '@/hooks/useFriends';
 import PostCard from '@/components/PostCard';
 
@@ -14,21 +21,23 @@ function FriendsPage({ currentUser }) {
   const [searchResults, setSearchResults] = useState([]);
   const [isSearching, setIsSearching] = useState(false);
   const [searchError, setSearchError] = useState('');
+  const [removeConfirm, setRemoveConfirm] = useState(null); // { id, name }
 
-  const { 
-    friends, 
-    isLoading: friendsLoading, 
-    addFriend, 
+  const {
+    friends,
+    incomingRequests,
+    isLoading: friendsLoading,
+    addFriend,
     removeFriend,
+    acceptRequest,
+    rejectRequest,
     isFriend,
-    refreshFriends 
+    hasSentRequest,
+    hasIncomingRequest,
+    refreshFriends,
   } = useFriends(currentUser?._id);
 
-  const { 
-    posts, 
-    isLoading: postsLoading,
-    refreshPosts 
-  } = useFriendPosts(currentUser?._id);
+  const { posts, isLoading: postsLoading } = useFriendPosts(currentUser?._id);
 
   const handleSearch = async () => {
     if (!searchQuery.trim()) return;
@@ -38,10 +47,8 @@ function FriendsPage({ currentUser }) {
 
     try {
       const response = await fetch(`${API_ROOT}/profile/search?q=${encodeURIComponent(searchQuery.trim())}`);
-      
-      if (!response.ok) {
-        throw new Error('Search failed');
-      }
+
+      if (!response.ok) throw new Error('Search failed');
 
       const data = await response.json();
       const filtered = (data.users || []).filter(u => u._id !== currentUser?._id);
@@ -54,23 +61,45 @@ function FriendsPage({ currentUser }) {
     }
   };
 
-  const handleAddFriend = async (friendId) => {
+  const handleAddFriend = async (userId) => {
     try {
-      await addFriend(friendId);
-      setSearchResults(prev => prev.map(u => 
-        u._id === friendId ? { ...u, isFriend: true } : u
+      await addFriend(userId);
+      // Optimistically mark in search results
+      setSearchResults(prev => prev.map(u =>
+        u._id === userId ? { ...u, _requestSent: true } : u
       ));
     } catch (err) {
       alert(err.message);
     }
   };
 
-  const handleRemoveFriend = async (friendId) => {
-    if (!confirm('Are you sure you want to remove this friend?')) return;
-    
+  const handleRemoveFriend = (friendId, friendName) => {
+    setRemoveConfirm({ id: friendId, name: friendName });
+  };
+
+  const confirmRemoveFriend = async () => {
+    if (!removeConfirm) return;
     try {
-      await removeFriend(friendId);
+      await removeFriend(removeConfirm.id);
       refreshFriends();
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setRemoveConfirm(null);
+    }
+  };
+
+  const handleAccept = async (requestId) => {
+    try {
+      await acceptRequest(requestId);
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+
+  const handleReject = async (requestId) => {
+    try {
+      await rejectRequest(requestId);
     } catch (err) {
       alert(err.message);
     }
@@ -80,6 +109,14 @@ function FriendsPage({ currentUser }) {
     setSearchQuery('');
     setSearchResults([]);
     setSearchError('');
+  };
+
+  const getSearchResultStatus = (user) => {
+    if (isFriend(user._id)) return 'friend';
+    if (user._requestSent || hasSentRequest(user._id)) return 'sent';
+    const incoming = hasIncomingRequest(user._id);
+    if (incoming) return { type: 'incoming', request: incoming };
+    return 'none';
   };
 
   return (
@@ -127,32 +164,47 @@ function FriendsPage({ currentUser }) {
           {searchResults.length > 0 && (
             <div className="mt-4 space-y-2">
               <p className="text-sm text-gray-500">{searchResults.length} user(s) found</p>
-              {searchResults.map(user => (
-                <div key={user._id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                  <div 
-                    className="flex items-center gap-3 cursor-pointer hover:opacity-80"
-                    onClick={() => user.googleId && navigate(`/user/${user.googleId}`)}
-                  >
-                    <img
-                      src={user.avatar || user.picture || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}`}
-                      alt={user.name}
-                      className="w-10 h-10 rounded-full object-cover"
-                    />
-                    <div>
-                      <p className="font-medium text-gray-900">{user.name}</p>
-                      <p className="text-sm text-gray-500">{user.email}</p>
+              {searchResults.map(user => {
+                const status = getSearchResultStatus(user);
+                return (
+                  <div key={user._id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                    <div
+                      className="flex items-center gap-3 cursor-pointer hover:opacity-80"
+                      onClick={() => user.googleId && navigate(`/user/${user.googleId}`)}
+                    >
+                      <img
+                        src={user.avatar || user.picture || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}`}
+                        alt={user.name}
+                        className="w-10 h-10 rounded-full object-cover"
+                      />
+                      <div>
+                        <p className="font-medium text-gray-900">{user.name}</p>
+                        <p className="text-sm text-gray-500">{user.email}</p>
+                      </div>
                     </div>
+                    {status === 'friend' ? (
+                      <span className="text-sm text-green-600 font-medium">Already friends</span>
+                    ) : status === 'sent' ? (
+                      <span className="text-sm text-gray-400 font-medium">Request sent</span>
+                    ) : status?.type === 'incoming' ? (
+                      <div className="flex gap-2">
+                        <Button size="sm" onClick={() => handleAccept(status.request._id)}>
+                          <Check className="w-4 h-4 mr-1" />
+                          Accept
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={() => handleReject(status.request._id)}>
+                          Decline
+                        </Button>
+                      </div>
+                    ) : (
+                      <Button size="sm" onClick={() => handleAddFriend(user._id)}>
+                        <UserPlus className="w-4 h-4 mr-1" />
+                        Add
+                      </Button>
+                    )}
                   </div>
-                  {isFriend(user._id) ? (
-                    <span className="text-sm text-green-600 font-medium">Already friends</span>
-                  ) : (
-                    <Button size="sm" onClick={() => handleAddFriend(user._id)}>
-                      <UserPlus className="w-4 h-4 mr-1" />
-                      Add
-                    </Button>
-                  )}
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
 
@@ -171,10 +223,27 @@ function FriendsPage({ currentUser }) {
                 : 'bg-white text-gray-700 border border-gray-200 hover:bg-gray-50'
             }`}
           >
-            Friends' Posts
+            Friends&apos; Posts
             {posts.length > 0 && (
               <span className="ml-2 text-xs bg-white/20 px-1.5 py-0.5 rounded-full">
                 {posts.length}
+              </span>
+            )}
+          </button>
+          <button
+            onClick={() => setActiveTab('requests')}
+            className={`flex-1 py-2 px-4 rounded-lg font-medium transition-colors relative ${
+              activeTab === 'requests'
+                ? 'bg-blue-500 text-white'
+                : 'bg-white text-gray-700 border border-gray-200 hover:bg-gray-50'
+            }`}
+          >
+            Requests
+            {incomingRequests.length > 0 && (
+              <span className={`ml-2 text-xs px-1.5 py-0.5 rounded-full ${
+                activeTab === 'requests' ? 'bg-white/20' : 'bg-blue-500 text-white'
+              }`}>
+                {incomingRequests.length}
               </span>
             )}
           </button>
@@ -195,8 +264,8 @@ function FriendsPage({ currentUser }) {
           </button>
         </div>
 
-        {/* Content */}
-        {activeTab === 'posts' ? (
+        {/* Friends' Posts */}
+        {activeTab === 'posts' && (
           <div>
             {postsLoading ? (
               <div className="flex flex-col items-center justify-center py-20 gap-4">
@@ -208,8 +277,8 @@ function FriendsPage({ currentUser }) {
                 <Users className="w-12 h-12 text-gray-300 mx-auto mb-3" />
                 <p className="text-gray-600 font-medium">No posts from friends yet</p>
                 <p className="text-sm text-gray-500 mt-1">
-                  {friends.length === 0 
-                    ? "Add some friends to see their ride posts here!"
+                  {friends.length === 0
+                    ? 'Add some friends to see their ride posts here!'
                     : "Your friends haven't posted any rides yet."}
                 </p>
               </div>
@@ -218,21 +287,76 @@ function FriendsPage({ currentUser }) {
                 <p className="text-gray-600 mb-4">
                   {posts.length} ride{posts.length === 1 ? '' : 's'} from your friends
                 </p>
-                {/* Same grid as PostList */}
                 <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
                   {posts.map(post => (
-                    <PostCard
-                      key={post._id}
-                      post={post}
-                      currentUser={currentUser}
-                      showActions={false}
-                    />
+                    <PostCard key={post._id} post={post} currentUser={currentUser} showActions={false} />
                   ))}
                 </div>
               </>
             )}
           </div>
-        ) : (
+        )}
+
+        {/* Incoming Requests */}
+        {activeTab === 'requests' && (
+          <div>
+            {friendsLoading ? (
+              <div className="flex flex-col items-center justify-center py-20 gap-4">
+                <div className="w-10 h-10 rounded-full border-4 border-gray-200 border-t-gray-800 animate-spin" />
+                <p className="text-sm text-gray-400 animate-pulse">Loading...</p>
+              </div>
+            ) : incomingRequests.length === 0 ? (
+              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8 text-center">
+                <UserPlus className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                <p className="text-gray-600 font-medium">No pending friend requests</p>
+                <p className="text-sm text-gray-500 mt-1">
+                  When someone sends you a friend request, it will appear here.
+                </p>
+              </div>
+            ) : (
+              <>
+                <p className="text-gray-600 mb-4">
+                  {incomingRequests.length} pending request{incomingRequests.length === 1 ? '' : 's'}
+                </p>
+                <div className="space-y-3">
+                  {incomingRequests.map(req => (
+                    <div key={req._id} className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm flex items-center justify-between gap-3">
+                      <div
+                        className="flex items-center gap-3 cursor-pointer hover:opacity-80 min-w-0 flex-1"
+                        onClick={() => req.sender?.googleId && navigate(`/user/${req.sender.googleId}`)}
+                      >
+                        <img
+                          src={req.sender?.avatar || req.sender?.picture || `https://ui-avatars.com/api/?name=${encodeURIComponent(req.sender?.name || '?')}`}
+                          alt={req.sender?.name}
+                          className="w-12 h-12 rounded-full object-cover shrink-0"
+                        />
+                        <div className="min-w-0">
+                          <p className="font-semibold text-gray-900 truncate">{req.sender?.name}</p>
+                          <p className="text-sm text-gray-500 truncate">{req.sender?.email}</p>
+                          {req.sender?.major && (
+                            <p className="text-xs text-gray-400 truncate mt-0.5">{req.sender.major}</p>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex gap-2 shrink-0">
+                        <Button size="sm" onClick={() => handleAccept(req._id)}>
+                          <Check className="w-4 h-4 mr-1" />
+                          Accept
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={() => handleReject(req._id)}>
+                          Decline
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
+        {/* My Friends */}
+        {activeTab === 'friends' && (
           <div>
             {friendsLoading ? (
               <div className="flex flex-col items-center justify-center py-20 gap-4">
@@ -252,7 +376,6 @@ function FriendsPage({ currentUser }) {
                 <p className="text-gray-600 mb-4">
                   {friends.length} friend{friends.length === 1 ? '' : 's'}
                 </p>
-                {/* Same grid layout for friends */}
                 <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
                   {friends.map(friend => (
                     <div
@@ -260,7 +383,7 @@ function FriendsPage({ currentUser }) {
                       className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm hover:shadow-md transition-shadow"
                     >
                       <div className="flex items-start justify-between gap-3">
-                        <div 
+                        <div
                           className="flex items-center gap-3 cursor-pointer hover:opacity-80 min-w-0 flex-1"
                           onClick={() => navigate(`/user/${friend.googleId}`)}
                         >
@@ -280,14 +403,13 @@ function FriendsPage({ currentUser }) {
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => handleRemoveFriend(friend._id)}
+                          onClick={() => handleRemoveFriend(friend._id, friend.name)}
                           className="text-red-600 hover:text-red-700 hover:bg-red-50 shrink-0"
                         >
                           <UserMinus className="w-4 h-4" />
                         </Button>
                       </div>
-                      
-                      {/* View Profile Button */}
+
                       <Button
                         variant="outline"
                         size="sm"
@@ -304,6 +426,31 @@ function FriendsPage({ currentUser }) {
           </div>
         )}
       </div>
+
+      {/* Remove friend confirmation dialog */}
+      <Dialog open={!!removeConfirm} onOpenChange={(open) => { if (!open) setRemoveConfirm(null); }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Remove Friend</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to remove{' '}
+              <span className="font-medium text-gray-900">{removeConfirm?.name}</span>{' '}
+              from your friends?
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-end gap-2 mt-4">
+            <Button variant="outline" onClick={() => setRemoveConfirm(null)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={confirmRemoveFriend}
+              className="bg-red-600 hover:bg-red-700 text-white border-0"
+            >
+              Remove
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

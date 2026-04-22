@@ -5,7 +5,7 @@ import WeatherForecastDialog from './WeatherForecastDialog';
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { formatTime, formatDate } from '@/lib/utils';
-import { MapPin, Calendar, Clock, MessageCircle, Pencil, Trash2, Info, User, Mail, Phone, Navigation, ExternalLink, UserPlus, Users, UserMinus } from 'lucide-react';
+import { MapPin, Calendar, Clock, MessageCircle, Pencil, Trash2, Info, User, Mail, Phone, Navigation, ExternalLink, UserPlus, Users, UserMinus, CheckCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { HoverCard, HoverCardTrigger, HoverCardContent } from '@/components/ui/hover-card';
@@ -68,6 +68,8 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
         return (post.pendingJoins || []).includes(currentUser.email);
     });
 
+    const maxRiders = post.maxRiders ?? null;
+    const isFull = maxRiders != null && listMembers.length >= maxRiders;
     const isOwner = currentUser && post.user?.email && currentUser.email === post.user.email;
     const canManagePost = showActions && isOwner;
     const riderRequestStatus = !currentUser || isOwner || !isOffer
@@ -234,7 +236,8 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
         date: trip?.date ?? '',
         time: trip?.time ?? '',
         description: description ?? '',
-    }), [type, user, trip, description]);
+        maxRiders: post.maxRiders ?? '',
+    }), [type, user, trip, description, post.maxRiders]);
 
     const handleEditSubmit = async (formData) => {
         await onUpdate?.(formData);
@@ -626,7 +629,15 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
             <div className='flex items-center gap-2 mb-4 text-sm flex-wrap'>
                 <Users className='w-4 h-4 text-gray-400 shrink-0' />
                 {listMembers.length === 0 ? (
-                    <span className='text-gray-400 italic'>No sharing people yet</span>
+                    maxRiders != null ? (
+                        <span className='text-gray-400 italic'>0 / {maxRiders} riders</span>
+                    ) : (
+                        <span className='text-gray-400 italic'>No sharing people yet</span>
+                    )
+                ) : maxRiders != null ? (
+                    <span className={isFull ? 'text-red-600 font-medium' : 'text-gray-700'}>
+                        {listMembers.length} / {maxRiders} riders{isFull ? ' — Full' : ''}
+                    </span>
                 ) : listMembers.length > 1 ? (
                     <span className='text-gray-700'>{listMembers.length} riders sharing this trip</span>
                 ) : (
@@ -693,7 +704,94 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
                     </Button>
                 ) : null}
 
-                {listJoinError && <p className='text-xs text-red-500 w-full'>{listJoinError}</p>}
+                {/* Join the rider list — only for non-owners */}
+                {currentUser && !isOwner && (
+                    <div className='flex-1 flex flex-col gap-1'>
+                        {!listJoined && <Button
+                            variant={listJoined || listRequestSent || isFull ? 'outline' : 'default'}
+                            size='sm'
+                            className={`w-full ${listJoined || listRequestSent || isFull ? 'text-gray-400' : 'bg-green-600 hover:bg-green-700'}`}
+                            disabled={listJoined || listRequestSent || listJoinLoading || isFull}
+                            onClick={async () => {
+                                setListJoinError('');
+                                setListJoinLoading(true);
+                                try {
+                                    const res = await fetch(`${API_ROOT}/posts/${post._id}/join`, {
+                                        method: 'POST',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({ email: currentUser.email }),
+                                    });
+                                    if (res.ok) {
+                                        const msg = `${currentUser.name} wants to join your rider list for the ride from ${post.trip?.startLocation?.title || 'start'} to ${post.trip?.endLocation?.title || 'destination'}.`;
+                                        await fetch(NOTIFICATIONS_ENDPOINT, {
+                                            method: 'POST',
+                                            headers: { 'Content-Type': 'application/json' },
+                                            body: JSON.stringify({
+                                                recipientEmail: post.user.email,
+                                                senderName: currentUser.name,
+                                                senderId: currentUser._id,
+                                                message: msg,
+                                                postId: post._id,
+                                                type: 'join_list',
+                                            }),
+                                        });
+                                        setListRequestSent(true);
+                                    } else {
+                                        const data = await res.json().catch(() => ({}));
+                                        setListJoinError(data.error || 'Failed to send request. Please try again.');
+                                    }
+                                } catch (err) {
+                                    setListJoinError('Network error. Please try again.');
+                                } finally {
+                                    setListJoinLoading(false);
+                                }
+                            }}
+                        >
+                            {listJoinLoading ? (
+                                'Sending...'
+                            ) : listJoined ? (
+                                <><CheckCircle className='w-4 h-4 mr-1' />Request Accepted</>
+                            ) : listRequestSent ? (
+                                <><CheckCircle className='w-4 h-4 mr-1' />Awaiting Approval</>
+                            ) : isFull ? (
+                                <><Users className='w-4 h-4 mr-1' />Ride Full</>
+                            ) : (
+                                <><Users className='w-4 h-4 mr-1' />Join the Rider List</>
+                            )}
+                        </Button>}
+                        {listJoined && (
+                            <Button
+                                variant='outline'
+                                size='sm'
+                                className='w-full text-xs text-red-600 border-red-300 hover:bg-red-50 hover:text-red-700'
+                                onClick={() => setRemoveConfirm({
+                                    open: true,
+                                    title: 'Leave Rider List?',
+                                    message: 'Are you sure you want to leave the rider list for this ride? You will need to be re-accepted if you request to join the ride again.',
+                                    onConfirm: async () => {
+                                        const res = await fetch(`${API_ROOT}/posts/${post._id}/remove-member`, {
+                                            method: 'POST',
+                                            headers: { 'Content-Type': 'application/json' },
+                                            body: JSON.stringify({
+                                                email: currentUser.email,
+                                                name: currentUser.name,
+                                                actorEmail: currentUser.email,
+                                                actorName: currentUser.name,
+                                                actorId: currentUser._id,
+                                            }),
+                                        });
+                                        if (res.ok) {
+                                            setListMembers(prev => prev.filter(m => m.email !== currentUser.email));
+                                        }
+                                    },
+                                })}
+                            >
+                                <UserMinus className='w-3 h-3 mr-1' />Leave Rider List
+                            </Button>
+                        )}
+                        {listJoinError && <p className='text-xs text-red-500'>{listJoinError}</p>}
+                    </div>
+                )}
 
                 {/* Join Rider List Message Dialog */}
                 <Dialog open={joinListMessageOpen} onOpenChange={setJoinListMessageOpen}>
@@ -1188,7 +1286,7 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
                                                     <RouteMap
                                                         userRoute={userRouteForMap}
                                                         posts={[post]}
-                                                        searchRadius={distanceFilter !== Infinity ? distanceFilter : 10}
+                                                        searchRadius={routeSearch?.radiusKm ?? (distanceFilter !== Infinity ? distanceFilter : 10)}
                                                         className="h-80"
                                                         showZoomControls={true}
                                                     />

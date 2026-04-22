@@ -259,6 +259,26 @@ const ChatPage = ({ currentUser }) => {
   const handleSendMessage = async () => {
     if (!message.trim() || !chatId) return;
 
+    // FRONTEND VALIDATION: Prevent sending empty messages
+    const trimmedMessage = message.trim();
+    if (!trimmedMessage || trimmedMessage.length === 0) {
+      setError('Message cannot be empty');
+      return;
+    }
+
+    // FRONTEND VALIDATION: Prevent messages exceeding max length
+    if (trimmedMessage.length > 10000) {
+      setError('Message is too long (max 10,000 characters)');
+      return;
+    }
+
+    // FRONTEND VALIDATION: Basic XSS check
+    const xssPatterns = /<script|javascript:|on\w+\s*=/i;
+    if (xssPatterns.test(trimmedMessage)) {
+      setError('Invalid characters in message');
+      return;
+    }
+
     try {
       const response = await fetch(`${API_ROOT}/chat/${chatId}/messages`, {
         method: 'POST',
@@ -266,20 +286,23 @@ const ChatPage = ({ currentUser }) => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          sender: currentUser._id,
-          message: message.trim(),
+          sender: currentUser.email || currentUser._id,
+          message: trimmedMessage,
+          recipientEmail: post?.user?.email, // Optional: for backend validation of self-messaging
         }),
       });
 
       if (!response.ok) {
-        throw new Error('Failed to send message');
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to send message');
       }
 
       const newMessage = await response.json();
       setMessage('');
+      setError(null); // Clear any previous errors
     } catch (err) {
       console.error('Error sending message:', err);
-      setError('Failed to send message');
+      setError(err.message || 'Failed to send message');
     }
   };
 
