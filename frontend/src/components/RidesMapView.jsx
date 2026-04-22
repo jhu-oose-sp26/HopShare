@@ -82,6 +82,7 @@ function AutoFitAfterSearch({ routeSearch, rides }) {
   const searchStartLng = Number(routeSearch?.start?.longitude);
   const searchEndLat = Number(routeSearch?.end?.latitude);
   const searchEndLng = Number(routeSearch?.end?.longitude);
+  const searchRadiusKm = Number(routeSearch?.radiusKm);
 
   const hasSearchPoints =
     Number.isFinite(searchStartLat)
@@ -91,7 +92,7 @@ function AutoFitAfterSearch({ routeSearch, rides }) {
 
   const rideIdSignature = rides.map((ride) => String(ride._id)).join(',');
   const searchSignature = hasSearchPoints
-    ? `${searchStartLat}|${searchStartLng}|${searchEndLat}|${searchEndLng}|${radiusKm}|${rideIdSignature}`
+    ? `${searchStartLat}|${searchStartLng}|${searchEndLat}|${searchEndLng}|${searchRadiusKm}|${rideIdSignature}`
     : null;
 
   useEffect(() => {
