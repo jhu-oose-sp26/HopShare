@@ -1286,7 +1286,7 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
                                                     <RouteMap
                                                         userRoute={userRouteForMap}
                                                         posts={[post]}
-                                                        searchRadius={distanceFilter !== Infinity ? distanceFilter : 10}
+                                                        searchRadius={routeSearch?.radiusKm ?? (distanceFilter !== Infinity ? distanceFilter : 10)}
                                                         className="h-80"
                                                         showZoomControls={true}
                                                     />
