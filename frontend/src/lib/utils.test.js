@@ -14,7 +14,7 @@ describe('getRouteCenter', () => {
 });
 
 describe('filterPostsByRouteRadius', () => {
-    it('returns posts whose route midpoint falls within the requested radius', () => {
+    it('returns posts only when both start and end are within the requested radius', () => {
         const posts = [
             {
                 _id: 'closest',
@@ -24,6 +24,17 @@ describe('filterPostsByRouteRadius', () => {
                     },
                     endLocation: {
                         gps_coordinates: { latitude: 39.19, longitude: -76.67 },
+                    },
+                },
+            },
+            {
+                _id: 'start-only-match',
+                trip: {
+                    startLocation: {
+                        gps_coordinates: { latitude: 39.315, longitude: -76.615 },
+                    },
+                    endLocation: {
+                        gps_coordinates: { latitude: 38.85, longitude: -77.04 },
                     },
                 },
             },
@@ -59,7 +70,7 @@ describe('filterPostsByRouteRadius', () => {
         ).toEqual([posts[0]]);
     });
 
-    it('sorts matching posts from nearest to farthest midpoint', () => {
+    it('sorts matching posts by nearest worst endpoint distance', () => {
         const posts = [
             {
                 _id: 'second',
