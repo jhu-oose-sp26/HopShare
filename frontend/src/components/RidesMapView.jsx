@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { MapContainer, TileLayer, Marker, Polyline, Circle } from 'react-leaflet';
+import { useRef, useState } from 'react';
+import { MapContainer, TileLayer, Marker, Polyline, Circle, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { format, parse } from 'date-fns';
@@ -72,6 +72,78 @@ function makeArrow(color, deg) {
     iconSize: [20, 20],
     iconAnchor: [10, 10],
   });
+}
+
+function AutoFitAfterSearch({ routeSearch, rides }) {
+  const map = useMap();
+  const lastAppliedKeyRef = useRef(null);
+
+  const searchStartLat = Number(routeSearch?.start?.latitude);
+  const searchStartLng = Number(routeSearch?.start?.longitude);
+  const searchEndLat = Number(routeSearch?.end?.latitude);
+  const searchEndLng = Number(routeSearch?.end?.longitude);
+  const radiusKm = Number(routeSearch?.radiusKm);
+
+  const hasSearchPoints =
+    Number.isFinite(searchStartLat)
+    && Number.isFinite(searchStartLng)
+    && Number.isFinite(searchEndLat)
+    && Number.isFinite(searchEndLng);
+
+  const rideIdSignature = rides.map((ride) => String(ride._id)).join(',');
+  const searchSignature = hasSearchPoints
+    ? `${searchStartLat}|${searchStartLng}|${searchEndLat}|${searchEndLng}|${radiusKm}|${rideIdSignature}`
+    : null;
+
+  if (!hasSearchPoints || !searchSignature || lastAppliedKeyRef.current === searchSignature) {
+    return null;
+  }
+
+  // Delay until map has this render's layers, then fit once for this search signature.
+  requestAnimationFrame(() => {
+    try {
+      const bounds = L.latLngBounds([
+        [searchStartLat, searchStartLng],
+        [searchEndLat, searchEndLng],
+      ]);
+
+      if (radiusKm > 0) {
+        const radiusMeters = radiusKm * 1000;
+        bounds.extend(L.circle([searchStartLat, searchStartLng], { radius: radiusMeters }).getBounds());
+        bounds.extend(L.circle([searchEndLat, searchEndLng], { radius: radiusMeters }).getBounds());
+      }
+
+      rides.forEach((post) => {
+        const start = post?.trip?.startLocation?.gps_coordinates;
+        const end = post?.trip?.endLocation?.gps_coordinates;
+        const startLat = Number(start?.latitude);
+        const startLng = Number(start?.longitude);
+        const endLat = Number(end?.latitude);
+        const endLng = Number(end?.longitude);
+
+        if (Number.isFinite(startLat) && Number.isFinite(startLng)) {
+          bounds.extend([startLat, startLng]);
+        }
+        if (Number.isFinite(endLat) && Number.isFinite(endLng)) {
+          bounds.extend([endLat, endLng]);
+        }
+      });
+
+      if (bounds.isValid()) {
+        map.fitBounds(bounds, {
+          padding: [40, 40],
+          maxZoom: 12,
+          animate: true,
+        });
+      }
+
+      lastAppliedKeyRef.current = searchSignature;
+    } catch {
+      // Ignore map fit failures to avoid breaking map rendering.
+    }
+  });
+
+  return null;
 }
 
 
@@ -209,6 +281,7 @@ function RidesMapView({ posts, currentUser, coords, routeSearch, onDeletePost, o
             style={{ height: '100%', width: '100%' }}
             scrollWheelZoom={true}
           >
+            <AutoFitAfterSearch routeSearch={routeSearch} rides={rides} />
             <TileLayer
               attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
               url='https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'
