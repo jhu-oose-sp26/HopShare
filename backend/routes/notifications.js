@@ -117,6 +117,10 @@ router.patch('/:id/respond', async (req, res) => {
       const senderEmail = senderUser?.email;
       if (senderEmail) {
         if (response === 'accepted') {
+          const post = await db.collection('posts').findOne({ _id: notif.postId });
+          if (post?.maxRiders != null && (post.riderList?.length ?? 0) >= post.maxRiders) {
+            return res.status(400).json({ error: 'This ride is already full.' });
+          }
           await db.collection('posts').updateOne(
             { _id: notif.postId },
             {
