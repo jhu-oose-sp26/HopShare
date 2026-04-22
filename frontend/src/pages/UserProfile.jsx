@@ -110,7 +110,7 @@ function UserProfile({ currentUser }) {
         <div className="container mx-auto px-6 py-8 max-w-4xl">
           <Button
             variant="outline"
-            onClick={() => navigate('/')}
+            onClick={() => navigate('/home')}
             className="mb-4"
           >
             <ArrowLeft className="w-4 h-4 mr-2" />
@@ -123,7 +123,7 @@ function UserProfile({ currentUser }) {
             </div>
             <h2 className="text-xl font-semibold text-gray-900 mb-2">Profile Not Found</h2>
             <p className="text-gray-600 mb-4">{error}</p>
-            <Button onClick={() => navigate('/')}>Return to Home</Button>
+            <Button onClick={() => navigate('/home')}>Return to Home</Button>
           </div>
         </div>
       </div>
@@ -137,7 +137,7 @@ function UserProfile({ currentUser }) {
       <div className="container mx-auto px-6 py-8 max-w-4xl">
         <Button
           variant="outline"
-          onClick={() => navigate('/')}
+          onClick={() => navigate('/home')}
           className="mb-4"
         >
           <ArrowLeft className="w-4 h-4 mr-2" />
