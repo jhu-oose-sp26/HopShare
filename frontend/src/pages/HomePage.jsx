@@ -263,6 +263,7 @@ function HomePage({ currentUser, onLogout }) {
           posts={myPosts}
           isLoading={isLoading}
           error={error}
+          routeSearch={routeSearch}
           onDeletePost={removePost}
           onUpdatePost={updatePost}
           coords={coords}
