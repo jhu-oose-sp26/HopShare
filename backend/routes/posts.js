@@ -32,8 +32,8 @@ function getTodayDateString() {
 }
 
 // In-memory cache for non-archived posts (avoids repeated slow Atlas queries)
-let postsCache = null;       // { data: [...], fetchedAt: timestamp }
-const CACHE_TTL_MS = 30000;  // serve cached data for up to 30 s
+let postsCache = null;
+const CACHE_TTL_MS = 30000;
 
 async function getActivePosts() {
   const now = Date.now();
@@ -74,7 +74,6 @@ async function archivePastRides() {
 async function enrichPostsWithGoogleIds(posts) {
   if (!posts || posts.length === 0) return posts;
 
-  // Collect emails that are missing a googleId
   const emails = [
     ...new Set(
       posts
@@ -104,7 +103,6 @@ async function enrichPostsWithGoogleIds(posts) {
   return posts;
 }
 
-
 // READ ALL POSTS (non-archived only)
 router.get('/', async (req, res) => {
   const t0 = Date.now();
@@ -114,22 +112,19 @@ router.get('/', async (req, res) => {
   const enrichedPosts = await getActivePosts();
   const t2 = Date.now();
 
-  console.log(`[GET /posts] archive=${t1-t0}ms  total=${t2-t0}ms`);
+  console.log(`[GET /posts] archive=${t1 - t0}ms  total=${t2 - t0}ms`);
   res.json(enrichedPosts);
 });
 
 // READ ARCHIVED POSTS
 router.get('/archived', async (req, res) => {
   const posts = await getDB().collection('posts').find({ archived: true }).toArray();
-  
-  // Enrich posts with Google IDs for user navigation
   const enrichedPosts = await enrichPostsWithGoogleIds(posts);
-  
   res.json(enrichedPosts);
 });
 
 // GET ONE POST
-router.get('/:id', async (req, res) => { 
+router.get('/:id', async (req, res) => {
   const postId = toObjectId(req.params.id);
   if (!postId) {
     return res.status(400).json({ error: 'Invalid post id' });
@@ -140,32 +135,28 @@ router.get('/:id', async (req, res) => {
   if (!post) {
     return res.status(404).json({ error: 'Post not found' });
   }
-  
-  // Enrich single post with Google ID for user navigation
+
   const enrichedPosts = await enrichPostsWithGoogleIds([post]);
-  
   res.json(enrichedPosts[0]);
 });
 
 // CREATE
-router.post('/', async (req, res) => { 
+router.post('/', async (req, res) => {
   try {
     const postInfo = req.body || {};
-      // validate the post info
-  if (postInfo.title===null || postInfo.description===null) {
-    return res.status(400).json({ error: 'Title and description are required' });
-  }
+    if (postInfo.title === null || postInfo.description === null) {
+      return res.status(400).json({ error: 'Title and description are required' });
+    }
     const db = getDB();
     const postsCollection = db.collection('posts');
     const tripsCollection = db.collection('trips');
 
     postInfo.confirmationCode = generateConfirmationCode();
-    postInfo.archived = false; // New posts are not archived
+    postInfo.archived = false;
     const postResult = await postsCollection.insertOne(postInfo);
     let tripId = null;
 
     if (postInfo.trip) {
-      // insert the trip and get the tripId
       const tripResult = await tripsCollection.insertOne({
         ...postInfo.trip,
         postId: postResult.insertedId,
@@ -191,11 +182,10 @@ router.post('/', async (req, res) => {
   }
 });
 
-
 // DELETE
-router.delete('/:id', async (req, res) => { 
+router.delete('/:id', async (req, res) => {
   const postId = toObjectId(req.params.id);
-  
+
   if (!postId) {
     return res.status(400).json({ error: 'Invalid post id' });
   }
@@ -204,25 +194,22 @@ router.delete('/:id', async (req, res) => {
   if (postDeleteResult.deletedCount === 0) {
     return res.status(404).json({ error: 'Post not found' });
   }
-  // delete the related trips
   await getDB().collection('trips').deleteMany({ postId });
   invalidatePostsCache();
   res.json({ success: true });
 });
 
 // UPDATE
-router.put('/:id', async (req, res) => { 
+router.put('/:id', async (req, res) => {
   try {
     const postId = toObjectId(req.params.id);
     if (!postId) {
       return res.status(400).json({ error: 'Invalid post id' });
     }
 
-    // get the update data
     const updateData = { ...(req.body || {}) };
     delete updateData._id;
 
-    // If trip.date is updated, check if it should be unarchived
     if (updateData.trip?.date) {
       const today = getTodayDateString();
       if (updateData.trip.date >= today) {
@@ -246,19 +233,14 @@ router.put('/:id', async (req, res) => {
 
     let tripId = null;
 
-    // update the trip
     if (Object.prototype.hasOwnProperty.call(updateData, 'trip')) {
-      // check if trip field has content (not null/empty object)
       const hasTripValue =
-        updateData.trip &&(typeof updateData.trip !== 'object' || Object.keys(updateData.trip).length > 0);
+        updateData.trip && (typeof updateData.trip !== 'object' || Object.keys(updateData.trip).length > 0);
 
-      // create/update trip only when trip has content
       if (hasTripValue) {
-        // get the existing trip by postID
         const existingTrip = await tripsCollection.findOne({ postId });
 
         if (existingTrip) {
-          // update the trip
           await tripsCollection.updateOne(
             { _id: existingTrip._id },
             { $set: { ...updateData.trip, postId } }
@@ -277,7 +259,6 @@ router.put('/:id', async (req, res) => {
           { $set: { tripId } }
         );
       } else {
-        // trip is null/empty object, delete related trip and remove trip fields from post
         await tripsCollection.deleteMany({ postId });
         await postsCollection.updateOne(
           { _id: postId },
@@ -285,7 +266,6 @@ router.put('/:id', async (req, res) => {
         );
       }
     } else {
-      // no trip field in update data, keep the existing tripId
       const post = await postsCollection.findOne(
         { _id: postId },
         { projection: { tripId: 1 } }
@@ -325,7 +305,7 @@ router.post('/:id/join', async (req, res) => {
       { $push: { pendingJoins: email } }
     );
 
-    // Notify the post owner — look up by _id first, fall back to email
+    // Notify the post owner
     const ownerEmail = post.user?.email;
     if (ownerEmail) {
       const ownerUser = await db.collection('users').findOne(
@@ -333,20 +313,34 @@ router.post('/:id/join', async (req, res) => {
         { projection: { _id: 1 } }
       );
       if (ownerUser) {
-        const baseMsg = `${senderName || email} wants to join your rider list for the ride from ${post.trip?.startLocation?.title || 'start'} to ${post.trip?.endLocation?.title || 'destination'}.`;
-        const finalMsg = message?.trim() ? `${baseMsg}\n\nMessage: _${message.trim()}_` : baseMsg;
-        await db.collection('notifications').insertOne({
+        // Check for duplicate notification (same user, same post, within last minute)
+        const recentNotification = await db.collection('notifications').findOne({
           recipientId: ownerUser._id,
-          senderName: senderName || email,
-          senderId: senderId && ObjectId.isValid(senderId) ? new ObjectId(senderId) : null,
-          message: finalMsg,
           postId,
-          replyToMessage: null,
           type: 'join_list',
-          response: null,
-          read: false,
-          createdAt: new Date(),
+          $or: [
+            { senderName: senderName || email },
+            { senderName: email }
+          ],
+          createdAt: { $gte: new Date(Date.now() - 60000) }
         });
+
+        if (!recentNotification) {
+          const baseMsg = `${senderName || email} wants to join your rider list for the ride from ${post.trip?.startLocation?.title || 'start'} to ${post.trip?.endLocation?.title || 'destination'}.`;
+          const finalMsg = message?.trim() ? `${baseMsg}\n\nMessage: _${message.trim()}_` : baseMsg;
+          await db.collection('notifications').insertOne({
+            recipientId: ownerUser._id,
+            senderName: senderName || email,
+            senderId: senderId && ObjectId.isValid(senderId) ? new ObjectId(senderId) : null,
+            message: finalMsg,
+            postId,
+            replyToMessage: null,
+            type: 'join_list',
+            response: null,
+            read: false,
+            createdAt: new Date(),
+          });
+        }
       }
     }
 
@@ -358,7 +352,7 @@ router.post('/:id/join', async (req, res) => {
   }
 });
 
-// TAKE a ride request (driver offers to drive — persisted so it survives refresh)
+// TAKE a ride request
 router.post('/:id/take', async (req, res) => {
   try {
     const postId = toObjectId(req.params.id);
@@ -390,8 +384,7 @@ router.post('/:id/take', async (req, res) => {
   }
 });
 
-
-// REMOVE a member from riderList (offer) or waitlist (request) — owner action
+// REMOVE a member from riderList
 router.post('/:id/remove-member', async (req, res) => {
   try {
     const postId = toObjectId(req.params.id);
@@ -413,14 +406,12 @@ router.post('/:id/remove-member', async (req, res) => {
       { _id: postId },
       { $pull: { riderList: { email: email || null } } }
     );
-    // Also remove any entry that matched on name if email was blank
-    if (!email) {
-      if (name) {
-        await db.collection('posts').updateOne(
-          { _id: postId },
-          { $pull: { riderList: { name } } }
-        );
-      }
+
+    if (!email && name) {
+      await db.collection('posts').updateOne(
+        { _id: postId },
+        { $pull: { riderList: { name } } }
+      );
     }
 
     const updatedPost = await db.collection('posts').findOne({ _id: postId });
@@ -438,7 +429,6 @@ router.post('/:id/remove-member', async (req, res) => {
       ? `${removedDisplayName} left your riding list for ${rideSummary}.`
       : `${removedDisplayName} was removed from your riding list for ${rideSummary} by ${actorDisplayName}.`;
 
-    // Notify all remaining riders and the post owner.
     const recipientEmailSet = new Set(
       remainingRiders
         .map((member) => (typeof member.email === 'string' ? member.email.trim() : ''))
@@ -448,7 +438,6 @@ router.post('/:id/remove-member', async (req, res) => {
       recipientEmailSet.add(post.user.email.trim());
     }
     if (typeof email === 'string' && email.trim()) {
-      // Don't notify the member who just left/was removed.
       recipientEmailSet.delete(email.trim());
     }
 
@@ -456,7 +445,6 @@ router.post('/:id/remove-member', async (req, res) => {
 
     const recipients = [];
     for (const recipientEmail of recipientEmails) {
-      // Use exact match first, then a case-insensitive fallback for inconsistent email casing.
       let user = await db.collection('users').findOne(
         { email: recipientEmail },
         { projection: { _id: 1, email: 1 } }
@@ -504,7 +492,7 @@ router.post('/:id/remove-member', async (req, res) => {
   }
 });
 
-// REMOVE a driver — owner action
+// REMOVE a driver
 router.post('/:id/remove-driver', async (req, res) => {
   try {
     const postId = toObjectId(req.params.id);
