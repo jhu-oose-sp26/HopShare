@@ -1,4 +1,5 @@
 import { Fragment, useState, useEffect, useMemo, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { MessageCircle, ArrowLeft, Info, SquareChevronRight } from 'lucide-react';
 import { io } from 'socket.io-client';
 import { Chat } from '@/components/chat/chat';
@@ -63,6 +64,7 @@ const formatChatTime = (dateString) => {
 };
 
 export default function MessagesPage({ currentUser }) {
+  const navigate = useNavigate();
   // ── Chat list ────────────────────────────────────────────────────────────
   const [chats, setChats] = useState([]);
   const [chatsLoading, setChatsLoading] = useState(true);
@@ -165,8 +167,9 @@ export default function MessagesPage({ currentUser }) {
     const toFetch = [];
 
     uniqueIds.forEach(id => {
-      if (!isCacheExpired(cache[id]) && cache[id]?.user) {
-        initialMap[id] = cache[id].user;
+      const cached = cache[id];
+      if (!isCacheExpired(cached) && cached?.user && 'googleId' in cached.user) {
+        initialMap[id] = cached.user;
       } else {
         toFetch.push(id);
       }
@@ -177,9 +180,13 @@ export default function MessagesPage({ currentUser }) {
 
     Promise.all(toFetch.map(async id => {
       try {
-        const res = await fetch(`${API_ROOT}/profile/${id}`);
+        const isEmail = id.includes('@');
+        const url = isEmail
+          ? `${API_ROOT}/profile/by-email/${encodeURIComponent(id)}`
+          : `${API_ROOT}/profile/${id}`;
+        const res = await fetch(url);
         const data = await res.json();
-        return { id, user: { name: data.user?.name, email: data.user?.email, picture: data.user?.picture || data.user?.avatar } };
+        return { id, user: { name: data.user?.name, email: data.user?.email, picture: data.user?.picture || data.user?.avatar, googleId: data.user?.googleId } };
       } catch { return { id, user: null }; }
     })).then(results => {
       results.forEach(({ id, user }) => { if (user) cache[id] = { user, fetchedAt: Date.now() }; });
@@ -210,6 +217,7 @@ export default function MessagesPage({ currentUser }) {
             avatarUrl: getAvatar(user),
             avatarAlt: user?.name || 'User',
             avatarFallback: (user?.name || 'U').slice(0, 2).toUpperCase(),
+            googleId: user?.googleId || null,
           },
           content: msg.message,
           timestamp: msg.timestamp,
@@ -392,6 +400,7 @@ export default function MessagesPage({ currentUser }) {
                           senderName={msg.sender.name}
                           content={msg.content}
                           timestamp={msg.timestamp}
+                          onAvatarClick={msg.sender.googleId ? () => navigate(`/user/${msg.sender.googleId}`) : undefined}
                         />
                         <DateItem timestamp={msg.timestamp} className="my-4" />
                       </Fragment>
@@ -412,6 +421,7 @@ export default function MessagesPage({ currentUser }) {
                       senderName={msg.sender.name}
                       content={msg.content}
                       timestamp={msg.timestamp}
+                      onAvatarClick={msg.sender.googleId ? () => navigate(`/user/${msg.sender.googleId}`) : undefined}
                     />
                   );
                 })
