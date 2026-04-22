@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { MapContainer, TileLayer, Marker, Polyline, Circle, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -82,7 +82,6 @@ function AutoFitAfterSearch({ routeSearch, rides }) {
   const searchStartLng = Number(routeSearch?.start?.longitude);
   const searchEndLat = Number(routeSearch?.end?.latitude);
   const searchEndLng = Number(routeSearch?.end?.longitude);
-  const radiusKm = Number(routeSearch?.radiusKm);
 
   const hasSearchPoints =
     Number.isFinite(searchStartLat)
@@ -95,24 +94,18 @@ function AutoFitAfterSearch({ routeSearch, rides }) {
     ? `${searchStartLat}|${searchStartLng}|${searchEndLat}|${searchEndLng}|${radiusKm}|${rideIdSignature}`
     : null;
 
-  if (!hasSearchPoints || !searchSignature || lastAppliedKeyRef.current === searchSignature) {
-    return null;
-  }
+  useEffect(() => {
+    if (!hasSearchPoints || !searchSignature || lastAppliedKeyRef.current === searchSignature) {
+      return;
+    }
 
-  // Delay until map has this render's layers, then fit once for this search signature.
-  requestAnimationFrame(() => {
     try {
-      const bounds = L.latLngBounds([
+      const points = [
         [searchStartLat, searchStartLng],
         [searchEndLat, searchEndLng],
-      ]);
+      ];
 
-      if (radiusKm > 0) {
-        const radiusMeters = radiusKm * 1000;
-        bounds.extend(L.circle([searchStartLat, searchStartLng], { radius: radiusMeters }).getBounds());
-        bounds.extend(L.circle([searchEndLat, searchEndLng], { radius: radiusMeters }).getBounds());
-      }
-
+      // Fit to satisfied route pins/endpoints so routes remain legible.
       rides.forEach((post) => {
         const start = post?.trip?.startLocation?.gps_coordinates;
         const end = post?.trip?.endLocation?.gps_coordinates;
@@ -122,17 +115,18 @@ function AutoFitAfterSearch({ routeSearch, rides }) {
         const endLng = Number(end?.longitude);
 
         if (Number.isFinite(startLat) && Number.isFinite(startLng)) {
-          bounds.extend([startLat, startLng]);
+          points.push([startLat, startLng]);
         }
         if (Number.isFinite(endLat) && Number.isFinite(endLng)) {
-          bounds.extend([endLat, endLng]);
+          points.push([endLat, endLng]);
         }
       });
 
+      const bounds = L.latLngBounds(points);
       if (bounds.isValid()) {
         map.fitBounds(bounds, {
-          padding: [40, 40],
-          maxZoom: 12,
+          padding: [72, 72],
+          maxZoom: 14,
           animate: true,
         });
       }
@@ -141,7 +135,16 @@ function AutoFitAfterSearch({ routeSearch, rides }) {
     } catch {
       // Ignore map fit failures to avoid breaking map rendering.
     }
-  });
+  }, [
+    hasSearchPoints,
+    map,
+    searchSignature,
+    searchStartLat,
+    searchStartLng,
+    searchEndLat,
+    searchEndLng,
+    rides,
+  ]);
 
   return null;
 }
