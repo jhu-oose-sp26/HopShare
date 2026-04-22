@@ -26,6 +26,21 @@ import { HoverCard, HoverCardTrigger, HoverCardContent } from '@/components/ui/h
 const inputBase =
     'flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50';
 
+const getTodayDateString = () => {
+    const today = new Date();
+    return format(today, 'yyyy-MM-dd');
+};
+
+const isPastDateString = (dateString) => {
+    if (!dateString) return false;
+    return dateString < getTodayDateString();
+};
+
+const toFiniteCoord = (value) => {
+    const num = Number(value);
+    return Number.isFinite(num) ? num : null;
+};
+
 function SubmitBox({ onSubmit, coords, initialData = null, isEdit = false }) {
     const [name, setName] = useState(initialData?.name ?? '');
     const [email, setEmail] = useState(initialData?.email ?? '');
@@ -63,6 +78,17 @@ function SubmitBox({ onSubmit, coords, initialData = null, isEdit = false }) {
         setIsSubmitting(false);
     }, [initialData]);
 
+    useEffect(() => {
+        if (date && isPastDateString(date)) {
+            setSubmitError('You cannot input a past date.');
+            return;
+        }
+
+        if (submitError === 'You cannot input a past date.') {
+            setSubmitError('');
+        }
+    }, [date, submitError]);
+
     const handleStartChange = (nextValue) => {
         setStartTitle(nextValue);
         setStartLatitude('');
@@ -85,15 +111,6 @@ function SubmitBox({ onSubmit, coords, initialData = null, isEdit = false }) {
             return;
         }
 
-        // Validation: prevent past-dated rides
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        const selectedDate = parse(date, 'yyyy-MM-dd', new Date());
-        if (selectedDate < today) {
-            setSubmitError('Ride date cannot be in the past. Please select today or a future date.');
-            return;
-        }
-
         // Validation: ensure title and description are not empty
         if (!startTitle || !startTitle.trim()) {
             setSubmitError('Please select a start location.');
@@ -103,6 +120,29 @@ function SubmitBox({ onSubmit, coords, initialData = null, isEdit = false }) {
             setSubmitError('Please select an end location.');
             return;
         }
+
+        // Validation: require selecting suggestions (or current location) with coordinates
+        const startLat = toFiniteCoord(startLatitude);
+        const startLng = toFiniteCoord(startLongitude);
+        const endLat = toFiniteCoord(endLatitude);
+        const endLng = toFiniteCoord(endLongitude);
+
+        if (
+            startLat === null ||
+            startLng === null ||
+            endLat === null ||
+            endLng === null
+        ) {
+            setSubmitError('Please select start and end from location suggestions.');
+            return;
+        }
+
+        // Validation: block same start/end route
+        if (Math.abs(startLat - endLat) < 1e-7 && Math.abs(startLng - endLng) < 1e-7) {
+            setSubmitError('Start and end locations cannot be the same.');
+            return;
+        }
+
         if (!description || !description.trim()) {
             setSubmitError('Please enter a description.');
             return;
@@ -332,8 +372,16 @@ function SubmitBox({ onSubmit, coords, initialData = null, isEdit = false }) {
                                         mode='single'
                                         selected={date ? parse(date,'yyyy-MM-dd', new Date()): undefined}
                                         onSelect={(selected) => {
-                                            if (selected) setDate(format(selected, 'yyyy-MM-dd'));
+                                            if (!selected) return;
+                                            const selectedDate = format(selected, 'yyyy-MM-dd');
+                                            if (isPastDateString(selectedDate)) {
+                                                setSubmitError('You cannot input a past date.');
+                                                return;
+                                            }
+                                            setSubmitError('');
+                                            setDate(selectedDate);
                                         }}
+                                        disabled={(day) => day < new Date(new Date().setHours(0, 0, 0, 0))}
                                         numberOfWeeks={7}
                                     />
                                 </div>
