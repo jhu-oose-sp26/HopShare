@@ -306,7 +306,7 @@ router.post('/:id/join', async (req, res) => {
     const postId = toObjectId(req.params.id);
     if (!postId) return res.status(400).json({ error: 'Invalid post id' });
 
-    const { email } = req.body;
+    const { email, senderName, senderId, message } = req.body;
     if (!email) return res.status(400).json({ error: 'User email required' });
 
     const db = getDB();
@@ -328,6 +328,31 @@ router.post('/:id/join', async (req, res) => {
       { _id: postId },
       { $push: { pendingJoins: email } }
     );
+
+    // Notify the post owner — look up by _id first, fall back to email
+    const ownerEmail = post.user?.email;
+    if (ownerEmail) {
+      const ownerUser = await db.collection('users').findOne(
+        { email: { $regex: `^${ownerEmail.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, $options: 'i' } },
+        { projection: { _id: 1 } }
+      );
+      if (ownerUser) {
+        const baseMsg = `${senderName || email} wants to join your rider list for the ride from ${post.trip?.startLocation?.title || 'start'} to ${post.trip?.endLocation?.title || 'destination'}.`;
+        const finalMsg = message?.trim() ? `${baseMsg}\n\nMessage: _${message.trim()}_` : baseMsg;
+        await db.collection('notifications').insertOne({
+          recipientId: ownerUser._id,
+          senderName: senderName || email,
+          senderId: senderId && ObjectId.isValid(senderId) ? new ObjectId(senderId) : null,
+          message: finalMsg,
+          postId,
+          replyToMessage: null,
+          type: 'join_list',
+          response: null,
+          read: false,
+          createdAt: new Date(),
+        });
+      }
+    }
 
     invalidatePostsCache();
     res.json({ success: true });

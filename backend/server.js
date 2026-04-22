@@ -12,6 +12,7 @@ const profileRoutes = require('./routes/profile');
 const notificationsRoutes = require('./routes/notifications');
 const weatherRoutes = require('./routes/weather');
 const chatRoutes = require('./routes/chat');
+const friendsRouter = require('./routes/friends');
 
 const app = express();
 const PORT = 3000;
@@ -26,6 +27,7 @@ app.use('/profile', profileRoutes);
 app.use('/notifications', notificationsRoutes);
 app.use('/weather', weatherRoutes);
 app.use('/chat', chatRoutes);
+app.use('/friends', friendsRouter);
 
 // Return JSON for body-size errors so frontend does not receive HTML pages.
 app.use((err, req, res, next) => {

@@ -68,19 +68,22 @@ const PostList = ({
                         ) : null}
                         <button
                             onClick={() => setDateOrder(o => o === 'asc' ? 'desc' : 'asc')}
-                            className="px-2 py-1 rounded border border-gray-300 text-gray-600 hover:text-gray-800 hover:border-gray-500"
+                            className={`px-2 py-1 rounded border text-sm font-medium transition-colors ${dateOrder === 'asc' ? 'border-blue-400 text-blue-600 bg-blue-50' : 'border-orange-400 text-orange-600 bg-orange-50'}`}
                         >
                             Date {dateOrder === 'asc' ? '↑' : '↓'}
                         </button>
                         <button
                             onClick={() => setTimeOrder(o => o === 'asc' ? 'desc' : 'asc')}
-                            className="px-2 py-1 rounded border border-gray-300 text-gray-600 hover:text-gray-800 hover:border-gray-500"
+                            className={`px-2 py-1 rounded border text-sm font-medium transition-colors ${timeOrder === 'asc' ? 'border-blue-400 text-blue-600 bg-blue-50' : 'border-orange-400 text-orange-600 bg-orange-50'}`}
                         >
                             Time {timeOrder === 'asc' ? '↑' : '↓'}
                         </button>
                     </div>
                 </div>
 
+                <p className="text-xs text-gray-400 mb-1">
+                    Sorted by date {dateOrder === 'asc' ? 'ascending' : 'descending'}, then time {timeOrder === 'asc' ? 'ascending' : 'descending'}
+                </p>
                 <p className="text-gray-600">
                     {subheading ||
                         (isLoading
