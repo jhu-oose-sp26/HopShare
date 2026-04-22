@@ -263,6 +263,7 @@ function HomePage({ currentUser, onLogout }) {
           posts={myPosts}
           isLoading={isLoading}
           error={error}
+          routeSearch={routeSearch}
           onDeletePost={removePost}
           onUpdatePost={updatePost}
           coords={coords}
@@ -278,7 +279,14 @@ function HomePage({ currentUser, onLogout }) {
         />
       )}
       {activeView === 'map' && (
-        <RidesMapView posts={visiblePosts} currentUser={currentUser} coords={coords} onDeletePost={removePost} onUpdatePost={updatePost} />
+        <RidesMapView
+          posts={visiblePosts}
+          currentUser={currentUser}
+          coords={coords}
+          routeSearch={routeSearch}
+          onDeletePost={removePost}
+          onUpdatePost={updatePost}
+        />
       )}
     </div>
   );
