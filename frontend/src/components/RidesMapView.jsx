@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { MapContainer, TileLayer, Marker, Polyline } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Polyline, Circle } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { format, parse } from 'date-fns';
@@ -76,7 +76,7 @@ function makeArrow(color, deg) {
 
 
 
-function RidesMapView({ posts, currentUser, coords, onDeletePost, onUpdatePost }) {
+function RidesMapView({ posts, currentUser, coords, routeSearch, onDeletePost, onUpdatePost }) {
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
   const [fromOpen, setFromOpen] = useState(false);
@@ -101,11 +101,26 @@ function RidesMapView({ posts, currentUser, coords, onDeletePost, onUpdatePost }
     [p.trip.endLocation.gps_coordinates.latitude,   p.trip.endLocation.gps_coordinates.longitude],
   ]);
 
-  const center = coords
-    ? [coords.lat, coords.lng]
-    : allPoints.length > 0
-      ? [allPoints[0][0], allPoints[0][1]]
-      : [39.3289, -76.6205]; // JHU Homewood campus fallback
+  const searchStart = routeSearch?.start
+    ? [Number(routeSearch.start.latitude), Number(routeSearch.start.longitude)]
+    : null;
+  const searchEnd = routeSearch?.end
+    ? [Number(routeSearch.end.latitude), Number(routeSearch.end.longitude)]
+    : null;
+  const searchRadiusMeters = Number(routeSearch?.radiusKm) > 0
+    ? Number(routeSearch.radiusKm) * 1000
+    : null;
+
+  const center = searchStart && searchEnd
+    ? [
+      (searchStart[0] + searchEnd[0]) / 2,
+      (searchStart[1] + searchEnd[1]) / 2,
+    ]
+    : coords
+      ? [coords.lat, coords.lng]
+      : allPoints.length > 0
+        ? [allPoints[0][0], allPoints[0][1]]
+        : [39.3289, -76.6205]; // JHU Homewood campus fallback
   const initialZoom = coords ? 9 : 11; // zoom 9 ≈ 100 km radius
 
   return (
@@ -198,6 +213,28 @@ function RidesMapView({ posts, currentUser, coords, onDeletePost, onUpdatePost }
               attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
               url='https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'
             />
+
+            {/* Route-search overlay for map tab filter context */}
+            {searchStart && searchRadiusMeters ? (
+              <>
+                <Marker position={searchStart} icon={START_ICON} />
+                <Circle
+                  center={searchStart}
+                  radius={searchRadiusMeters}
+                  pathOptions={{ color: '#16a34a', fillColor: '#16a34a', fillOpacity: 0.08, weight: 2 }}
+                />
+              </>
+            ) : null}
+            {searchEnd && searchRadiusMeters ? (
+              <>
+                <Marker position={searchEnd} icon={END_ICON} />
+                <Circle
+                  center={searchEnd}
+                  radius={searchRadiusMeters}
+                  pathOptions={{ color: '#dc2626', fillColor: '#dc2626', fillOpacity: 0.08, weight: 2 }}
+                />
+              </>
+            ) : null}
 
             {rides.map((post, idx) => {
               const start = post.trip.startLocation.gps_coordinates;
