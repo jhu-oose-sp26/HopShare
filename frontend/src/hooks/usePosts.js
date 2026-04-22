@@ -241,12 +241,8 @@ export const usePosts = (currentUser = null) => {
         if (!response.ok) {
             throw new Error(await readErrorMessage(response));
         }
-
-        setPosts((prevPosts) =>
-            prevPosts.filter((post) => String(post._id) !== String(postId))
-        );
-        setLastUpdatedAt(new Date().toISOString());
-    }, [currentUser?.email]);
+        // Change Stream will broadcast to all clients
+    }, []);
 
     const updatePost = useCallback(async (postId, formData) => {
         const postPayload = createPostPayload(formData);
@@ -264,17 +260,8 @@ export const usePosts = (currentUser = null) => {
         if (!response.ok) {
             throw new Error(await readErrorMessage(response));
         }
-
-        // Update local state with the new data
-        setPosts((prevPosts) =>
-            prevPosts.map((post) =>
-                String(post._id) === String(postId)
-                    ? { ...post, ...postPayload }
-                    : post
-            )
-        );
-        setLastUpdatedAt(new Date().toISOString());
-    }, [currentUser?.email]);
+        // Change Stream will broadcast to all clients
+    }, []);
 
     return {
         posts,
