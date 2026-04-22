@@ -117,7 +117,7 @@ router.post('/:chatId/messages', async (req, res) => {
       return res.status(404).json({ error: 'Chat not found' });
     }
 
-    req.app.get('io').to(req.params.chatId).emit('newMessage', newMessage);
+    req.app.get('io').to(req.params.chatId).emit('newMessage', { ...newMessage, chatId: req.params.chatId });
 
     res.status(201).json(newMessage);
   } catch (error) {
@@ -172,6 +172,39 @@ router.get('/user/:email', async (req, res) => {
         updatedAt: chat.updatedAt || chat.createdAt
       };
     });
+
+    // Enrich lastMessage with sender's display name
+    // sender may be stored as email OR MongoDB ObjectId string
+    const senderValues = [...new Set(
+      formattedChats.filter(c => c.lastMessage?.sender).map(c => c.lastMessage.sender)
+    )];
+    if (senderValues.length > 0) {
+      const emailSenders = senderValues.filter(s => s.includes('@'));
+      const idSenders = senderValues.filter(s => !s.includes('@') && ObjectId.isValid(s));
+
+      const orClauses = [];
+      if (emailSenders.length > 0) orClauses.push({ email: { $in: emailSenders } });
+      if (idSenders.length > 0) orClauses.push({ _id: { $in: idSenders.map(id => new ObjectId(id)) } });
+
+      const senderUsers = orClauses.length > 0
+        ? await db.collection('users')
+            .find({ $or: orClauses }, { projection: { _id: 1, email: 1, name: 1 } })
+            .toArray()
+        : [];
+
+      const nameByKey = {};
+      for (const u of senderUsers) {
+        if (u.email) nameByKey[u.email.toLowerCase()] = u.name;
+        nameByKey[u._id.toString()] = u.name;
+      }
+
+      for (const chat of formattedChats) {
+        const s = chat.lastMessage?.sender;
+        if (s) {
+          chat.lastMessage.senderName = nameByKey[s.toLowerCase()] || nameByKey[s] || null;
+        }
+      }
+    }
 
     // Sort by most recently updated
     formattedChats.sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));

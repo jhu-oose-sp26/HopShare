@@ -182,10 +182,12 @@ connectDB().then(() => {
 io.on("connection", (socket) => {
   console.log("User connected:", socket.id);
 
-  // join a chat room
   socket.on("joinChat", (chatId) => {
     socket.join(chatId);
-    console.log(`Joined room: ${chatId}`);
+  });
+
+  socket.on("leaveChat", (chatId) => {
+    socket.leave(chatId);
   });
 
   socket.on("disconnect", () => {
