@@ -78,8 +78,40 @@ function SubmitBox({ onSubmit, coords, initialData = null, isEdit = false }) {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
+        
+        // Validation: date is required
         if (!date) {
             setSubmitError('Please select a date.');
+            return;
+        }
+
+        // Validation: prevent past-dated rides
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const selectedDate = parse(date, 'yyyy-MM-dd', new Date());
+        if (selectedDate < today) {
+            setSubmitError('Ride date cannot be in the past. Please select today or a future date.');
+            return;
+        }
+
+        // Validation: ensure title and description are not empty
+        if (!startTitle || !startTitle.trim()) {
+            setSubmitError('Please select a start location.');
+            return;
+        }
+        if (!endTitle || !endTitle.trim()) {
+            setSubmitError('Please select an end location.');
+            return;
+        }
+        if (!description || !description.trim()) {
+            setSubmitError('Please enter a description.');
+            return;
+        }
+
+        // Validation: check for XSS patterns (basic check)
+        const xssPatterns = /<script|javascript:|on\w+\s*=/i;
+        if (xssPatterns.test(description) || xssPatterns.test(startTitle) || xssPatterns.test(endTitle)) {
+            setSubmitError('Invalid characters in input. Please avoid HTML tags or scripts.');
             return;
         }
 
