@@ -117,6 +117,10 @@ router.patch('/:id/respond', async (req, res) => {
       const senderEmail = senderUser?.email;
       if (senderEmail) {
         if (response === 'accepted') {
+          const post = await db.collection('posts').findOne({ _id: notif.postId });
+          if (post?.maxRiders != null && (post.riderList?.length ?? 0) >= post.maxRiders) {
+            return res.status(400).json({ error: 'This ride is already full.' });
+          }
           await db.collection('posts').updateOne(
             { _id: notif.postId },
             {
@@ -166,6 +170,52 @@ router.patch('/:id/respond', async (req, res) => {
           );
         }
       }
+    }
+
+    // Handle friend_request approval/decline
+    if (notif.type === 'friend_request' && notif.senderId) {
+      const requesterId = notif.senderId.toString();
+      const accepterId = notif.recipientId.toString();
+      const responderUser = await db.collection('users').findOne({ _id: notif.recipientId });
+
+      if (response === 'accepted') {
+        // Mutually add friends
+        const friends = db.collection('friends');
+        await friends.updateOne(
+          { userId: accepterId },
+          { $addToSet: { friendIds: requesterId }, $set: { updatedAt: new Date() }, $setOnInsert: { createdAt: new Date() } },
+          { upsert: true }
+        );
+        await friends.updateOne(
+          { userId: requesterId },
+          { $addToSet: { friendIds: accepterId }, $set: { updatedAt: new Date() }, $setOnInsert: { createdAt: new Date() } },
+          { upsert: true }
+        );
+        // Delete the pending friendRequest doc
+        await db.collection('friendRequests').deleteOne({ senderId: requesterId, receiverId: accepterId, status: 'pending' });
+
+        await db.collection('notifications').insertOne({
+          recipientId: notif.senderId,
+          senderId: notif.recipientId,
+          senderName: responderUser?.name || responderName || 'Someone',
+          message: `${responderUser?.name || responderName || 'Someone'} accepted your friend request!`,
+          type: 'friend_request_response',
+          postId: null, replyToMessage: null, response: null, read: false, createdAt: new Date(),
+        });
+      } else {
+        await db.collection('friendRequests').deleteOne({ senderId: requesterId, receiverId: accepterId, status: 'pending' });
+
+        await db.collection('notifications').insertOne({
+          recipientId: notif.senderId,
+          senderId: notif.recipientId,
+          senderName: responderUser?.name || responderName || 'Someone',
+          message: `${responderUser?.name || responderName || 'Someone'} declined your friend request.`,
+          type: 'friend_request_response',
+          postId: null, replyToMessage: null, response: null, read: false, createdAt: new Date(),
+        });
+      }
+
+      return res.json({ success: true });
     }
 
     // Send reply notification back to the original requester

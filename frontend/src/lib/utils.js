@@ -90,13 +90,15 @@ export function filterPostsByRouteRadius(posts, route, radiusKm) {
                 postEnd.longitude
             );
 
-            // The route matches only when both start and end are within radius.
+            // A route is a match only when both endpoints are within the selected radius.
             if (startDistanceKm > maxDistanceKm || endDistanceKm > maxDistanceKm) {
                 return null;
             }
 
             return {
                 post,
+                startDistanceKm,
+                endDistanceKm,
                 maxEndpointDistanceKm: Math.max(startDistanceKm, endDistanceKm),
             };
         })
