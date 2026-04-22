@@ -69,7 +69,7 @@ async function readErrorMessage(response) {
     return `Request failed (${response.status})`;
 }
 
-export const usePosts = () => {
+export const usePosts = (currentUser = null) => {
     const [posts, setPosts] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isRefreshing, setIsRefreshing] = useState(false);
@@ -179,6 +179,12 @@ export const usePosts = () => {
     const removePost = useCallback(async (postId) => {
         const response = await fetch(`${POSTS_ENDPOINT}/${postId}`, {
             method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                userEmail: currentUser?.email || '',
+            }),
         });
 
         if (!response.ok) {
@@ -189,7 +195,7 @@ export const usePosts = () => {
             prevPosts.filter((post) => String(post._id) !== String(postId))
         );
         setLastUpdatedAt(new Date().toISOString());
-    }, []);
+    }, [currentUser?.email]);
 
     const updatePost = useCallback(async (postId, formData) => {
         const postPayload = createPostPayload(formData);
@@ -198,7 +204,10 @@ export const usePosts = () => {
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify(postPayload),
+            body: JSON.stringify({
+                ...postPayload,
+                userEmail: currentUser?.email || '',
+            }),
         });
 
         if (!response.ok) {
@@ -214,7 +223,7 @@ export const usePosts = () => {
             )
         );
         setLastUpdatedAt(new Date().toISOString());
-    }, []);
+    }, [currentUser?.email]);
 
     return {
         posts,
