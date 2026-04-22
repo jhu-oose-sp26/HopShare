@@ -141,17 +141,19 @@ function NotificationMenu({ currentUser }) {
                 : notif.type;
 
               const typeStyles = {
-                join_list:            { bg: 'bg-purple-50 border-purple-200', badge: 'bg-purple-100 text-purple-700', label: 'Joined List' },
-                ride_request:         { bg: 'bg-blue-50 border-blue-200',     badge: 'bg-blue-100 text-blue-700',     label: 'Ride Request' },
-                ride_request_response:{ bg: 'bg-gray-50 border-gray-200',     badge: notif.message?.includes('accepted') ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700', label: notif.message?.includes('accepted') ? 'Accepted' : 'Declined' },
-                left_list:            { bg: 'bg-red-50 border-red-200',       badge: 'bg-red-100 text-red-700',       label: 'Left List' },
-                message:              { bg: 'bg-gray-50 border-gray-200',     badge: 'bg-gray-100 text-gray-600',     label: 'Message' },
+                join_list:              { bg: 'bg-purple-50 border-purple-200', badge: 'bg-purple-100 text-purple-700',                                                                                     label: 'Joined List' },
+                ride_request:           { bg: 'bg-blue-50 border-blue-200',     badge: 'bg-blue-100 text-blue-700',                                                                                         label: 'Ride Request' },
+                ride_request_response:  { bg: 'bg-gray-50 border-gray-200',     badge: notif.message?.includes('accepted') ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700',                    label: notif.message?.includes('accepted') ? 'Accepted' : 'Declined' },
+                friend_request:         { bg: 'bg-yellow-50 border-yellow-200', badge: 'bg-yellow-100 text-yellow-700',                                                                                     label: 'Friend Request' },
+                friend_request_response:{ bg: 'bg-gray-50 border-gray-200',     badge: notif.message?.includes('accepted') ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700',                    label: notif.message?.includes('accepted') ? 'Accepted' : 'Declined' },
+                left_list:              { bg: 'bg-red-50 border-red-200',       badge: 'bg-red-100 text-red-700',                                                                                           label: 'Left List' },
+                message:                { bg: 'bg-gray-50 border-gray-200',     badge: 'bg-gray-100 text-gray-600',                                                                                         label: 'Message' },
               };
               const style = typeStyles[displayType] || typeStyles.message;
-              const actionableTypes = ['ride_request', 'join_list'];
+              const actionableTypes = ['ride_request', 'join_list', 'friend_request'];
               const isActionable = actionableTypes.includes(notif.type) && !notif.response;
               const hasResponded = actionableTypes.includes(notif.type) && notif.response;
-              const canReply = !actionableTypes.includes(notif.type);
+              const canReply = !actionableTypes.includes(notif.type) && notif.type !== 'friend_request_response';
 
               return (
                 <div

@@ -2,6 +2,21 @@ const express = require('express');
 const { getDB } = require('../db');
 const { ObjectId } = require('mongodb');
 
+async function sendNotification(db, { recipientId, senderId, senderName, message, type }) {
+  await db.collection('notifications').insertOne({
+    recipientId: new ObjectId(recipientId),
+    senderId: senderId ? new ObjectId(senderId) : null,
+    senderName: senderName || 'Someone',
+    message,
+    type,
+    postId: null,
+    replyToMessage: null,
+    response: null,
+    read: false,
+    createdAt: new Date(),
+  });
+}
+
 const router = express.Router();
 
 // Helper to get or create friends document for a user
@@ -91,15 +106,31 @@ router.post('/:userId/add', async (req, res) => {
 
     const requests = getDB().collection('friendRequests');
 
-    // Check for existing pending request in either direction
-    const existing = await requests.findOne({
-      $or: [
-        { senderId: userId, receiverId: friendId },
-        { senderId: friendId, receiverId: userId },
-      ],
-      status: 'pending',
+    // If the other person already sent us a request, auto-accept it
+    const theirRequest = await requests.findOne({
+      senderId: friendId, receiverId: userId, status: 'pending',
     });
-    if (existing) {
+    if (theirRequest) {
+      const friends = getDB().collection('friends');
+      await friends.updateOne(
+        { userId: userId },
+        { $addToSet: { friendIds: friendId }, $set: { updatedAt: new Date() }, $setOnInsert: { createdAt: new Date() } },
+        { upsert: true }
+      );
+      await friends.updateOne(
+        { userId: friendId },
+        { $addToSet: { friendIds: userId }, $set: { updatedAt: new Date() }, $setOnInsert: { createdAt: new Date() } },
+        { upsert: true }
+      );
+      await requests.deleteOne({ _id: theirRequest._id });
+      return res.json({ success: true, status: 'accepted' });
+    }
+
+    // Check for a request we already sent
+    const ourRequest = await requests.findOne({
+      senderId: userId, receiverId: friendId, status: 'pending',
+    });
+    if (ourRequest) {
       return res.status(409).json({ error: 'Friend request already pending' });
     }
 
@@ -108,6 +139,18 @@ router.post('/:userId/add', async (req, res) => {
       receiverId: friendId,
       status: 'pending',
       createdAt: new Date(),
+    });
+
+    const senderUser = await getDB().collection('users').findOne(
+      { _id: new ObjectId(userId) },
+      { projection: { name: 1 } }
+    );
+    await sendNotification(getDB(), {
+      recipientId: friendId,
+      senderId: userId,
+      senderName: senderUser?.name || 'Someone',
+      message: `${senderUser?.name || 'Someone'} sent you a friend request.`,
+      type: 'friend_request',
     });
 
     return res.json({ success: true, status: 'pending' });
@@ -206,10 +249,18 @@ router.post('/:userId/requests/:requestId/accept', async (req, res) => {
     await requests.deleteOne({ _id: new ObjectId(requestId) });
 
     const users = getDB().collection('users');
-    const senderUser = await users.findOne(
-      { _id: new ObjectId(senderId) },
-      { projection: { _id: 1, googleId: 1, name: 1, email: 1, picture: 1, avatar: 1, major: 1 } }
-    );
+    const [senderUser, receiverUser] = await Promise.all([
+      users.findOne({ _id: new ObjectId(senderId) }, { projection: { _id: 1, googleId: 1, name: 1, email: 1, picture: 1, avatar: 1, major: 1 } }),
+      users.findOne({ _id: new ObjectId(userId) }, { projection: { name: 1 } }),
+    ]);
+
+    await sendNotification(getDB(), {
+      recipientId: senderId,
+      senderId: userId,
+      senderName: receiverUser?.name || 'Someone',
+      message: `${receiverUser?.name || 'Someone'} accepted your friend request!`,
+      type: 'friend_request_response',
+    });
 
     return res.json({ success: true, friend: senderUser });
   } catch (error) {
@@ -228,11 +279,26 @@ router.post('/:userId/requests/:requestId/reject', async (req, res) => {
     }
 
     const requests = getDB().collection('friendRequests');
-    const result = await requests.deleteOne({ _id: new ObjectId(requestId), receiverId: userId, status: 'pending' });
+    const request = await requests.findOne({ _id: new ObjectId(requestId), receiverId: userId, status: 'pending' });
 
-    if (result.deletedCount === 0) {
+    if (!request) {
       return res.status(404).json({ error: 'Request not found' });
     }
+
+    await requests.deleteOne({ _id: new ObjectId(requestId) });
+
+    const rejecter = await getDB().collection('users').findOne(
+      { _id: new ObjectId(userId) },
+      { projection: { name: 1 } }
+    );
+
+    await sendNotification(getDB(), {
+      recipientId: request.senderId,
+      senderId: userId,
+      senderName: rejecter?.name || 'Someone',
+      message: `${rejecter?.name || 'Someone'} declined your friend request.`,
+      type: 'friend_request_response',
+    });
 
     return res.json({ success: true });
   } catch (error) {
