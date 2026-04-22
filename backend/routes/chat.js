@@ -3,6 +3,34 @@ const router = express.Router();
 const { getDB } = require('../db');
 const { ObjectId } = require('mongodb');
 
+// Validation helpers
+function sanitizeString(str, fieldName = 'input', maxLength = 5000) {
+  if (typeof str !== 'string') {
+    throw new Error(`${fieldName} must be a string`);
+  }
+  
+  // Remove potential XSS vectors
+  const sanitized = str
+    .replace(/<script[^>]*>.*?<\/script>/gi, '')
+    .replace(/<iframe[^>]*>.*?<\/iframe>/gi, '')
+    .replace(/on\w+\s*=/gi, '')
+    .trim();
+  
+  if (sanitized.length > maxLength) {
+    throw new Error(`${fieldName} exceeds maximum length of ${maxLength} characters`);
+  }
+  
+  return sanitized;
+}
+
+function validateEmail(email) {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!email || typeof email !== 'string' || !emailRegex.test(email.trim())) {
+    throw new Error('Invalid email format');
+  }
+  return email.trim().toLowerCase();
+}
+
 // Get or create chat for a post
 router.get('/:postId', async (req, res) => {
   try {
@@ -37,14 +65,31 @@ router.get('/:postId', async (req, res) => {
   }
 });
 
-// Add message to chat
+// Add message to chat - validate sender and message, prevent self-messaging
 router.post('/:chatId/messages', async (req, res) => {
   try {
     const { chatId } = req.params;
-    const { sender, message } = req.body;
+    let { sender, message, recipientEmail } = req.body;
 
     if (!sender || !message) {
       return res.status(400).json({ error: 'Sender and message are required' });
+    }
+
+    // Validate and sanitize input
+    try {
+      sender = validateEmail(sender);
+      message = sanitizeString(message, 'Message', 10000);
+      
+      if (recipientEmail) {
+        recipientEmail = validateEmail(recipientEmail);
+      }
+    } catch (validationError) {
+      return res.status(400).json({ error: validationError.message });
+    }
+
+    // PREVENT SELF-MESSAGING: user cannot message themselves
+    if (recipientEmail && sender === recipientEmail) {
+      return res.status(400).json({ error: 'You cannot message yourself' });
     }
 
     const db = getDB();
@@ -77,7 +122,7 @@ router.post('/:chatId/messages', async (req, res) => {
     res.status(201).json(newMessage);
   } catch (error) {
     console.error('Error adding message:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: error.message || 'Internal server error' });
   }
 });
 
