@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { MapContainer, TileLayer, Marker, Polyline } from 'react-leaflet';
+import { useEffect, useRef, useState } from 'react';
+import { MapContainer, TileLayer, Marker, Polyline, Circle, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { format, parse } from 'date-fns';
@@ -74,9 +74,85 @@ function makeArrow(color, deg) {
   });
 }
 
+function AutoFitAfterSearch({ routeSearch, rides }) {
+  const map = useMap();
+  const lastAppliedKeyRef = useRef(null);
+
+  const searchStartLat = Number(routeSearch?.start?.latitude);
+  const searchStartLng = Number(routeSearch?.start?.longitude);
+  const searchEndLat = Number(routeSearch?.end?.latitude);
+  const searchEndLng = Number(routeSearch?.end?.longitude);
+  const searchRadiusKm = Number(routeSearch?.radiusKm);
+
+  const hasSearchPoints =
+    Number.isFinite(searchStartLat)
+    && Number.isFinite(searchStartLng)
+    && Number.isFinite(searchEndLat)
+    && Number.isFinite(searchEndLng);
+
+  const rideIdSignature = rides.map((ride) => String(ride._id)).join(',');
+  const searchSignature = hasSearchPoints
+    ? `${searchStartLat}|${searchStartLng}|${searchEndLat}|${searchEndLng}|${searchRadiusKm}|${rideIdSignature}`
+    : null;
+
+  useEffect(() => {
+    if (!hasSearchPoints || !searchSignature || lastAppliedKeyRef.current === searchSignature) {
+      return;
+    }
+
+    try {
+      const points = [
+        [searchStartLat, searchStartLng],
+        [searchEndLat, searchEndLng],
+      ];
+
+      // Fit to satisfied route pins/endpoints so routes remain legible.
+      rides.forEach((post) => {
+        const start = post?.trip?.startLocation?.gps_coordinates;
+        const end = post?.trip?.endLocation?.gps_coordinates;
+        const startLat = Number(start?.latitude);
+        const startLng = Number(start?.longitude);
+        const endLat = Number(end?.latitude);
+        const endLng = Number(end?.longitude);
+
+        if (Number.isFinite(startLat) && Number.isFinite(startLng)) {
+          points.push([startLat, startLng]);
+        }
+        if (Number.isFinite(endLat) && Number.isFinite(endLng)) {
+          points.push([endLat, endLng]);
+        }
+      });
+
+      const bounds = L.latLngBounds(points);
+      if (bounds.isValid()) {
+        map.fitBounds(bounds, {
+          padding: [72, 72],
+          maxZoom: 14,
+          animate: true,
+        });
+      }
+
+      lastAppliedKeyRef.current = searchSignature;
+    } catch {
+      // Ignore map fit failures to avoid breaking map rendering.
+    }
+  }, [
+    hasSearchPoints,
+    map,
+    searchSignature,
+    searchStartLat,
+    searchStartLng,
+    searchEndLat,
+    searchEndLng,
+    rides,
+  ]);
+
+  return null;
+}
 
 
-function RidesMapView({ posts, currentUser, coords, onDeletePost, onUpdatePost }) {
+
+function RidesMapView({ posts, currentUser, coords, routeSearch, onDeletePost, onUpdatePost }) {
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
   const [fromOpen, setFromOpen] = useState(false);
@@ -101,11 +177,26 @@ function RidesMapView({ posts, currentUser, coords, onDeletePost, onUpdatePost }
     [p.trip.endLocation.gps_coordinates.latitude,   p.trip.endLocation.gps_coordinates.longitude],
   ]);
 
-  const center = coords
-    ? [coords.lat, coords.lng]
-    : allPoints.length > 0
-      ? [allPoints[0][0], allPoints[0][1]]
-      : [39.3289, -76.6205]; // JHU Homewood campus fallback
+  const searchStart = routeSearch?.start
+    ? [Number(routeSearch.start.latitude), Number(routeSearch.start.longitude)]
+    : null;
+  const searchEnd = routeSearch?.end
+    ? [Number(routeSearch.end.latitude), Number(routeSearch.end.longitude)]
+    : null;
+  const searchRadiusMeters = Number(routeSearch?.radiusKm) > 0
+    ? Number(routeSearch.radiusKm) * 1000
+    : null;
+
+  const center = searchStart && searchEnd
+    ? [
+      (searchStart[0] + searchEnd[0]) / 2,
+      (searchStart[1] + searchEnd[1]) / 2,
+    ]
+    : coords
+      ? [coords.lat, coords.lng]
+      : allPoints.length > 0
+        ? [allPoints[0][0], allPoints[0][1]]
+        : [39.3289, -76.6205]; // JHU Homewood campus fallback
   const initialZoom = coords ? 9 : 11; // zoom 9 ≈ 100 km radius
 
   return (
@@ -194,10 +285,33 @@ function RidesMapView({ posts, currentUser, coords, onDeletePost, onUpdatePost }
             style={{ height: '100%', width: '100%' }}
             scrollWheelZoom={true}
           >
+            <AutoFitAfterSearch routeSearch={routeSearch} rides={rides} />
             <TileLayer
               attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
               url='https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'
             />
+
+            {/* Route-search overlay for map tab filter context */}
+            {searchStart && searchRadiusMeters ? (
+              <>
+                <Marker position={searchStart} icon={START_ICON} />
+                <Circle
+                  center={searchStart}
+                  radius={searchRadiusMeters}
+                  pathOptions={{ color: '#16a34a', fillColor: '#16a34a', fillOpacity: 0.08, weight: 2 }}
+                />
+              </>
+            ) : null}
+            {searchEnd && searchRadiusMeters ? (
+              <>
+                <Marker position={searchEnd} icon={END_ICON} />
+                <Circle
+                  center={searchEnd}
+                  radius={searchRadiusMeters}
+                  pathOptions={{ color: '#dc2626', fillColor: '#dc2626', fillOpacity: 0.08, weight: 2 }}
+                />
+              </>
+            ) : null}
 
             {rides.map((post, idx) => {
               const start = post.trip.startLocation.gps_coordinates;
