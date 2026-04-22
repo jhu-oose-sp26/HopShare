@@ -268,14 +268,14 @@ router.post('/', async (req, res) => {
     const postInfo = req.body || {};
     
     // Validation: required fields
-    if (!postInfo.title || !postInfo.description) {
-      return res.status(400).json({ error: 'Title and description are required' });
+    if (!postInfo.title) {
+      return res.status(400).json({ error: 'Title is required' });
     }
     
     // Validation: sanitize and validate string fields
     try {
       postInfo.title = sanitizeString(postInfo.title, 'Title', 200);
-      postInfo.description = sanitizeString(postInfo.description, 'Description', 5000);
+      postInfo.description = sanitizeString(postInfo.description ?? '', 'Description', 5000);
       
       if (postInfo.trip?.date) {
         postInfo.trip.date = validateDate(postInfo.trip.date);
@@ -410,8 +410,8 @@ router.put('/:id', async (req, res) => {
       if (updateData.title) {
         updateData.title = sanitizeString(updateData.title, 'Title', 200);
       }
-      if (updateData.description) {
-        updateData.description = sanitizeString(updateData.description, 'Description', 5000);
+      if (Object.prototype.hasOwnProperty.call(updateData, 'description')) {
+        updateData.description = sanitizeString(updateData.description ?? '', 'Description', 5000);
       }
     } catch (validationError) {
       return res.status(400).json({ error: validationError.message });

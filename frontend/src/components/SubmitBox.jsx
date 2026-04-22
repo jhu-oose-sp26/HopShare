@@ -111,13 +111,20 @@ function SubmitBox({ onSubmit, coords, initialData = null, isEdit = false }) {
             return;
         }
 
-        // Validation: ensure title and description are not empty
+        // Validation: ensure locations are provided
         if (!startTitle || !startTitle.trim()) {
             setSubmitError('Please select a start location.');
             return;
         }
         if (!endTitle || !endTitle.trim()) {
             setSubmitError('Please select an end location.');
+            return;
+        }
+
+        const normalizedStartTitle = startTitle.trim().toLowerCase();
+        const normalizedEndTitle = endTitle.trim().toLowerCase();
+        if (normalizedStartTitle && normalizedStartTitle === normalizedEndTitle) {
+            setSubmitError('Start and end locations cannot be the same.');
             return;
         }
 
@@ -143,14 +150,13 @@ function SubmitBox({ onSubmit, coords, initialData = null, isEdit = false }) {
             return;
         }
 
-        if (!description || !description.trim()) {
-            setSubmitError('Please enter a description.');
-            return;
-        }
-
         // Validation: check for XSS patterns (basic check)
         const xssPatterns = /<script|javascript:|on\w+\s*=/i;
-        if (xssPatterns.test(description) || xssPatterns.test(startTitle) || xssPatterns.test(endTitle)) {
+        if (
+            xssPatterns.test(startTitle)
+            || xssPatterns.test(endTitle)
+            || (description && xssPatterns.test(description))
+        ) {
             setSubmitError('Invalid characters in input. Please avoid HTML tags or scripts.');
             return;
         }
