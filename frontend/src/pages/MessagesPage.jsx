@@ -281,23 +281,45 @@ export default function MessagesPage({ currentUser }) {
                   key={chat._id}
                   onClick={() => handleSelectChat(chat)}
                   className={`
-                    w-full text-left px-4 py-3 border-b border-gray-100 transition-colors
+                    w-full text-left px-4 py-4 border-b border-gray-100 transition-colors
                     ${isActive
                       ? 'bg-blue-50 border-l-[3px] border-l-blue-500'
                       : 'hover:bg-gray-50 border-l-[3px] border-l-transparent'
                     }
                   `}
                 >
-                  <div className="flex items-center justify-between gap-2 mb-0.5">
-                    <p className={`font-semibold text-sm truncate ${isActive ? 'text-blue-700' : 'text-gray-900'}`}>
+                  {/* Title + timestamp */}
+                  <div className="flex items-start justify-between gap-2 mb-1">
+                    <p className={`font-semibold text-sm leading-snug ${isActive ? 'text-blue-700' : 'text-gray-900'}`}>
                       {chat.postTitle || 'Untitled ride'}
                     </p>
                     {chat.lastMessage?.timestamp && (
-                      <span className="text-xs text-gray-400 shrink-0">
+                      <span className="text-xs text-gray-400 shrink-0 mt-0.5">
                         {formatChatTime(chat.lastMessage.timestamp)}
                       </span>
                     )}
                   </div>
+
+                  {/* Date / time / people */}
+                  <div className="flex flex-wrap gap-x-3 gap-y-0.5 mb-1.5">
+                    {chat.tripDate && (
+                      <span className="text-xs text-gray-500">
+                        📅 {chat.tripDate}
+                      </span>
+                    )}
+                    {chat.tripTime && (
+                      <span className="text-xs text-gray-500">
+                        🕐 {chat.tripTime}
+                      </span>
+                    )}
+                    {chat.participantCount != null && (
+                      <span className="text-xs text-gray-500">
+                        👥 {chat.participantCount} {chat.participantCount === 1 ? 'person' : 'people'}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Last message */}
                   <p className="text-xs text-gray-500 truncate">
                     {chat.lastMessage
                       ? `${chat.lastMessage.sender === currentUser.email ? 'You' : (chat.lastMessage.senderName || chat.lastMessage.sender.split('@')[0])}: ${chat.lastMessage.message}`

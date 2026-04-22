@@ -141,12 +141,17 @@ router.get('/user/:email', async (req, res) => {
         { 'riderList.email': email },
         { 'drivers.email': email }
       ]
-    }).project({ title: 1 }).toArray(); 
-    
-    // Create an array of post IDs and a map to quickly look up post titles
+    }).project({ title: 1, 'trip.date': 1, 'trip.time': 1, riderList: 1, drivers: 1 }).toArray();
+
+    // Create an array of post IDs and a map to quickly look up post info
     const postIds = userPosts.map(p => p._id);
     const postMap = userPosts.reduce((acc, post) => {
-      acc[post._id.toString()] = post.title;
+      acc[post._id.toString()] = {
+        title: post.title,
+        tripDate: post.trip?.date || null,
+        tripTime: post.trip?.time || null,
+        participantCount: 1 + (post.riderList?.length || 0) + (post.drivers?.length || 0),
+      };
       return acc;
     }, {});
 
@@ -164,10 +169,14 @@ router.get('/user/:email', async (req, res) => {
         ? chat.messages[chat.messages.length - 1] 
         : null;
 
+      const postInfo = postMap[chat._id.toString()] || {};
       return {
         _id: chat._id,
         postId: chat.postId,
-        postTitle: postMap[chat._id.toString()] || 'Unknown Ride',
+        postTitle: postInfo.title || 'Unknown Ride',
+        tripDate: postInfo.tripDate || null,
+        tripTime: postInfo.tripTime || null,
+        participantCount: postInfo.participantCount ?? null,
         lastMessage: lastMessage,
         updatedAt: chat.updatedAt || chat.createdAt
       };
