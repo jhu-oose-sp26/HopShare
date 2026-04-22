@@ -1,6 +1,8 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, useRef } from 'react';
+import { io } from 'socket.io-client';
 
 const API_ROOT = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '');
+const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || window.location.origin;
 
 async function parseNotificationResponse(response) {
     if (!response.ok) {
@@ -19,13 +21,13 @@ async function parseNotificationResponse(response) {
     return response.json();
 }
 
-export function useNotifications(currentUser, options = {}) {
-    const pollingIntervalMs = options.pollingIntervalMs ?? 30000;
+export function useNotifications(currentUser) {
     const [notifications, setNotifications] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isRefreshing, setIsRefreshing] = useState(false);
     const [error, setError] = useState('');
     const [lastUpdatedAt, setLastUpdatedAt] = useState(null);
+    const socketRef = useRef(null);
 
     const userId = currentUser?._id;
 
@@ -71,51 +73,92 @@ export function useNotifications(currentUser, options = {}) {
         [userId]
     );
 
+    // WebSocket connection for real-time updates
     useEffect(() => {
-        let isActive = true;
-
-        const loadNotifications = async () => {
-            try {
-                await refreshNotifications();
-            } catch {
-                if (!isActive) {
-                    return;
-                }
-            }
-        };
-
-        loadNotifications();
-
         if (!userId) {
-            return () => {
-                isActive = false;
-            };
+            setNotifications([]);
+            setIsLoading(false);
+            return;
         }
 
-        const intervalId = window.setInterval(() => {
-            refreshNotifications({ silent: true }).catch(() => {});
-        }, pollingIntervalMs);
+        refreshNotifications().catch(() => { });
 
-        const handleWindowFocus = () => {
-            refreshNotifications({ silent: true }).catch(() => {});
+        const socket = io(SOCKET_URL, {
+            transports: ['websocket', 'polling'],
+        });
+        socketRef.current = socket;
+
+        socket.on('connect', () => {
+            console.log('Connected to notifications socket:', socket.id);
+        });
+
+        socket.on(`notification:created:${userId}`, ({ notification }) => {
+            console.log('Received new notification:', notification._id);
+            setNotifications((prev) => {
+                if (prev.some((n) => String(n._id) === String(notification._id))) {
+                    return prev;
+                }
+                return [notification, ...prev];
+            });
+            setLastUpdatedAt(new Date().toISOString());
+        });
+
+        socket.on(`notification:updated:${userId}`, ({ notification }) => {
+            console.log('Received updated notification:', notification._id);
+            setNotifications((prev) =>
+                prev.map((n) =>
+                    String(n._id) === String(notification._id) ? notification : n
+                )
+            );
+            setLastUpdatedAt(new Date().toISOString());
+        });
+
+        socket.on('notification:deleted', ({ notificationId }) => {
+            console.log('Received deleted notification:', notificationId);
+            setNotifications((prev) =>
+                prev.filter((n) => String(n._id) !== String(notificationId))
+            );
+            setLastUpdatedAt(new Date().toISOString());
+        });
+
+        socket.on('disconnect', () => {
+            console.log('Disconnected from notifications socket');
+        });
+
+        socket.on('connect_error', (err) => {
+            console.error('Notifications socket connection error:', err.message);
+        });
+
+        return () => {
+            socket.disconnect();
+            socketRef.current = null;
         };
+    }, [userId, refreshNotifications]);
 
-        const handleVisibilityChange = () => {
-            if (!document.hidden) {
-                refreshNotifications({ silent: true }).catch(() => {});
+    // Fallback refresh on focus (only if socket disconnected)
+    useEffect(() => {
+        if (!userId) return;
+
+        const handleFocus = () => {
+            if (!socketRef.current?.connected) {
+                refreshNotifications({ silent: true }).catch(() => { });
             }
         };
 
-        window.addEventListener('focus', handleWindowFocus);
-        document.addEventListener('visibilitychange', handleVisibilityChange);
+        const handleVisibility = () => {
+            if (!document.hidden && !socketRef.current?.connected) {
+                refreshNotifications({ silent: true }).catch(() => { });
+            }
+        };
+
+        window.addEventListener('focus', handleFocus);
+        document.addEventListener('visibilitychange', handleVisibility);
 
         return () => {
-            isActive = false;
-            window.clearInterval(intervalId);
-            window.removeEventListener('focus', handleWindowFocus);
-            document.removeEventListener('visibilitychange', handleVisibilityChange);
+            window.removeEventListener('focus', handleFocus);
+            document.removeEventListener('visibilitychange', handleVisibility);
         };
-    }, [pollingIntervalMs, refreshNotifications, userId]);
+    }, [userId, refreshNotifications]);
 
     const markAllAsRead = useCallback(async () => {
         const unreadNotifications = notifications.filter((item) => !item.read);
@@ -131,7 +174,7 @@ export function useNotifications(currentUser, options = {}) {
             )
         );
 
-        setNotifications((prev) => prev.map((item) => ({ ...item, read: true })));
+        // Change Stream will broadcast the updates
     }, [notifications]);
 
     const sendReply = useCallback(
@@ -151,9 +194,9 @@ export function useNotifications(currentUser, options = {}) {
                 })
             );
 
-            await refreshNotifications({ silent: true });
+            // Change Stream will broadcast the new notification
         },
-        [currentUser?._id, currentUser?.name, refreshNotifications]
+        [currentUser?._id, currentUser?.name]
     );
 
     const respondToNotification = useCallback(
@@ -174,9 +217,9 @@ export function useNotifications(currentUser, options = {}) {
                 return;
             }
 
-            await refreshNotifications({ silent: true });
+            // Change Stream will broadcast the update
         },
-        [currentUser?.name, refreshNotifications]
+        [currentUser?.name]
     );
 
     const unreadCount = useMemo(
