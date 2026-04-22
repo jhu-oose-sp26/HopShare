@@ -114,8 +114,65 @@ function setupPostsChangeStream() {
   });
 }
 
+// Change Stream for real-time notifications
+function setupNotificationsChangeStream() {
+  const db = getDB();
+  const notificationsCollection = db.collection('notifications');
+
+  const changeStream = notificationsCollection.watch([], {
+    fullDocument: 'updateLookup'
+  });
+
+  console.log('MongoDB Change Stream setup for notifications collection');
+
+  changeStream.on('change', async (change) => {
+    console.log('Notifications change detected:', change.operationType);
+
+    try {
+      switch (change.operationType) {
+        case 'insert': {
+          const notification = change.fullDocument;
+          const recipientId = notification.recipientId?.toString();
+          if (recipientId) {
+            io.emit(`notification:created:${recipientId}`, { notification });
+            console.log('Broadcasted new notification to user:', recipientId);
+          }
+          break;
+        }
+
+        case 'update':
+        case 'replace': {
+          const notification = change.fullDocument;
+          if (notification) {
+            const recipientId = notification.recipientId?.toString();
+            if (recipientId) {
+              io.emit(`notification:updated:${recipientId}`, { notification });
+              console.log('Broadcasted updated notification to user:', recipientId);
+            }
+          }
+          break;
+        }
+
+        case 'delete': {
+          const notificationId = change.documentKey._id.toString();
+          io.emit('notification:deleted', { notificationId });
+          console.log('Broadcasted deleted notification:', notificationId);
+          break;
+        }
+      }
+    } catch (err) {
+      console.error('Error processing notification change stream event:', err);
+    }
+  });
+
+  changeStream.on('error', (error) => {
+    console.error('Notifications change stream error:', error);
+  });
+}
+
 connectDB().then(() => {
   setupPostsChangeStream();
+  setupNotificationsChangeStream();
   
   server.listen(PORT, () => {
     console.log(`Server listening on port ${PORT}`);
