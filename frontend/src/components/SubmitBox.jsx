@@ -56,7 +56,7 @@ function SubmitBox({ onSubmit, coords, initialData = null, isEdit = false }) {
     const [time, setTime] = useState(initialData?.time ?? '');
     const [description, setDescription] = useState(initialData?.description ?? '');
     const [type, setType] = useState(initialData?.type ?? 'request');
-    const [maxRiders, setMaxRiders] = useState(initialData?.maxRiders ?? '');
+    const [maxRiders, setMaxRiders] = useState(initialData?.maxRiders ?? 4);
     const [suggestedPrice, setSuggestedPrice] = useState(initialData?.suggestedPrice ?? '');
     const [submitError, setSubmitError] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -75,7 +75,7 @@ function SubmitBox({ onSubmit, coords, initialData = null, isEdit = false }) {
         setTime(initialData?.time ?? '');
         setDescription(initialData?.description ?? '');
         setType(initialData?.type ?? 'request');
-        setMaxRiders(initialData?.maxRiders ?? '');
+        setMaxRiders(initialData?.maxRiders ?? 4);
         setSuggestedPrice(initialData?.suggestedPrice ?? '');
         setSubmitError('');
         setIsSubmitting(false);
@@ -172,7 +172,7 @@ function SubmitBox({ onSubmit, coords, initialData = null, isEdit = false }) {
             time,
             description,
             type,
-            maxRiders: maxRiders !== '' ? Number(maxRiders) : undefined,
+            maxRiders: Number(maxRiders),
             suggestedPrice: type === 'offer' ? suggestedPrice : '',
         };
 
@@ -197,7 +197,7 @@ function SubmitBox({ onSubmit, coords, initialData = null, isEdit = false }) {
                 setTime('');
                 setDescription('');
                 setType('request');
-                setMaxRiders('');
+                setMaxRiders(4);
                 setSuggestedPrice('');
             }
         } catch (err) {
@@ -416,7 +416,7 @@ function SubmitBox({ onSubmit, coords, initialData = null, isEdit = false }) {
                             className='flex items-center gap-2 text-sm font-medium text-foreground'
                         >
                             <Users className='size-4 text-muted-foreground' />
-                            Max riders
+                            Max riders <span className='text-red-500'>*</span>
                         </label>
                         <input
                             id='submit-max-riders'
@@ -424,9 +424,9 @@ function SubmitBox({ onSubmit, coords, initialData = null, isEdit = false }) {
                             min='1'
                             max='20'
                             className={inputBase}
-                            placeholder='No limit'
                             value={maxRiders}
                             onChange={(e) => setMaxRiders(e.target.value)}
+                            required
                         />
                     </div>
                 </div>
