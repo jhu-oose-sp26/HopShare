@@ -330,7 +330,7 @@ function SubmitBox({ onSubmit, coords, initialData = null, isEdit = false }) {
                             required
                         />
                     </div>
-                    {type === 'offer' && (
+                    {type === 'offer' && isEdit && (
                         <div className='space-y-2'>
                             <label
                                 htmlFor='submit-max-riders'
