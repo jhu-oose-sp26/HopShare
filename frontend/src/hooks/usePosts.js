@@ -1,10 +1,12 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, useRef } from 'react';
+import { io } from 'socket.io-client';
 
 const API_ROOT = (import.meta.env.VITE_API_BASE_URL || '/api').replace(
     /\/$/,
     ''
 );
 const POSTS_ENDPOINT = `${API_ROOT}/posts`;
+const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || window.location.origin;
 
 function toShortPlaceName(value) {
     const raw = typeof value === 'string' ? value.trim() : '';
@@ -17,9 +19,8 @@ function createPostPayload(formData) {
     const endShort = toShortPlaceName(formData.endTitle);
 
     return {
-        title: `${startShort || formData.startTitle} → ${
-            endShort || formData.endTitle
-        }`,
+        title: `${startShort || formData.startTitle} → ${endShort || formData.endTitle
+            }`,
         description: formData.description,
         type: formData.type,
         suggestedPrice: formData.type === 'offer' && formData.suggestedPrice ? Number(formData.suggestedPrice) : null,
@@ -75,6 +76,7 @@ export const usePosts = (currentUser = null) => {
     const [isRefreshing, setIsRefreshing] = useState(false);
     const [error, setError] = useState('');
     const [lastUpdatedAt, setLastUpdatedAt] = useState(null);
+    const socketRef = useRef(null);
 
     const fetchPosts = useCallback(async () => {
         const response = await fetch(POSTS_ENDPOINT);
@@ -116,33 +118,89 @@ export const usePosts = (currentUser = null) => {
         [fetchPosts]
     );
 
+    // WebSocket connection for real-time updates
     useEffect(() => {
-        refreshPosts().catch(() => {});
+        refreshPosts().catch(() => { });
 
-        const intervalId = window.setInterval(() => {
-            refreshPosts({ silent: true }).catch(() => {});
-        }, 30000);
+        const socket = io(SOCKET_URL, {
+            transports: ['websocket', 'polling'],
+        });
+        socketRef.current = socket;
 
-        const handleWindowFocus = () => {
-            refreshPosts({ silent: true }).catch(() => {});
-        };
+        socket.on('connect', () => {
+            console.log('Connected to posts socket:', socket.id);
+        });
 
-        const handleVisibilityChange = () => {
-            if (!document.hidden) {
-                refreshPosts({ silent: true }).catch(() => {});
+        socket.on('post:created', ({ post }) => {
+            console.log('Received new post:', post._id);
+            if (!post.archived) {
+                setPosts((prev) => {
+                    if (prev.some((p) => String(p._id) === String(post._id))) {
+                        return prev;
+                    }
+                    return [post, ...prev];
+                });
+                setLastUpdatedAt(new Date().toISOString());
             }
-        };
+        });
 
-        window.addEventListener('focus', handleWindowFocus);
-        document.addEventListener('visibilitychange', handleVisibilityChange);
+        socket.on('post:updated', ({ post }) => {
+            console.log('Received updated post:', post._id);
+            setPosts((prev) =>
+                prev
+                    .map((p) => (String(p._id) === String(post._id) ? post : p))
+                    .filter((p) => !p.archived)
+            );
+            setLastUpdatedAt(new Date().toISOString());
+        });
+
+        socket.on('post:deleted', ({ postId }) => {
+            console.log('Received deleted post:', postId);
+            setPosts((prev) => prev.filter((p) => String(p._id) !== String(postId)));
+            setLastUpdatedAt(new Date().toISOString());
+        });
+
+        socket.on('posts:refresh', () => {
+            console.log('Received refresh signal');
+            refreshPosts({ silent: true }).catch(() => { });
+        });
+
+        socket.on('disconnect', () => {
+            console.log('Disconnected from posts socket');
+        });
+
+        socket.on('connect_error', (err) => {
+            console.error('Socket connection error:', err.message);
+        });
 
         return () => {
-            window.clearInterval(intervalId);
-            window.removeEventListener('focus', handleWindowFocus);
-            document.removeEventListener('visibilitychange', handleVisibilityChange);
+            socket.disconnect();
+            socketRef.current = null;
         };
     }, [refreshPosts]);
 
+    // Fallback refresh on focus (only if socket disconnected)
+    useEffect(() => {
+        const handleFocus = () => {
+            if (!socketRef.current?.connected) {
+                refreshPosts({ silent: true }).catch(() => { });
+            }
+        };
+
+        const handleVisibility = () => {
+            if (!document.hidden && !socketRef.current?.connected) {
+                refreshPosts({ silent: true }).catch(() => { });
+            }
+        };
+
+        window.addEventListener('focus', handleFocus);
+        document.addEventListener('visibilitychange', handleVisibility);
+
+        return () => {
+            window.removeEventListener('focus', handleFocus);
+            document.removeEventListener('visibilitychange', handleVisibility);
+        };
+    }, [refreshPosts]);
 
     const addPost = useCallback(async (formData) => {
         const postPayload = createPostPayload(formData);
@@ -158,22 +216,14 @@ export const usePosts = (currentUser = null) => {
             throw new Error(await readErrorMessage(response));
         }
 
-        const createdResult = await response.json();
-        const createdPost = {
+        const result = await response.json();
+        // Change Stream will broadcast to all clients. No local state update needed
+        return {
             ...postPayload,
-            _id: normalizeId(
-                createdResult.postId || createdResult.insertedId,
-                Date.now().toString()
-            ),
-            tripId: createdResult.tripId
-                ? normalizeId(createdResult.tripId, null)
-                : null,
+            _id: normalizeId(result.postId || result.insertedId, Date.now().toString()),
+            tripId: result.tripId ? normalizeId(result.tripId, null) : null,
+            confirmationCode: result.confirmationCode,
         };
-
-        setPosts((prevPosts) => [createdPost, ...prevPosts]);
-        setError('');
-        setLastUpdatedAt(new Date().toISOString());
-        return createdPost;
     }, []);
 
     const removePost = useCallback(async (postId) => {
@@ -190,11 +240,7 @@ export const usePosts = (currentUser = null) => {
         if (!response.ok) {
             throw new Error(await readErrorMessage(response));
         }
-
-        setPosts((prevPosts) =>
-            prevPosts.filter((post) => String(post._id) !== String(postId))
-        );
-        setLastUpdatedAt(new Date().toISOString());
+        // Change Stream will broadcast to all clients
     }, [currentUser?.email]);
 
     const updatePost = useCallback(async (postId, formData) => {
@@ -213,16 +259,7 @@ export const usePosts = (currentUser = null) => {
         if (!response.ok) {
             throw new Error(await readErrorMessage(response));
         }
-
-        // Update local state with the new data
-        setPosts((prevPosts) =>
-            prevPosts.map((post) =>
-                String(post._id) === String(postId)
-                    ? { ...post, ...postPayload }
-                    : post
-            )
-        );
-        setLastUpdatedAt(new Date().toISOString());
+        // Change Stream will broadcast to all clients
     }, [currentUser?.email]);
 
     return {
