@@ -71,7 +71,7 @@ async function readErrorMessage(response) {
     return `Request failed (${response.status})`;
 }
 
-export const usePosts = () => {
+export const usePosts = (currentUser = null) => {
     const [posts, setPosts] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isRefreshing, setIsRefreshing] = useState(false);
@@ -230,13 +230,23 @@ export const usePosts = () => {
     const removePost = useCallback(async (postId) => {
         const response = await fetch(`${POSTS_ENDPOINT}/${postId}`, {
             method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                userEmail: currentUser?.email || '',
+            }),
         });
 
         if (!response.ok) {
             throw new Error(await readErrorMessage(response));
         }
-        // Change Stream will broadcast to all clients
-    }, []);
+
+        setPosts((prevPosts) =>
+            prevPosts.filter((post) => String(post._id) !== String(postId))
+        );
+        setLastUpdatedAt(new Date().toISOString());
+    }, [currentUser?.email]);
 
     const updatePost = useCallback(async (postId, formData) => {
         const postPayload = createPostPayload(formData);
@@ -245,14 +255,26 @@ export const usePosts = () => {
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify(postPayload),
+            body: JSON.stringify({
+                ...postPayload,
+                userEmail: currentUser?.email || '',
+            }),
         });
 
         if (!response.ok) {
             throw new Error(await readErrorMessage(response));
         }
-        // Change Stream will broadcast to all clients
-    }, []);
+
+        // Update local state with the new data
+        setPosts((prevPosts) =>
+            prevPosts.map((post) =>
+                String(post._id) === String(postId)
+                    ? { ...post, ...postPayload }
+                    : post
+            )
+        );
+        setLastUpdatedAt(new Date().toISOString());
+    }, [currentUser?.email]);
 
     return {
         posts,

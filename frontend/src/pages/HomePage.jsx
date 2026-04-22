@@ -26,7 +26,7 @@ function HomePage({ currentUser, onLogout }) {
     isRefreshing,
     error,
     lastUpdatedAt,
-  } = usePosts();
+  } = usePosts(currentUser);
   const [isOpen, setIsOpen] = useState(false);
   const [coords, setCoords] = useState(null);
   const [routeSearch, setRouteSearch] = useState(null);
@@ -263,6 +263,7 @@ function HomePage({ currentUser, onLogout }) {
           posts={myPosts}
           isLoading={isLoading}
           error={error}
+          routeSearch={routeSearch}
           onDeletePost={removePost}
           onUpdatePost={updatePost}
           coords={coords}
