@@ -91,6 +91,61 @@ function validateUserNotSelf(userEmail, targetEmail, actionName = 'action') {
   }
 }
 
+function toFiniteNumber(value, fieldName) {
+  const num = Number(value);
+  if (!Number.isFinite(num)) {
+    throw new Error(`${fieldName} must be a valid number`);
+  }
+  return num;
+}
+
+function validateTripLocations(trip) {
+  if (!trip || typeof trip !== 'object') {
+    throw new Error('Trip information is required');
+  }
+
+  const start = trip.startLocation;
+  const end = trip.endLocation;
+  if (!start || !end) {
+    throw new Error('Start and end locations are required');
+  }
+
+  const startTitle = sanitizeString(start.title || '', 'Start location', 200);
+  const endTitle = sanitizeString(end.title || '', 'End location', 200);
+  if (!startTitle || !endTitle) {
+    throw new Error('Start and end locations are required');
+  }
+
+  const startLat = toFiniteNumber(start?.gps_coordinates?.latitude, 'Start latitude');
+  const startLng = toFiniteNumber(start?.gps_coordinates?.longitude, 'Start longitude');
+  const endLat = toFiniteNumber(end?.gps_coordinates?.latitude, 'End latitude');
+  const endLng = toFiniteNumber(end?.gps_coordinates?.longitude, 'End longitude');
+
+  if (Math.abs(startLat - endLat) < 1e-7 && Math.abs(startLng - endLng) < 1e-7) {
+    throw new Error('Start and end locations cannot be the same');
+  }
+
+  return {
+    ...trip,
+    startLocation: {
+      ...start,
+      title: startTitle,
+      gps_coordinates: {
+        latitude: startLat,
+        longitude: startLng,
+      },
+    },
+    endLocation: {
+      ...end,
+      title: endTitle,
+      gps_coordinates: {
+        latitude: endLat,
+        longitude: endLng,
+      },
+    },
+  };
+}
+
 // In-memory cache for non-archived posts (avoids repeated slow Atlas queries)
 let postsCache = null;       // { data: [...], fetchedAt: timestamp }
 const CACHE_TTL_MS = 30000;  // serve cached data for up to 30 s
@@ -224,6 +279,9 @@ router.post('/', async (req, res) => {
       
       if (postInfo.trip?.date) {
         postInfo.trip.date = validateDate(postInfo.trip.date);
+      }
+      if (postInfo.trip) {
+        postInfo.trip = validateTripLocations(postInfo.trip);
       }
       
       // Validate email if present
@@ -368,6 +426,14 @@ router.put('/:id', async (req, res) => {
           updateData.archived = false;
           updateData.archivedAt = null;
         }
+      } catch (validationError) {
+        return res.status(400).json({ error: validationError.message });
+      }
+    }
+
+    if (updateData.trip) {
+      try {
+        updateData.trip = validateTripLocations(updateData.trip);
       } catch (validationError) {
         return res.status(400).json({ error: validationError.message });
       }
