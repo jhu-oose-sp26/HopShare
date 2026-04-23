@@ -238,6 +238,30 @@ router.get('/archived', async (req, res) => {
   res.json(enrichedPosts);
 });
 
+// GET /posts/starred?email=... — fetch all starred posts for a user
+router.get('/starred', async (req, res) => {
+  try {
+    let { email } = req.query;
+    if (!email) return res.status(400).json({ error: 'Email required' });
+    try { email = validateEmail(email); } catch (e) { return res.status(400).json({ error: e.message }); }
+
+    const db = getDB();
+    const user = await db.collection('users').findOne({ email });
+    if (!user || !user.starredPosts?.length) return res.json([]);
+
+    const objectIds = user.starredPosts
+      .map(id => toObjectId(id))
+      .filter(Boolean);
+
+    const posts = await db.collection('posts').find({ _id: { $in: objectIds } }).toArray();
+    const enriched = await enrichPostsWithGoogleIds(posts);
+    res.json(enriched);
+  } catch (err) {
+    console.error('Get starred posts error:', err);
+    res.status(500).json({ error: err.message || 'Failed to fetch starred posts' });
+  }
+});
+
 // GET ONE POST
 router.get('/:id', async (req, res) => {
   const postId = toObjectId(req.params.id);
@@ -828,6 +852,35 @@ router.post('/:id/remove-driver', async (req, res) => {
   } catch (err) {
     console.error('Remove driver error:', err);
     res.status(500).json({ error: err.message || 'Failed to remove driver' });
+  }
+});
+
+// POST /posts/:id/star — toggle star on a post for a user
+router.post('/:id/star', async (req, res) => {
+  try {
+    const postId = toObjectId(req.params.id);
+    if (!postId) return res.status(400).json({ error: 'Invalid post id' });
+
+    let { email } = req.body;
+    if (!email) return res.status(400).json({ error: 'Email required' });
+    try { email = validateEmail(email); } catch (e) { return res.status(400).json({ error: e.message }); }
+
+    const db = getDB();
+    const postIdStr = postId.toString();
+    const user = await db.collection('users').findOne({ email });
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    const alreadyStarred = (user.starredPosts || []).includes(postIdStr);
+    if (alreadyStarred) {
+      await db.collection('users').updateOne({ email }, { $pull: { starredPosts: postIdStr } });
+    } else {
+      await db.collection('users').updateOne({ email }, { $addToSet: { starredPosts: postIdStr } });
+    }
+
+    res.json({ starred: !alreadyStarred });
+  } catch (err) {
+    console.error('Star post error:', err);
+    res.status(500).json({ error: err.message || 'Failed to star post' });
   }
 });
 
