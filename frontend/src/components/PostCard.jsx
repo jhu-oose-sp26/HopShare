@@ -5,7 +5,7 @@ import WeatherForecastDialog from './WeatherForecastDialog';
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { formatTime, formatDate } from '@/lib/utils';
-import { MapPin, Calendar, Clock, MessageCircle, Pencil, Trash2, Info, User, Mail, Phone, Navigation, ExternalLink, UserPlus, Users, UserMinus, CheckCircle } from 'lucide-react';
+import { MapPin, Calendar, Clock, MessageCircle, Pencil, Trash2, Info, User, Mail, Phone, Navigation, ExternalLink, UserPlus, Users, UserMinus, CheckCircle, Star } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { HoverCard, HoverCardTrigger, HoverCardContent } from '@/components/ui/hover-card';
@@ -24,7 +24,7 @@ import SubmitBox from './SubmitBox';
 const API_ROOT = (import.meta.env.VITE_API_BASE_URL || '/api').replace(/\/$/, '');
 const NOTIFICATIONS_ENDPOINT = `${API_ROOT}/notifications`;
 
-const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, routeSearch, distanceFilter, currentUser }) => {
+const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, routeSearch, distanceFilter, currentUser, initialStarred = false, onStarChange }) => {
     const { _id, title, description, user, trip, type = 'request', createdAt, suggestedPrice } = post;
     const navigate = useNavigate();
     const isOffer = type === 'offer';
@@ -67,6 +67,23 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
         if (!currentUser) return false;
         return (post.pendingJoins || []).includes(currentUser.email);
     });
+    const [isStarred, setIsStarred] = useState(initialStarred);
+
+    const handleStarToggle = async () => {
+        if (!currentUser) return;
+        const next = !isStarred;
+        setIsStarred(next);
+        try {
+            await fetch(`${API_ROOT}/posts/${_id}/star`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email: currentUser.email }),
+            });
+            onStarChange?.(_id, next);
+        } catch {
+            setIsStarred(!next);
+        }
+    };
 
     const maxRiders = post.maxRiders ?? null;
     const isFull = maxRiders != null && listMembers.length >= maxRiders;
@@ -262,6 +279,16 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
 
     return (
         <div className={`relative rounded-xl border border-gray-200 bg-white px-6 pb-6 shadow-sm hover:shadow-md transition-shadow ${canManagePost ? 'pt-10' : 'pt-6'}`}>
+            {/* Star button — top right, visible to all logged-in users */}
+            {currentUser && (
+                <button
+                    className='absolute top-3 right-3 p-1.5 rounded-md transition-colors hover:bg-yellow-50'
+                    onClick={handleStarToggle}
+                    aria-label={isStarred ? 'Unstar ride' : 'Star ride'}
+                >
+                    <Star className={`w-4 h-4 ${isStarred ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300 hover:text-yellow-400'}`} />
+                </button>
+            )}
             {canManagePost && (
                 <>
                     {/* Edit button — top left */}
@@ -287,10 +314,10 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
                         </DialogContent>
                     </Dialog>
 
-                    {/* Delete button — top right */}
+                    {/* Delete button — shifted left to make room for star */}
                     <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
                         <DialogTrigger asChild>
-                            <button className='absolute top-3 right-3 p-1.5 rounded-md text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors'>
+                            <button className='absolute top-3 right-9 p-1.5 rounded-md text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors'>
                                 <Trash2 className='w-4 h-4' />
                             </button>
                         </DialogTrigger>

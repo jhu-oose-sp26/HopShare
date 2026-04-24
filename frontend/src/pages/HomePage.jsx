@@ -11,6 +11,7 @@ import RidesMapView from '@/components/RidesMapView';
 import RouteSearchPanel from '@/components/RouteSearchPanel';
 import SubmitBox from '@/components/SubmitBox';
 import NotificationMenu from '@/components/NotificationMenu';
+import StarredPage from '@/pages/StarredPage';
 import { usePosts } from '@/hooks/usePosts';
 import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 import { filterPostsByRouteRadius } from '@/lib/utils';
@@ -211,6 +212,16 @@ function HomePage({ currentUser, onLogout }) {
               >
                 My Rides
               </button>
+              <button
+                onClick={() => setActiveView('starred')}
+                className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px ${
+                  activeView === 'starred'
+                    ? 'border-black text-gray-900'
+                    : 'border-transparent text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                Starred
+              </button>
             </div>
 
             <Dialog open={isOpen} onOpenChange={handleDialogOpenChange}>
@@ -287,6 +298,9 @@ function HomePage({ currentUser, onLogout }) {
           onDeletePost={removePost}
           onUpdatePost={updatePost}
         />
+      )}
+      {activeView === 'starred' && (
+        <StarredPage currentUser={currentUser} />
       )}
     </div>
   );
