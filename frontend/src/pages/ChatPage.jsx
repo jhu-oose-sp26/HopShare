@@ -121,7 +121,12 @@ const ChatPage = ({ currentUser }) => {
 
     const fetchChat = async () => {
       try {
-        const response = await fetch(`${API_ROOT}/chat/${chatId}`);
+        const viewerEmail = encodeURIComponent(currentUser?.email || '');
+        const response = await fetch(`${API_ROOT}/chat/${chatId}?viewerEmail=${viewerEmail}`);
+        if (!response.ok) {
+          const payload = await response.json().catch(() => ({}));
+          throw new Error(payload.error || 'Failed to load chat');
+        }
         const chat = await response.json();
         setMessages(chat.messages || []);
       } catch (err) {
@@ -133,7 +138,7 @@ const ChatPage = ({ currentUser }) => {
     };
 
     fetchChat();
-  }, [chatId]);
+  }, [chatId, currentUser?.email]);
 
   useEffect(() => {
     if (messages.length === 0) return;
@@ -255,9 +260,21 @@ const ChatPage = ({ currentUser }) => {
   }, [messages, usersMap]);
 
   const participantCount = 1 + (post?.riderList?.length || 0) + (post?.drivers?.length || 0);
+  const currentEmail = (currentUser?.email || '').trim().toLowerCase();
+  const isOwner = currentEmail && (post?.user?.email || '').trim().toLowerCase() === currentEmail;
+  const isRider = Array.isArray(post?.riderList)
+    && post.riderList.some((rider) => (rider?.email || '').trim().toLowerCase() === currentEmail);
+  const isDriver = Array.isArray(post?.drivers)
+    && post.drivers.some((driver) => (driver?.email || '').trim().toLowerCase() === currentEmail);
+  const canSendMessages = Boolean(currentEmail && (isOwner || isRider || isDriver));
   
   const handleSendMessage = async () => {
     if (!message.trim() || !chatId) return;
+
+    if (!canSendMessages) {
+      setError('You can view this chat history, but you are no longer allowed to send messages for this ride.');
+      return;
+    }
 
     // FRONTEND VALIDATION: Prevent sending empty messages
     const trimmedMessage = message.trim();
@@ -404,13 +421,19 @@ const ChatPage = ({ currentUser }) => {
           value={message}
           onChange={(e) => setMessage(e.target.value)}
           onSubmit={() => handleSendMessage()}
+          disabled={!canSendMessages}
         />
         <ChatToolbarAddon align="inline-end">
-          <ChatToolbarButton onClick={handleSendMessage}>
+          <ChatToolbarButton onClick={handleSendMessage} disabled={!canSendMessages}>
             <SquareChevronRightIcon />
           </ChatToolbarButton>
         </ChatToolbarAddon>
       </ChatToolbar>
+      {!canSendMessages && (
+        <div className="px-4 pb-2 text-xs text-amber-700">
+          You were removed from this ride. Chat history remains visible, but sending new messages is disabled.
+        </div>
+      )}
 
       <Dialog open={detailsOpen} onOpenChange={setDetailsOpen}>
         <DialogContent className='sm:max-w-2xl max-h-[85vh] overflow-y-auto'>

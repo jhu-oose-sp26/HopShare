@@ -59,11 +59,32 @@ function isActiveRideParticipant(post, email) {
 router.get('/:postId', async (req, res) => {
   try {
     const { postId } = req.params;
+    const { viewerEmail } = req.query;
     const db = getDB();
 
     const chatId = toObjectId(postId);
     if (!chatId) {
       return res.status(400).json({ error: 'Invalid post ID' });
+    }
+
+    const post = await db.collection('posts').findOne({ _id: chatId });
+    if (!post) {
+      return res.status(404).json({ error: 'Ride post not found' });
+    }
+
+    if (!viewerEmail) {
+      return res.status(400).json({ error: 'viewerEmail is required' });
+    }
+
+    let viewer;
+    try {
+      viewer = validateEmail(viewerEmail);
+    } catch (validationError) {
+      return res.status(400).json({ error: validationError.message });
+    }
+
+    if (!isActiveRideParticipant(post, viewer)) {
+      return res.status(403).json({ error: 'You are not authorized to view this chat' });
     }
 
     // Check if chat exists for this post
@@ -164,7 +185,7 @@ router.post('/:chatId/messages', async (req, res) => {
 // GET all chats for a user
 router.get('/user/:email', async (req, res) => {
   try {
-    const { email } = req.params;
+    const email = validateEmail(req.params.email);
     const db = getDB();
 
     // Find all posts where the user is the owner, a rider, or a driver

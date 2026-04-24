@@ -131,7 +131,8 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
     // Function to handle chatting
     const handleChatClick = async () => {
         try {
-            const response = await fetch(`${API_ROOT}/chat/${_id}`);
+            const viewerEmail = encodeURIComponent(currentUser?.email || '');
+            const response = await fetch(`${API_ROOT}/chat/${_id}?viewerEmail=${viewerEmail}`);
             if (!response.ok) {
                 throw new Error('Failed to get/create chat');
             }

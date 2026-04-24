@@ -719,13 +719,23 @@ router.post('/:id/remove-member', async (req, res) => {
     }
 
     const riderListBefore = post.riderList || [];
-    const removedMember = riderListBefore.find((member) => member.email === email)
-      || riderListBefore.find((member) => name && member.name === name)
-      || null;
+    const removedMember = riderListBefore.find((member) => {
+      const memberEmail = typeof member.email === 'string' ? member.email.trim().toLowerCase() : '';
+      if (targetNorm && memberEmail === targetNorm) return true;
+      return !targetNorm && name && member.name === name;
+    }) || null;
+
+    if (!removedMember) {
+      return res.status(404).json({ error: 'Rider not found in this ride' });
+    }
+
+    if (isSelfLeave && !targetNorm) {
+      return res.status(400).json({ error: 'Self-leave requires a valid email' });
+    }
 
     await db.collection('posts').updateOne(
       { _id: postId },
-      { $pull: { riderList: { email: email || null } } }
+      { $pull: { riderList: { email: removedMember.email || null } } }
     );
     // Also remove any entry that matched on name if email was blank
     if (!email && name) {
