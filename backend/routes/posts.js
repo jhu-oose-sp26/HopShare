@@ -694,20 +694,28 @@ router.post('/:id/remove-member', async (req, res) => {
     const post = await db.collection('posts').findOne({ _id: postId });
     if (!post) return res.status(404).json({ error: 'Post not found' });
 
-    // AUTHORIZATION CHECK: only post owner can remove members
+    // AUTHORIZATION CHECK:
+    // - post owner can remove any rider
+    // - a rider can remove themself (leave the ride)
     if (!actorEmail || !post.user?.email) {
-      return res.status(403).json({ error: 'Unauthorized: cannot verify ownership' });
+      return res.status(403).json({ error: 'Unauthorized: cannot verify actor' });
     }
-    
+
+    let actorNorm;
+    let ownerNorm;
     try {
-      const actorNorm = validateEmail(actorEmail);
-      const ownerNorm = validateEmail(post.user.email);
-      
-      if (actorNorm !== ownerNorm) {
-        return res.status(403).json({ error: 'Unauthorized: only post owner can remove members' });
-      }
+      actorNorm = validateEmail(actorEmail);
+      ownerNorm = validateEmail(post.user.email);
     } catch (err) {
       return res.status(400).json({ error: err.message });
+    }
+
+    const targetNorm = email || '';
+    const isOwnerAction = actorNorm === ownerNorm;
+    const isSelfLeave = Boolean(targetNorm) && actorNorm === targetNorm;
+
+    if (!isOwnerAction && !isSelfLeave) {
+      return res.status(403).json({ error: 'Unauthorized: only the post owner can remove riders' });
     }
 
     const riderListBefore = post.riderList || [];
@@ -732,26 +740,27 @@ router.post('/:id/remove-member', async (req, res) => {
     let notifiedCount = 0;
 
     const removedDisplayName = removedMember?.name || name || email;
-    const actorDisplayName = actorName || removedDisplayName;
-    const removedOwnself = actorEmail && actorEmail === email;
+    const actorDisplayName = actorName || post.user?.name || 'The poster';
+    const removedOwnself = isSelfLeave;
     const routeSummary = `${post.trip?.startLocation?.title || 'start'} to ${post.trip?.endLocation?.title || 'destination'}`;
     const dateSummary = post.trip?.date ? ` on ${post.trip.date}` : '';
     const timeSummary = post.trip?.time ? ` at ${post.trip.time}` : '';
     const rideSummary = `${routeSummary}${dateSummary}${timeSummary}`;
     const notificationMessage = removedOwnself
       ? `${removedDisplayName} left your riding list for ${rideSummary}.`
-      : `${removedDisplayName} was removed from your riding list for ${rideSummary} by ${actorDisplayName}.`;
+      : `You were removed from the riding list for ${rideSummary} by ${actorDisplayName}.`;
 
-    const recipientEmailSet = new Set(
-      remainingRiders
-        .map((member) => (typeof member.email === 'string' ? member.email.trim() : ''))
-        .filter(Boolean)
-    );
-    if (typeof post.user?.email === 'string' && post.user.email.trim()) {
-      recipientEmailSet.add(post.user.email.trim());
-    }
-    if (typeof email === 'string' && email.trim()) {
-      recipientEmailSet.delete(email.trim());
+    const recipientEmailSet = new Set();
+    if (removedOwnself) {
+      // Self-leave: notify post owner.
+      if (typeof post.user?.email === 'string' && post.user.email.trim()) {
+        recipientEmailSet.add(post.user.email.trim());
+      }
+    } else {
+      // Owner removal: notify the removed rider.
+      if (typeof email === 'string' && email.trim()) {
+        recipientEmailSet.add(email.trim());
+      }
     }
 
     const recipientEmails = Array.from(recipientEmailSet);

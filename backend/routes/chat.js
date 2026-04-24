@@ -31,6 +31,30 @@ function validateEmail(email) {
   return email.trim().toLowerCase();
 }
 
+function isActiveRideParticipant(post, email) {
+  if (!post || !email) return false;
+
+  const normalized = validateEmail(email);
+  const ownerEmail = typeof post.user?.email === 'string' ? post.user.email.trim().toLowerCase() : '';
+  if (ownerEmail && ownerEmail === normalized) return true;
+
+  const riderEmails = Array.isArray(post.riderList)
+    ? post.riderList
+        .map((member) => (typeof member.email === 'string' ? member.email.trim().toLowerCase() : ''))
+        .filter(Boolean)
+    : [];
+
+  if (riderEmails.includes(normalized)) return true;
+
+  const driverEmails = Array.isArray(post.drivers)
+    ? post.drivers
+        .map((member) => (typeof member.email === 'string' ? member.email.trim().toLowerCase() : ''))
+        .filter(Boolean)
+    : [];
+
+  return driverEmails.includes(normalized);
+}
+
 // Get or create chat for a post
 router.get('/:postId', async (req, res) => {
   try {
@@ -96,6 +120,15 @@ router.post('/:chatId/messages', async (req, res) => {
     const chatObjectId = toObjectId(chatId);
     if (!chatObjectId) {
       return res.status(400).json({ error: 'Invalid chat ID' });
+    }
+
+    const post = await db.collection('posts').findOne({ _id: chatObjectId });
+    if (!post) {
+      return res.status(404).json({ error: 'Ride post not found' });
+    }
+
+    if (!isActiveRideParticipant(post, sender)) {
+      return res.status(403).json({ error: 'You are no longer part of this ride and cannot send new messages' });
     }
 
     const newMessage = {
