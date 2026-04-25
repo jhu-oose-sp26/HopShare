@@ -2,7 +2,20 @@ import { useCallback, useEffect, useMemo, useState, useRef } from 'react';
 import { io } from 'socket.io-client';
 
 const API_ROOT = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '');
-const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || window.location.origin;
+const SOCKET_URL = (() => {
+    if (import.meta.env.VITE_SOCKET_URL) return import.meta.env.VITE_SOCKET_URL;
+    if (/^https?:\/\//i.test(API_ROOT)) {
+        try {
+            return new URL(API_ROOT, window.location.origin).origin;
+        } catch {
+            // Fall through to frontend origin.
+        }
+    }
+    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+        return `${window.location.protocol}//${window.location.hostname}:3000`;
+    }
+    return window.location.origin;
+})();
 
 async function parseNotificationResponse(response) {
     if (!response.ok) {

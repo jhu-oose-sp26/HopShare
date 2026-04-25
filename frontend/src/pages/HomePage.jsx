@@ -307,6 +307,7 @@ function HomePage({ currentUser, onLogout }) {
       {activeView === 'map' && (
         <RidesMapView
           posts={visiblePosts}
+          isLoading={isLoading}
           currentUser={currentUser}
           coords={coords}
           routeSearch={routeSearch}

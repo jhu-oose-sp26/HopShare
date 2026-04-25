@@ -152,7 +152,7 @@ function AutoFitAfterSearch({ routeSearch, rides }) {
 
 
 
-function RidesMapView({ posts, currentUser, coords, routeSearch, onDeletePost, onUpdatePost }) {
+function RidesMapView({ posts, isLoading = false, currentUser, coords, routeSearch, onDeletePost, onUpdatePost }) {
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
   const [fromOpen, setFromOpen] = useState(false);
@@ -273,7 +273,12 @@ function RidesMapView({ posts, currentUser, coords, routeSearch, onDeletePost, o
         </div>
       </div>
 
-      {rides.length === 0 ? (
+      {isLoading ? (
+        <div className='rounded-xl border border-gray-200 shadow-sm h-[520px] flex flex-col items-center justify-center gap-4'>
+          <div className='w-10 h-10 rounded-full border-4 border-gray-200 border-t-gray-800 animate-spin' />
+          <p className='text-sm text-gray-400 animate-pulse'>Loading map rides...</p>
+        </div>
+      ) : rides.length === 0 ? (
         <div className='text-center py-12'>
           <p className='text-gray-500 text-lg'>No rides with location data to display.</p>
         </div>

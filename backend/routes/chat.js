@@ -31,10 +31,57 @@ function validateEmail(email) {
   return email.trim().toLowerCase();
 }
 
+function normalizeEmail(email) {
+  return typeof email === 'string' ? email.trim().toLowerCase() : '';
+}
+
+function isActiveRideParticipant(post, email) {
+  if (!post || !email) return false;
+
+  const normalized = validateEmail(email);
+  const ownerEmail = typeof post.user?.email === 'string' ? post.user.email.trim().toLowerCase() : '';
+  if (ownerEmail && ownerEmail === normalized) return true;
+
+  const riderEmails = Array.isArray(post.riderList)
+    ? post.riderList
+        .map((member) => (typeof member.email === 'string' ? member.email.trim().toLowerCase() : ''))
+        .filter(Boolean)
+    : [];
+
+  if (riderEmails.includes(normalized)) return true;
+
+  const driverEmails = Array.isArray(post.drivers)
+    ? post.drivers
+        .map((member) => (typeof member.email === 'string' ? member.email.trim().toLowerCase() : ''))
+        .filter(Boolean)
+    : [];
+
+  return driverEmails.includes(normalized);
+}
+
+function hasChatHistory(chat, email) {
+  if (!chat || !Array.isArray(chat.messages) || !email) return false;
+  const normalized = normalizeEmail(email);
+  return chat.messages.some((message) => normalizeEmail(message?.sender) === normalized);
+}
+
+function hasReadOnlyAccess(chat, email) {
+  if (!chat || !email) return false;
+  const normalized = normalizeEmail(email);
+  if (!normalized) return false;
+
+  const allowedReaders = Array.isArray(chat.allowedReaders)
+    ? chat.allowedReaders.map((item) => normalizeEmail(item)).filter(Boolean)
+    : [];
+
+  return allowedReaders.includes(normalized);
+}
+
 // Get or create chat for a post
 router.get('/:postId', async (req, res) => {
   try {
     const { postId } = req.params;
+    const { viewerEmail } = req.query;
     const db = getDB();
 
     const chatId = toObjectId(postId);
@@ -42,20 +89,61 @@ router.get('/:postId', async (req, res) => {
       return res.status(400).json({ error: 'Invalid post ID' });
     }
 
-    // Check if chat exists for this post
+    const post = await db.collection('posts').findOne({ _id: chatId });
+    if (!post) {
+      return res.status(404).json({ error: 'Ride post not found' });
+    }
+
+    if (!viewerEmail) {
+      return res.status(400).json({ error: 'viewerEmail is required' });
+    }
+
+    let viewer;
+    try {
+      viewer = validateEmail(viewerEmail);
+    } catch (validationError) {
+      return res.status(400).json({ error: validationError.message });
+    }
+
     let chat = await db.collection('chats').findOne({ _id: chatId });
 
+    const isActiveParticipant = isActiveRideParticipant(post, viewer);
+    const canReadHistory = hasChatHistory(chat, viewer) || hasReadOnlyAccess(chat, viewer);
+
+    // Read-only access policy:
+    // - active participants can read/create chat
+    // - former participants can read existing chat history if they have participated before
+    if (!isActiveParticipant && !canReadHistory) {
+      return res.status(403).json({ error: 'You are not authorized to view this chat' });
+    }
+
     if (!chat) {
+      if (!isActiveParticipant) {
+        return res.status(403).json({ error: 'You are not authorized to view this chat' });
+      }
+
       // Create new chat
       const newChat = {
         _id: chatId,
         postId,
         messages: [],
+        allowedReaders: [viewer],
         createdAt: new Date(),
         updatedAt: new Date()
       };
       await db.collection('chats').insertOne(newChat);
       chat = newChat;
+    } else if (isActiveParticipant) {
+      await db.collection('chats').updateOne(
+        { _id: chatId },
+        { $addToSet: { allowedReaders: viewer } }
+      );
+
+      if (!Array.isArray(chat.allowedReaders)) {
+        chat.allowedReaders = [viewer];
+      } else if (!chat.allowedReaders.includes(viewer)) {
+        chat.allowedReaders.push(viewer);
+      }
     }
 
     res.json(chat);
@@ -98,6 +186,15 @@ router.post('/:chatId/messages', async (req, res) => {
       return res.status(400).json({ error: 'Invalid chat ID' });
     }
 
+    const post = await db.collection('posts').findOne({ _id: chatObjectId });
+    if (!post) {
+      return res.status(404).json({ error: 'Ride post not found' });
+    }
+
+    if (!isActiveRideParticipant(post, sender)) {
+      return res.status(403).json({ error: 'You are no longer part of this ride and cannot send new messages' });
+    }
+
     const newMessage = {
       _id: new ObjectId(),
       sender,
@@ -109,6 +206,7 @@ router.post('/:chatId/messages', async (req, res) => {
       { _id: chatObjectId },
       {
         $push: { messages: newMessage },
+        $addToSet: { allowedReaders: sender },
         $set: { updatedAt: new Date() }
       }
     );
@@ -131,7 +229,7 @@ router.post('/:chatId/messages', async (req, res) => {
 // GET all chats for a user
 router.get('/user/:email', async (req, res) => {
   try {
-    const { email } = req.params;
+    const email = validateEmail(req.params.email);
     const db = getDB();
 
     // Find all posts where the user is the owner, a rider, or a driver
