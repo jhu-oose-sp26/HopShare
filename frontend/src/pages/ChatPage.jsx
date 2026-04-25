@@ -55,7 +55,7 @@ const isCacheExpired = (entry) => {
 const ChatPage = ({ currentUser }) => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { chatId, postId } = location.state || {};
+  const { chatId, postId, isDm } = location.state || {};
   const [post, setPost] = useState(null);
   const [messages, setMessages] = useState([]);
   const [usersMap, setUsersMap] = useState({});
@@ -63,6 +63,7 @@ const ChatPage = ({ currentUser }) => {
   const [error, setError] = useState(null);
   const [message, setMessage] = useState('');
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const [otherUser, setOtherUser] = useState(null);
 
   const getAvatar = (user) => {
     const url = user?.picture || user?.avatar;
@@ -122,12 +123,35 @@ const ChatPage = ({ currentUser }) => {
     const fetchChat = async () => {
       try {
         const viewerEmail = encodeURIComponent(currentUser?.email || '');
-        const response = await fetch(`${API_ROOT}/chat/${chatId}?viewerEmail=${viewerEmail}`);
-        if (!response.ok) {
-          const payload = await response.json().catch(() => ({}));
-          throw new Error(payload.error || 'Failed to load chat');
+        let chat;
+        
+        if (isDm) {
+          // Fetch DM chat
+          const response = await fetch(`${API_ROOT}/chat/dm/${chatId}?viewerEmail=${viewerEmail}`);
+          if (!response.ok) {
+            const payload = await response.json().catch(() => ({}));
+            throw new Error(payload.error || 'Failed to load DM chat');
+          }
+          chat = await response.json();
+          // For DMs, get the other participant's info
+          const otherEmail = chat.participants?.find(p => p.toLowerCase() !== viewerEmail.toLowerCase());
+          if (otherEmail) {
+            const profileRes = await fetch(`${API_ROOT}/profile/by-email/${encodeURIComponent(otherEmail)}`);
+            if (profileRes.ok) {
+              const profileData = await profileRes.json();
+              setOtherUser(profileData.user);
+            }
+          }
+        } else {
+          // Fetch post-based chat
+          const response = await fetch(`${API_ROOT}/chat/${chatId}?viewerEmail=${viewerEmail}`);
+          if (!response.ok) {
+            const payload = await response.json().catch(() => ({}));
+            throw new Error(payload.error || 'Failed to load chat');
+          }
+          chat = await response.json();
         }
-        const chat = await response.json();
+        
         setMessages(chat.messages || []);
       } catch (err) {
         console.error('Error loading chat:', err);
@@ -271,7 +295,7 @@ const ChatPage = ({ currentUser }) => {
   const handleSendMessage = async () => {
     if (!message.trim() || !chatId) return;
 
-    if (!canSendMessages) {
+    if (!isDm && !canSendMessages) {
       setError('You can view this chat history, but you are no longer allowed to send messages for this ride.');
       return;
     }
@@ -297,7 +321,10 @@ const ChatPage = ({ currentUser }) => {
     }
 
     try {
-      const response = await fetch(`${API_ROOT}/chat/${chatId}/messages`, {
+      const endpoint = isDm 
+        ? `${API_ROOT}/chat/dm/${chatId}/messages`
+        : `${API_ROOT}/chat/${chatId}/messages`;
+      const response = await fetch(endpoint, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -332,19 +359,35 @@ const ChatPage = ({ currentUser }) => {
           </ChatHeaderButton>
         </ChatHeaderAddon>
         <ChatHeaderMain>
-          <span className="font-medium">{post?.title}</span>
-          <span className="text-sm font-semibold">—</span>
-          <span className="flex-1 grid">
-            <span className="text-sm font-medium truncate">
-              {participantCount} people
-            </span>
-          </span>
+          {isDm ? (
+            <>
+              <span className="font-medium">{otherUser?.name || 'Direct Message'}</span>
+              <span className="text-sm font-semibold">—</span>
+              <span className="flex-1 grid">
+                <span className="text-sm font-medium truncate">
+                  {otherUser?.email || ''}
+                </span>
+              </span>
+            </>
+          ) : (
+            <>
+              <span className="font-medium">{post?.title}</span>
+              <span className="text-sm font-semibold">—</span>
+              <span className="flex-1 grid">
+                <span className="text-sm font-medium truncate">
+                  {participantCount} people
+                </span>
+              </span>
+            </>
+          )}
         </ChatHeaderMain>
-        <ChatHeaderAddon>
-          <ChatHeaderButton className="@2xl/chat:inline-flex hidden" onClick={() => setDetailsOpen(true)}>
-            <Info />
-          </ChatHeaderButton>
-        </ChatHeaderAddon>
+        {!isDm && (
+          <ChatHeaderAddon>
+            <ChatHeaderButton className="@2xl/chat:inline-flex hidden" onClick={() => setDetailsOpen(true)}>
+              <Info />
+            </ChatHeaderButton>
+          </ChatHeaderAddon>
+        )}
       </ChatHeader>
 
       <ChatMessages className="px-2 sm:px-4 lg:px-6">

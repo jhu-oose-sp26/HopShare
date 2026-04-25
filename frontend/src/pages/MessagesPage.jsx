@@ -1,5 +1,5 @@
 import { Fragment, useState, useEffect, useMemo, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { MessageCircle, ArrowLeft, Info, SquareChevronRight } from 'lucide-react';
 import { io } from 'socket.io-client';
 import { Chat } from '@/components/chat/chat';
@@ -65,6 +65,9 @@ const formatChatTime = (dateString) => {
 
 export default function MessagesPage({ currentUser }) {
   const navigate = useNavigate();
+  const location = useLocation();
+  const initialState = location.state || {};
+  
   // ── Chat list ────────────────────────────────────────────────────────────
   const [chats, setChats] = useState([]);
   const [chatsLoading, setChatsLoading] = useState(true);
@@ -73,6 +76,7 @@ export default function MessagesPage({ currentUser }) {
   const [selectedChatId, setSelectedChatId] = useState(null);
   const selectedChatIdRef = useRef(null);
   const [selectedPostId, setSelectedPostId] = useState(null);
+  const [isDmChat, setIsDmChat] = useState(false);
 
   // ── Chat view ────────────────────────────────────────────────────────────
   const [post, setPost] = useState(null);
@@ -90,12 +94,53 @@ export default function MessagesPage({ currentUser }) {
   // ── Fetch chat list ───────────────────────────────────────────────────────
   useEffect(() => {
     if (!currentUser?.email) { setChatsLoading(false); return; }
-    fetch(`${API_ROOT}/chat/user/${encodeURIComponent(currentUser.email)}`)
-      .then(r => r.json())
-      .then(data => setChats(Array.isArray(data) ? data : []))
-      .catch(err => console.error('Failed to load chats:', err))
-      .finally(() => setChatsLoading(false));
+    
+    const fetchChats = async () => {
+      try {
+        // Fetch both post-based chats and DM chats
+        const [postChatsRes, dmChatsRes] = await Promise.all([
+          fetch(`${API_ROOT}/chat/user/${encodeURIComponent(currentUser.email)}`),
+          fetch(`${API_ROOT}/chat/dm/user/${encodeURIComponent(currentUser.email)}`)
+        ]);
+        
+        const postChats = await postChatsRes.json();
+        const dmChats = await dmChatsRes.json();
+        
+        // Combine and sort by updatedAt
+        const allChats = [
+          ...(Array.isArray(postChats) ? postChats : []),
+          ...(Array.isArray(dmChats) ? dmChats : [])
+        ];
+        allChats.sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
+        
+        setChats(allChats);
+      } catch (err) {
+        console.error('Failed to load chats:', err);
+        setChats([]);
+      } finally {
+        setChatsLoading(false);
+      }
+    };
+    
+    fetchChats();
   }, [currentUser]);
+
+  // ── Handle initial state from navigation (DM from UserProfile) ────────────
+  useEffect(() => {
+    if (initialState.chatId && initialState.isDm) {
+      // Find the chat in the list or select it directly
+      const existingChat = chats.find(c => c._id === initialState.chatId);
+      if (existingChat) {
+        handleSelectChat(existingChat);
+      } else {
+        // Chat not in list yet, set it as selected
+        setSelectedChatId(initialState.chatId);
+        selectedChatIdRef.current = initialState.chatId;
+        setIsDmChat(true);
+        setMobileView('chat');
+      }
+    }
+  }, [initialState, chats]);
 
   // ── Select a chat ─────────────────────────────────────────────────────────
   const handleSelectChat = (chat) => {
@@ -109,6 +154,7 @@ export default function MessagesPage({ currentUser }) {
     setSelectedChatId(chat._id);
     selectedChatIdRef.current = chat._id;
     setSelectedPostId(chat.postId);
+    setIsDmChat(chat.type === 'dm');
     setMessages([]);
     setPost(null);
     setUsersMap({});
@@ -233,7 +279,10 @@ export default function MessagesPage({ currentUser }) {
     if (/<script|javascript:|on\w+\s*=/i.test(trimmed)) { setChatError('Invalid characters in message'); return; }
 
     try {
-      const res = await fetch(`${API_ROOT}/chat/${selectedChatId}/messages`, {
+      const endpoint = isDmChat 
+        ? `${API_ROOT}/chat/dm/${selectedChatId}/messages`
+        : `${API_ROOT}/chat/${selectedChatId}/messages`;
+      const res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ sender: currentUser.email || currentUser._id, message: trimmed }),
@@ -299,7 +348,10 @@ export default function MessagesPage({ currentUser }) {
                   {/* Title + timestamp */}
                   <div className="flex items-start justify-between gap-2 mb-1">
                     <p className={`font-semibold text-sm leading-snug ${isActive ? 'text-blue-700' : 'text-gray-900'}`}>
-                      {chat.postTitle || 'Untitled ride'}
+                      {chat.type === 'dm' 
+                        ? (chat.otherUser?.name || chat.otherUser?.email || 'Direct Message')
+                        : (chat.postTitle && chat.postTitle !== 'Unknown Ride' ? chat.postTitle : 'Untitled ride')
+                      }
                     </p>
                     {chat.lastMessage?.timestamp && (
                       <span className="text-xs text-gray-400 shrink-0 mt-0.5">
@@ -310,27 +362,33 @@ export default function MessagesPage({ currentUser }) {
 
                   {/* Date / time / people */}
                   <div className="flex flex-wrap gap-x-3 gap-y-0.5 mb-1.5">
-                    {chat.tripDate && (
-                      <span className="text-xs text-gray-500">
-                        📅 {chat.tripDate}
-                      </span>
-                    )}
-                    {chat.tripTime && (
-                      <span className="text-xs text-gray-500">
-                        🕐 {chat.tripTime}
-                      </span>
-                    )}
-                    {chat.participantCount != null && (
-                      <span className="text-xs text-gray-500">
-                        👥 {chat.participantCount} {chat.participantCount === 1 ? 'person' : 'people'}
-                      </span>
+                    {chat.type === 'dm' ? (
+                      <span className="text-xs text-gray-500">💬 Direct Message</span>
+                    ) : (
+                      <>
+                        {chat.tripDate && (
+                          <span className="text-xs text-gray-500">
+                            📅 {chat.tripDate}
+                          </span>
+                        )}
+                        {chat.tripTime && (
+                          <span className="text-xs text-gray-500">
+                            🕐 {chat.tripTime}
+                          </span>
+                        )}
+                        {chat.participantCount != null && (
+                          <span className="text-xs text-gray-500">
+                            👥 {chat.participantCount} {chat.participantCount === 1 ? 'person' : 'people'}
+                          </span>
+                        )}
+                      </>
                     )}
                   </div>
 
                   {/* Last message */}
                   <p className="text-xs text-gray-500 truncate">
                     {chat.lastMessage
-                      ? `${chat.lastMessage.sender === currentUser.email ? 'You' : (chat.lastMessage.senderName || chat.lastMessage.sender.split('@')[0])}: ${chat.lastMessage.message}`
+                      ? `${chat.lastMessage.sender === currentUser.email ? 'You' : (chat.lastMessage.senderName || (chat.type === 'dm' ? (chat.otherUser?.name || chat.otherUser?.email) : 'Unknown'))}: ${chat.lastMessage.message}`
                       : <span className="italic">No messages yet</span>
                     }
                   </p>
@@ -359,13 +417,27 @@ export default function MessagesPage({ currentUser }) {
                 </ChatHeaderButton>
               </ChatHeaderAddon>
               <ChatHeaderMain>
-                <span className="font-semibold truncate">{selectedChat?.postTitle || post?.title || '…'}</span>
-                {participantCount > 0 && (
+                <span className="font-semibold truncate">
+                  {isDmChat 
+                    ? (selectedChat?.otherUser?.name || selectedChat?.otherUser?.email || 'Direct Message')
+                    : (selectedChat?.postTitle || post?.title || '…')
+                  }
+                </span>
+                {!isDmChat && participantCount > 0 && (
                   <span className="text-sm text-gray-500 shrink-0">{participantCount} {participantCount === 1 ? 'person' : 'people'}</span>
                 )}
               </ChatHeaderMain>
               <ChatHeaderAddon>
-                <ChatHeaderButton onClick={() => setDetailsOpen(true)}>
+                <ChatHeaderButton onClick={() => {
+                  if (isDmChat) {
+                    const otherUser = selectedChat?.otherUser;
+                    if (otherUser?._id) {
+                      navigate(`/user/${otherUser.googleId}`);
+                    }
+                  } else {
+                    setDetailsOpen(true);
+                  }
+                }}>
                   <Info />
                 </ChatHeaderButton>
               </ChatHeaderAddon>
