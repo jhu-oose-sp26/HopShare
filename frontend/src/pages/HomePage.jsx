@@ -132,10 +132,7 @@ function HomePage({ currentUser, onLogout }) {
   return (
     <div className='min-h-screen bg-white pb-20' {...handlers}>
       <div className='bg-white'>
-        <div className="relative">
-          <div className="absolute top-6 right-6">
-            <NotificationMenu currentUser={currentUser}/>
-          </div>
+        <div>
           <div className='container mx-auto px-6 py-8 max-w-6xl space-y-6'>
             <div className='flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between'>
               <div>
@@ -154,12 +151,13 @@ function HomePage({ currentUser, onLogout }) {
                 </p>
               </div>
 
-              <div className='flex flex-col items-end gap-2'>
+              <div className='flex flex-col items-start gap-2 sm:items-end'>
                 <div className='text-right'>
                   <p className='text-sm text-gray-700'>{currentUser?.name}</p>
                   <p className='text-xs text-gray-500'>{currentUser?.email}</p>
                 </div>
-                <div className='flex gap-2 items-center'>
+                <div className='flex w-full flex-wrap items-center gap-2 sm:w-auto sm:justify-end'>
+                  <NotificationMenu currentUser={currentUser} />
                   <Button size='sm' onClick={openCreateRequest}>Create a Request</Button>
                   <Button size='sm' onClick={onLogout} className='bg-rose-600/70 hover:bg-rose-600/90 text-white border-0'>
                     Log out
