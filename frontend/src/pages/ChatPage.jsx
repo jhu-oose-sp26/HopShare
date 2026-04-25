@@ -421,6 +421,8 @@ const ChatPage = ({ currentUser }) => {
           value={message}
           onChange={(e) => setMessage(e.target.value)}
           onSubmit={() => handleSendMessage()}
+          placeholder={!canSendMessages ? 'cannot sent message in quitted group chat' : 'Type your message...'}
+          className={!canSendMessages ? 'text-center placeholder:text-center' : ''}
           disabled={!canSendMessages}
         />
         <ChatToolbarAddon align="inline-end">
