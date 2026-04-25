@@ -31,6 +31,10 @@ function AppRoutes({ currentUser, authApi }) {
     <>
       <Routes>
         <Route
+          path='/'
+          element={<Navigate to={currentUser ? '/home' : '/landing'} replace />}
+        />
+        <Route
           path='/landing'
           element={currentUser ? <Navigate to='/home' replace /> : <LandingPage onLogin={authApi.login} />}
         />
