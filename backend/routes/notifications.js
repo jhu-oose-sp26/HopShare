@@ -124,7 +124,10 @@ router.patch('/:id/respond', async (req, res) => {
           await db.collection('posts').updateOne(
             { _id: notif.postId },
             {
-              $pull: { pendingJoins: senderEmail },
+              $pull: {
+                pendingJoins: senderEmail,
+                riderList: { email: senderEmail },
+              },
               $push: { riderList: {
                 name: senderUser.name || senderUser.displayName || notif.senderName || '',
                 email: senderEmail,
@@ -152,7 +155,10 @@ router.patch('/:id/respond', async (req, res) => {
           await db.collection('posts').updateOne(
             { _id: notif.postId },
             {
-              $pull: { pendingDrivers: { email: senderUser.email } },
+              $pull: {
+                pendingDrivers: { email: senderUser.email },
+                drivers: { email: senderUser.email },
+              },
               $push: { drivers: {
                 name: senderUser.name || notif.senderName || '',
                 email: senderUser.email,

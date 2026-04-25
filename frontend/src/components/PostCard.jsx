@@ -747,22 +747,13 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
                                     const res = await fetch(`${API_ROOT}/posts/${post._id}/join`, {
                                         method: 'POST',
                                         headers: { 'Content-Type': 'application/json' },
-                                        body: JSON.stringify({ email: currentUser.email }),
+                                        body: JSON.stringify({
+                                            email: currentUser.email,
+                                            senderName: currentUser.name,
+                                            senderId: currentUser._id,
+                                        }),
                                     });
                                     if (res.ok) {
-                                        const msg = `${currentUser.name} wants to join your rider list for the ride from ${post.trip?.startLocation?.title || 'start'} to ${post.trip?.endLocation?.title || 'destination'}.`;
-                                        await fetch(NOTIFICATIONS_ENDPOINT, {
-                                            method: 'POST',
-                                            headers: { 'Content-Type': 'application/json' },
-                                            body: JSON.stringify({
-                                                recipientEmail: post.user.email,
-                                                senderName: currentUser.name,
-                                                senderId: currentUser._id,
-                                                message: msg,
-                                                postId: post._id,
-                                                type: 'join_list',
-                                            }),
-                                        });
                                         setListRequestSent(true);
                                     } else {
                                         const data = await res.json().catch(() => ({}));

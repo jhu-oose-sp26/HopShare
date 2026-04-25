@@ -30,11 +30,27 @@ export function useFriends(userId) {
       }
       if (incomingRes.ok) {
         const data = await incomingRes.json();
-        setIncomingRequests(data.requests || []);
+        const uniqueIncoming = [];
+        const seenSenderIds = new Set();
+        for (const req of data.requests || []) {
+          const senderId = String(req?.sender?._id || '');
+          if (!senderId || seenSenderIds.has(senderId)) continue;
+          seenSenderIds.add(senderId);
+          uniqueIncoming.push(req);
+        }
+        setIncomingRequests(uniqueIncoming);
       }
       if (sentRes.ok) {
         const data = await sentRes.json();
-        setSentRequests(data.requests || []);
+        const uniqueSent = [];
+        const seenReceivers = new Set();
+        for (const req of data.requests || []) {
+          const receiverId = String(req?.receiverId || '');
+          if (!receiverId || seenReceivers.has(receiverId)) continue;
+          seenReceivers.add(receiverId);
+          uniqueSent.push(req);
+        }
+        setSentRequests(uniqueSent);
       }
       setError('');
     } catch (err) {
@@ -63,7 +79,12 @@ export function useFriends(userId) {
       throw new Error(data.error || 'Failed to send friend request');
     }
 
-    setSentRequests(prev => [...prev, { senderId: userId, receiverId: friendId }]);
+    setSentRequests((prev) => {
+      if (prev.some((r) => String(r.receiverId) === String(friendId))) {
+        return prev;
+      }
+      return [...prev, { senderId: userId, receiverId: friendId }];
+    });
   }, [userId]);
 
   // Keep addFriend as an alias for sendFriendRequest for backwards compat
@@ -83,10 +104,16 @@ export function useFriends(userId) {
 
     const data = await response.json();
     if (data.friend) {
-      setFriends(prev => [...prev, data.friend]);
+      setFriends((prev) => {
+        if (prev.some((f) => String(f._id) === String(data.friend._id))) {
+          return prev;
+        }
+        return [...prev, data.friend];
+      });
     }
-    setIncomingRequests(prev => prev.filter(r => r._id !== requestId));
-  }, [userId]);
+    setIncomingRequests((prev) => prev.filter((r) => String(r._id) !== String(requestId)));
+    await fetchFriends();
+  }, [userId, fetchFriends]);
 
   const rejectRequest = useCallback(async (requestId) => {
     if (!userId) return;
@@ -100,8 +127,9 @@ export function useFriends(userId) {
       throw new Error(data.error || 'Failed to reject request');
     }
 
-    setIncomingRequests(prev => prev.filter(r => r._id !== requestId));
-  }, [userId]);
+    setIncomingRequests((prev) => prev.filter((r) => String(r._id) !== String(requestId)));
+    await fetchFriends();
+  }, [userId, fetchFriends]);
 
   const cancelRequest = useCallback(async (requestId) => {
     if (!userId) return;
@@ -115,8 +143,9 @@ export function useFriends(userId) {
       throw new Error(data.error || 'Failed to cancel request');
     }
 
-    setSentRequests(prev => prev.filter(r => r._id !== requestId));
-  }, [userId]);
+    setSentRequests((prev) => prev.filter((r) => String(r._id) !== String(requestId)));
+    await fetchFriends();
+  }, [userId, fetchFriends]);
 
   const removeFriend = useCallback(async (friendId) => {
     if (!userId) return;

@@ -550,10 +550,9 @@ router.post('/:id/join', async (req, res) => {
     }
 
     const riderList = post.riderList || [];
-    const pendingJoins = post.pendingJoins || [];
 
-    // Check if already joined or pending
-    if (riderList.some(u => u.email === email) || pendingJoins.includes(email)) {
+    // Check if already joined
+    if (riderList.some(u => u.email === email)) {
       return res.json({ success: true, alreadyJoined: true });
     }
 
@@ -561,10 +560,15 @@ router.post('/:id/join', async (req, res) => {
       return res.status(400).json({ error: 'This ride is full.' });
     }
 
-    await db.collection('posts').updateOne(
+    const joinResult = await db.collection('posts').updateOne(
       { _id: postId },
-      { $push: { pendingJoins: email } }
+      { $addToSet: { pendingJoins: email } }
     );
+
+    // No-op if request is already pending.
+    if (joinResult.modifiedCount === 0) {
+      return res.json({ success: true, alreadyJoined: true });
+    }
 
     // Notify the post owner
     const ownerEmail = post.user?.email;
