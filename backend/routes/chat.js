@@ -255,10 +255,7 @@ router.get('/user/:email', async (req, res) => {
 
     // Find all chats tied to those posts OR where the user has sent a message
     const chats = await db.collection('chats').find({
-      $or: [
-        { _id: { $in: postIds } },
-        { 'messages.sender': email }
-      ]
+      _id: { $in: postIds }
     }).toArray();
 
     // Format the chats for the UI (attach post title, get last message)
@@ -319,6 +316,215 @@ router.get('/user/:email', async (req, res) => {
     res.json(formattedChats);
   } catch (error) {
     console.error('Error getting user chats:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Get or create a DM chat between two users (not tied to a post)
+router.get('/dm/:otherUserId', async (req, res) => {
+  try {
+    const { otherUserId } = req.params;
+    const { viewerEmail } = req.query;
+
+    if (!viewerEmail) {
+      return res.status(400).json({ error: 'viewerEmail is required' });
+    }
+
+    let viewer;
+    try {
+      viewer = validateEmail(viewerEmail);
+    } catch (validationError) {
+      return res.status(400).json({ error: validationError.message });
+    }
+
+    const db = getDB();
+
+    // Get the other user's profile to find their email
+    let otherUserEmail = otherUserId;
+    if (ObjectId.isValid(otherUserId) && otherUserId.length === 24) {
+      const otherUser = await db.collection('users').findOne({ _id: new ObjectId(otherUserId) });
+      if (otherUser) {
+        otherUserEmail = otherUser.email;
+      }
+    } else if (otherUserId.includes('@')) {
+      otherUserEmail = otherUserId;
+    }
+
+    if (!otherUserEmail) {
+      return res.status(400).json({ error: 'Invalid user ID' });
+    }
+
+    otherUserEmail = validateEmail(otherUserEmail);
+
+    // Prevent DM with self
+    if (viewer === otherUserEmail) {
+      return res.status(400).json({ error: 'Cannot create a DM with yourself' });
+    }
+
+    // Check if a DM chat already exists between these two users
+    // DM chats have type: 'dm' and participants array
+    const existingDm = await db.collection('chats').findOne({
+      type: 'dm',
+      participants: { $all: [viewer, otherUserEmail], $size: 2 }
+    });
+
+    if (existingDm) {
+      return res.json(existingDm);
+    }
+
+    // Create new DM chat
+    const newDm = {
+      _id: new ObjectId(),
+      type: 'dm',
+      participants: [viewer, otherUserEmail],
+      messages: [],
+      allowedReaders: [viewer, otherUserEmail],
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+
+    await db.collection('chats').insertOne(newDm);
+    res.status(201).json(newDm);
+  } catch (error) {
+    console.error('Error creating DM chat:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Send a message in a DM chat
+router.post('/dm/:chatId/messages', async (req, res) => {
+  try {
+    const { chatId } = req.params;
+    let { sender, message } = req.body;
+
+    if (!sender || !message) {
+      return res.status(400).json({ error: 'Sender and message are required' });
+    }
+
+    // Validate and sanitize input
+    try {
+      sender = validateEmail(sender);
+      message = sanitizeString(message, 'Message', 10000);
+    } catch (validationError) {
+      return res.status(400).json({ error: validationError.message });
+    }
+
+    const db = getDB();
+    const chatObjectId = toObjectId(chatId);
+    if (!chatObjectId) {
+      return res.status(400).json({ error: 'Invalid chat ID' });
+    }
+
+    // Verify this is a DM chat
+    const chat = await db.collection('chats').findOne({ _id: chatObjectId, type: 'dm' });
+    if (!chat) {
+      return res.status(404).json({ error: 'DM chat not found' });
+    }
+
+    // Verify sender is a participant
+    const normalizedSender = normalizeEmail(sender);
+    const participants = chat.participants?.map(p => normalizeEmail(p)) || [];
+    if (!participants.includes(normalizedSender)) {
+      return res.status(403).json({ error: 'You are not a participant of this DM chat' });
+    }
+
+    const newMessage = {
+      _id: new ObjectId(),
+      sender,
+      message,
+      timestamp: new Date()
+    };
+
+    const result = await db.collection('chats').updateOne(
+      { _id: chatObjectId },
+      {
+        $push: { messages: newMessage },
+        $set: { updatedAt: new Date() }
+      }
+    );
+
+    if (result.matchedCount === 0) {
+      return res.status(404).json({ error: 'Chat not found' });
+    }
+
+    req.app.get('io').to(chatId).emit('newMessage', { ...newMessage, chatId });
+
+    res.status(201).json(newMessage);
+  } catch (error) {
+    console.error('Error adding DM message:', error);
+    res.status(500).json({ error: error.message || 'Internal server error' });
+  }
+});
+
+// Get all DM chats for a user (separate from post-based chats)
+router.get('/dm/user/:email', async (req, res) => {
+  try {
+    const email = validateEmail(req.params.email);
+    const db = getDB();
+
+    const dmChats = await db.collection('chats').find({
+      type: 'dm',
+      participants: email
+    }).toArray();
+
+    // Enrich with participant user info
+    const allParticipants = [...new Set(
+      dmChats.flatMap(chat => chat.participants || [])
+    )];
+
+    const participantUsers = await db.collection('users').find(
+      { email: { $in: allParticipants } },
+      { projection: { _id: 1, email: 1, name: 1, picture: 1, avatar: 1, googleId: 1 } }
+    ).toArray();
+
+    const userByEmail = {};
+    for (const user of participantUsers) {
+      userByEmail[user.email.toLowerCase()] = user;
+    }
+
+    const formattedDms = dmChats.map(chat => {
+      const otherParticipant = chat.participants?.find(p => 
+        normalizeEmail(p) !== normalizeEmail(email)
+      );
+      const otherUser = otherParticipant ? userByEmail[otherParticipant.toLowerCase()] : null;
+
+      const lastMessage = chat.messages?.length > 0
+        ? chat.messages[chat.messages.length - 1]
+        : null;
+
+      if (lastMessage) {
+        const senderIsViewer = normalizeEmail(lastMessage.sender) === normalizeEmail(email);
+        lastMessage.senderName = senderIsViewer
+          ? null
+          : (otherUser?.name || otherParticipant);
+      }
+
+      return {
+        _id: chat._id,
+        type: 'dm',
+        postId: null,
+        postTitle: null,
+        otherUser: otherUser ? {
+          _id: otherUser._id,
+          googleId: otherUser.googleId,
+          name: otherUser.name,
+          email: otherUser.email,
+          picture: otherUser.picture || otherUser.avatar
+        } : {
+          name: otherParticipant,
+          email: otherParticipant
+        },
+        lastMessage: lastMessage,
+        updatedAt: chat.updatedAt || chat.createdAt
+      };
+    });
+
+    // Sort by most recently updated
+    formattedDms.sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
+
+    res.json(formattedDms);
+  } catch (error) {
+    console.error('Error getting user DM chats:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
