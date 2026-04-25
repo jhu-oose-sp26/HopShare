@@ -129,12 +129,20 @@ function HomePage({ currentUser, onLogout }) {
     { enabled: true }
   );
 
+  const userAvatar = currentUser?.picture
+    || currentUser?.avatar
+    || `https://ui-avatars.com/api/?name=${encodeURIComponent(currentUser?.name || 'User')}&background=e5e7eb&color=374151&size=128`;
+
   return (
     <div className='min-h-screen bg-white pb-20' {...handlers}>
       <div className='bg-white'>
-        <div>
+        <div className='relative'>
+          <div className='absolute top-6 right-6 z-10'>
+            <NotificationMenu currentUser={currentUser} />
+          </div>
+
           <div className='container mx-auto px-6 py-8 max-w-6xl space-y-6'>
-            <div className='flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between'>
+            <div className='flex flex-col gap-4 pr-14 lg:flex-row lg:items-end lg:justify-between sm:pr-20'>
               <div>
                 <h1 className='text-3xl font-bold text-gray-900 mb-2'>HopShare</h1>
                 <p className='text-gray-600'>
@@ -152,12 +160,21 @@ function HomePage({ currentUser, onLogout }) {
               </div>
 
               <div className='flex flex-col items-start gap-2 sm:items-end'>
-                <div className='text-right'>
-                  <p className='text-sm text-gray-700'>{currentUser?.name}</p>
-                  <p className='text-xs text-gray-500'>{currentUser?.email}</p>
+                <div className='flex items-center gap-3 self-start sm:self-end'>
+                  <img
+                    src={userAvatar}
+                    alt={currentUser?.name || 'User avatar'}
+                    className='h-10 w-10 rounded-full border border-gray-200 object-cover'
+                    onError={(e) => {
+                      e.currentTarget.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(currentUser?.name || 'User')}&background=e5e7eb&color=374151&size=128`;
+                    }}
+                  />
+                  <div className='text-left sm:text-right'>
+                    <p className='text-sm text-gray-700'>{currentUser?.name}</p>
+                    <p className='max-w-[240px] truncate text-xs text-gray-500'>{currentUser?.email}</p>
+                  </div>
                 </div>
                 <div className='flex w-full flex-wrap items-center gap-2 sm:w-auto sm:justify-end'>
-                  <NotificationMenu currentUser={currentUser} />
                   <Button size='sm' onClick={openCreateRequest}>Create a Request</Button>
                   <Button size='sm' onClick={onLogout} className='bg-rose-600/70 hover:bg-rose-600/90 text-white border-0'>
                     Log out
