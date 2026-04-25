@@ -16,12 +16,19 @@ export function PrimaryMessage({
   senderName,
   content,
   timestamp,
-  className
+  className,
+  onAvatarClick,
 }) {
   return (
     <ChatEvent className={cn("hover:bg-accent", className)}>
       <ChatEventAddon>
-        <ChatEventAvatar src={avatarSrc} alt={avatarAlt} fallback={avatarFallback} />
+        <ChatEventAvatar
+          src={avatarSrc}
+          alt={avatarAlt}
+          fallback={avatarFallback}
+          onClick={onAvatarClick}
+          className={onAvatarClick ? 'cursor-pointer hover:opacity-80' : undefined}
+        />
       </ChatEventAddon>
       <ChatEventBody>
         <ChatEventTitle>

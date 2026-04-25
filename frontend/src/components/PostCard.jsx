@@ -723,7 +723,7 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
                     <Button
                         variant='default'
                         size='sm'
-                        className='flex-1'
+                        className='w-full'
                         onClick={handleChatClick}
                     >
                         <MessageCircle className='w-4 h-4 mr-1' />
@@ -786,36 +786,6 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
                                 <><Users className='w-4 h-4 mr-1' />Join the Rider List</>
                             )}
                         </Button>}
-                        {listJoined && (
-                            <Button
-                                variant='outline'
-                                size='sm'
-                                className='w-full text-xs text-red-600 border-red-300 hover:bg-red-50 hover:text-red-700'
-                                onClick={() => setRemoveConfirm({
-                                    open: true,
-                                    title: 'Leave Rider List?',
-                                    message: 'Are you sure you want to leave the rider list for this ride? You will need to be re-accepted if you request to join the ride again.',
-                                    onConfirm: async () => {
-                                        const res = await fetch(`${API_ROOT}/posts/${post._id}/remove-member`, {
-                                            method: 'POST',
-                                            headers: { 'Content-Type': 'application/json' },
-                                            body: JSON.stringify({
-                                                email: currentUser.email,
-                                                name: currentUser.name,
-                                                actorEmail: currentUser.email,
-                                                actorName: currentUser.name,
-                                                actorId: currentUser._id,
-                                            }),
-                                        });
-                                        if (res.ok) {
-                                            setListMembers(prev => prev.filter(m => m.email !== currentUser.email));
-                                        }
-                                    },
-                                })}
-                            >
-                                <UserMinus className='w-3 h-3 mr-1' />Leave Rider List
-                            </Button>
-                        )}
                         {listJoinError && <p className='text-xs text-red-500'>{listJoinError}</p>}
                     </div>
                 )}

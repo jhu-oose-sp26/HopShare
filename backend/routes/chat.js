@@ -117,7 +117,7 @@ router.post('/:chatId/messages', async (req, res) => {
       return res.status(404).json({ error: 'Chat not found' });
     }
 
-    req.app.get('io').to(req.params.chatId).emit('newMessage', newMessage);
+    req.app.get('io').to(req.params.chatId).emit('newMessage', { ...newMessage, chatId: req.params.chatId });
 
     res.status(201).json(newMessage);
   } catch (error) {
@@ -141,12 +141,17 @@ router.get('/user/:email', async (req, res) => {
         { 'riderList.email': email },
         { 'drivers.email': email }
       ]
-    }).project({ title: 1 }).toArray(); 
-    
-    // Create an array of post IDs and a map to quickly look up post titles
+    }).project({ title: 1, 'trip.date': 1, 'trip.time': 1, riderList: 1, drivers: 1 }).toArray();
+
+    // Create an array of post IDs and a map to quickly look up post info
     const postIds = userPosts.map(p => p._id);
     const postMap = userPosts.reduce((acc, post) => {
-      acc[post._id.toString()] = post.title;
+      acc[post._id.toString()] = {
+        title: post.title,
+        tripDate: post.trip?.date || null,
+        tripTime: post.trip?.time || null,
+        participantCount: 1 + (post.riderList?.length || 0) + (post.drivers?.length || 0),
+      };
       return acc;
     }, {});
 
@@ -164,14 +169,51 @@ router.get('/user/:email', async (req, res) => {
         ? chat.messages[chat.messages.length - 1] 
         : null;
 
+      const postInfo = postMap[chat._id.toString()] || {};
       return {
         _id: chat._id,
         postId: chat.postId,
-        postTitle: postMap[chat._id.toString()] || 'Unknown Ride',
+        postTitle: postInfo.title || 'Unknown Ride',
+        tripDate: postInfo.tripDate || null,
+        tripTime: postInfo.tripTime || null,
+        participantCount: postInfo.participantCount ?? null,
         lastMessage: lastMessage,
         updatedAt: chat.updatedAt || chat.createdAt
       };
     });
+
+    // Enrich lastMessage with sender's display name
+    // sender may be stored as email OR MongoDB ObjectId string
+    const senderValues = [...new Set(
+      formattedChats.filter(c => c.lastMessage?.sender).map(c => c.lastMessage.sender)
+    )];
+    if (senderValues.length > 0) {
+      const emailSenders = senderValues.filter(s => s.includes('@'));
+      const idSenders = senderValues.filter(s => !s.includes('@') && ObjectId.isValid(s));
+
+      const orClauses = [];
+      if (emailSenders.length > 0) orClauses.push({ email: { $in: emailSenders } });
+      if (idSenders.length > 0) orClauses.push({ _id: { $in: idSenders.map(id => new ObjectId(id)) } });
+
+      const senderUsers = orClauses.length > 0
+        ? await db.collection('users')
+            .find({ $or: orClauses }, { projection: { _id: 1, email: 1, name: 1 } })
+            .toArray()
+        : [];
+
+      const nameByKey = {};
+      for (const u of senderUsers) {
+        if (u.email) nameByKey[u.email.toLowerCase()] = u.name;
+        nameByKey[u._id.toString()] = u.name;
+      }
+
+      for (const chat of formattedChats) {
+        const s = chat.lastMessage?.sender;
+        if (s) {
+          chat.lastMessage.senderName = nameByKey[s.toLowerCase()] || nameByKey[s] || null;
+        }
+      }
+    }
 
     // Sort by most recently updated
     formattedChats.sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
