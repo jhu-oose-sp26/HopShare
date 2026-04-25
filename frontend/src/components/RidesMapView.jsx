@@ -158,6 +158,9 @@ function RidesMapView({ posts, isLoading = false, currentUser, coords, routeSear
   const [fromOpen, setFromOpen] = useState(false);
   const [toOpen, setToOpen] = useState(false);
   const [selectedPost, setSelectedPost] = useState(null);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const pastDateMatcher = { before: today };
 
   const ridesWithCoords = posts.filter(
     (p) =>
@@ -228,11 +231,13 @@ function RidesMapView({ posts, isLoading = false, currentUser, coords, routeSear
                   mode='single'
                   selected={fromDate ? parse(fromDate, 'yyyy-MM-dd', new Date()) : undefined}
                   onSelect={(d) => {
-                    if (!d) return;
+                    if (!d || d < today) return;
                     setFromDate(format(d, 'yyyy-MM-dd'));
                     setFromOpen(false);
                     setToOpen(true);
                   }}
+                  disabled={pastDateMatcher}
+                  startMonth={today}
                 />
               </PopoverContent>
             </Popover>
@@ -254,10 +259,12 @@ function RidesMapView({ posts, isLoading = false, currentUser, coords, routeSear
                   mode='single'
                   selected={toDate ? parse(toDate, 'yyyy-MM-dd', new Date()) : undefined}
                   onSelect={(d) => {
-                    if (!d) return;
+                    if (!d || d < today) return;
                     setToDate(format(d, 'yyyy-MM-dd'));
                     setToOpen(false);
                   }}
+                  disabled={pastDateMatcher}
+                  startMonth={today}
                 />
               </PopoverContent>
             </Popover>
