@@ -242,7 +242,7 @@ export const usePosts = (currentUser = null) => {
             throw new Error(await readErrorMessage(response));
         }
         // Change Stream will broadcast to all clients
-    }, []);
+    }, [currentUser?.email]);
 
     const updatePost = useCallback(async (postId, formData) => {
         const postPayload = createPostPayload(formData);
@@ -261,7 +261,7 @@ export const usePosts = (currentUser = null) => {
             throw new Error(await readErrorMessage(response));
         }
         // Change Stream will broadcast to all clients
-    }, []);
+    }, [currentUser?.email]);
 
     return {
         posts,
