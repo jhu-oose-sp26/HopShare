@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { User, Mail, Phone, BookOpen, Calendar, MapPin, ArrowLeft, UserPlus, UserMinus } from 'lucide-react';
+import { User, Mail, Phone, BookOpen, Calendar, MapPin, ArrowLeft, UserPlus, UserMinus, MessageCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -192,28 +192,51 @@ function UserProfile({ currentUser }) {
                 const isAlreadyFriend = isFriend(profile._id);
                 const isPending = requestSent || hasSentRequest(profile._id);
                 return (
-                  <Button
-                    onClick={handleToggleFriend}
-                    disabled={friendLoading || isPending}
-                    variant={isAlreadyFriend ? 'outline' : 'default'}
-                    className={isAlreadyFriend ? 'text-red-600 hover:bg-red-50' : ''}
-                  >
-                    {friendLoading ? (
-                      'Loading...'
-                    ) : isAlreadyFriend ? (
-                      <>
-                        <UserMinus className="w-4 h-4 mr-2" />
-                        Remove Friend
-                      </>
-                    ) : isPending ? (
-                      'Request Sent'
-                    ) : (
-                      <>
-                        <UserPlus className="w-4 h-4 mr-2" />
-                        Add Friend
-                      </>
-                    )}
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button
+                      onClick={handleToggleFriend}
+                      disabled={friendLoading || isPending}
+                      variant={isAlreadyFriend ? 'outline' : 'default'}
+                      className={isAlreadyFriend ? 'text-red-600 hover:bg-red-50' : ''}
+                    >
+                      {friendLoading ? (
+                        'Loading...'
+                      ) : isAlreadyFriend ? (
+                        <>
+                          <UserMinus className="w-4 h-4 mr-2" />
+                          Remove Friend
+                        </>
+                      ) : isPending ? (
+                        'Request Sent'
+                      ) : (
+                        <>
+                          <UserPlus className="w-4 h-4 mr-2" />
+                          Add Friend
+                        </>
+                      )}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={async () => {
+                        try {
+                          const response = await fetch(
+                            `${API_ROOT}/chat/dm/${profile._id}?viewerEmail=${encodeURIComponent(currentUser.email)}`
+                          );
+                          if (!response.ok) {
+                            throw new Error('Failed to create DM chat');
+                          }
+                          const chat = await response.json();
+                          navigate('/messages', { state: { chatId: chat._id, isDm: true } });
+                        } catch (error) {
+                          console.error('Error starting DM:', error);
+                          alert('Failed to start conversation. Please try again.');
+                        }
+                      }}
+                    >
+                      <MessageCircle className="w-4 h-4 mr-2" />
+                      Message
+                    </Button>
+                  </div>
                 );
               })()}
             </div>
