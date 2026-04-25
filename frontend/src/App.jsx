@@ -36,7 +36,7 @@ function AppRoutes({ currentUser, authApi }) {
         />
         <Route
           path='/home'
-          element={currentUser ? <HomePage currentUser={currentUser} onLogout={authApi.logout} /> : <Navigate to='/status/401' replace />}
+          element={currentUser ? <HomePage currentUser={currentUser} onLogout={authApi.logout} /> : <Navigate to='/landing' replace />}
         />
         <Route
           path='/friends'
