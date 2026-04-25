@@ -2,7 +2,7 @@ require('dotenv').config();
 
 const express = require('express');
 const cors = require('cors');
-const { connectDB } = require('./db');
+const { connectDB, getDB } = require('./db');
 const { Server }  = require('socket.io');
 const http = require('http');
 const postsRoutes = require('./routes/posts');
@@ -53,7 +53,127 @@ const io = new Server(server, {
 
 app.set('io', io);
 
+// Change Stream for realtime posts
+function setupPostsChangeStream() {
+  const db = getDB();
+  const postsCollection = db.collection('posts');
+
+  const changeStream = postsCollection.watch([], {
+    fullDocument: 'updateLookup'
+  });
+
+  console.log('MongoDB Change Stream setup for posts collection');
+
+  changeStream.on('change', async (change) => {
+    console.log('Posts change detected:', change.operationType);
+
+    try {
+      let post = change.fullDocument;
+
+      // Enrich with googleId if needed (referring to enrichPostsWithGoogleIds func in routes/posts.js)
+      if (post && post.user?.email && !post.user?.googleId) {
+        const user = await db.collection('users').findOne(
+          { email: post.user.email },
+          { projection: { googleId: 1 } }
+        );
+        if (user?.googleId) {
+          post.user.googleId = user.googleId;
+        }
+      }
+
+      switch (change.operationType) {
+        case 'insert':
+          io.emit('post:created', { post });
+          console.log('Broadcasted new post:', post._id);
+          break;
+
+        case 'update':
+        case 'replace':
+          if (post) {
+            io.emit('post:updated', { post });
+            console.log('Broadcasted updated post:', post._id);
+          }
+          break;
+
+        case 'delete':
+          const postId = change.documentKey._id.toString();
+          io.emit('post:deleted', { postId });
+          console.log('Broadcasted deleted post:', postId);
+          break;
+
+        default:
+          io.emit('posts:refresh');
+      }
+    } catch (err) {
+      console.error('Error processing change stream event:', err);
+    }
+  });
+
+  changeStream.on('error', (error) => {
+    console.error('Change stream error:', error);
+  });
+}
+
+// Change Stream for real-time notifications
+function setupNotificationsChangeStream() {
+  const db = getDB();
+  const notificationsCollection = db.collection('notifications');
+
+  const changeStream = notificationsCollection.watch([], {
+    fullDocument: 'updateLookup'
+  });
+
+  console.log('MongoDB Change Stream setup for notifications collection');
+
+  changeStream.on('change', async (change) => {
+    console.log('Notifications change detected:', change.operationType);
+
+    try {
+      switch (change.operationType) {
+        case 'insert': {
+          const notification = change.fullDocument;
+          const recipientId = notification.recipientId?.toString();
+          if (recipientId) {
+            io.emit(`notification:created:${recipientId}`, { notification });
+            console.log('Broadcasted new notification to user:', recipientId);
+          }
+          break;
+        }
+
+        case 'update':
+        case 'replace': {
+          const notification = change.fullDocument;
+          if (notification) {
+            const recipientId = notification.recipientId?.toString();
+            if (recipientId) {
+              io.emit(`notification:updated:${recipientId}`, { notification });
+              console.log('Broadcasted updated notification to user:', recipientId);
+            }
+          }
+          break;
+        }
+
+        case 'delete': {
+          const notificationId = change.documentKey._id.toString();
+          io.emit('notification:deleted', { notificationId });
+          console.log('Broadcasted deleted notification:', notificationId);
+          break;
+        }
+      }
+    } catch (err) {
+      console.error('Error processing notification change stream event:', err);
+    }
+  });
+
+  changeStream.on('error', (error) => {
+    console.error('Notifications change stream error:', error);
+  });
+}
+
 connectDB().then(() => {
+  setupPostsChangeStream();
+  setupNotificationsChangeStream();
+  
   server.listen(PORT, () => {
     console.log(`Server listening on port ${PORT}`);
   });
@@ -62,10 +182,12 @@ connectDB().then(() => {
 io.on("connection", (socket) => {
   console.log("User connected:", socket.id);
 
-  // join a chat room
   socket.on("joinChat", (chatId) => {
     socket.join(chatId);
-    console.log(`Joined room: ${chatId}`);
+  });
+
+  socket.on("leaveChat", (chatId) => {
+    socket.leave(chatId);
   });
 
   socket.on("disconnect", () => {

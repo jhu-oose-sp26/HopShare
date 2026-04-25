@@ -31,9 +31,124 @@ function getTodayDateString() {
   return `${year}-${month}-${day}`;
 }
 
+// Validation helpers
+function sanitizeString(str, fieldName = 'input', maxLength = 5000) {
+  if (typeof str !== 'string') {
+    throw new Error(`${fieldName} must be a string`);
+  }
+  
+  // Remove potential XSS vectors
+  const sanitized = str
+    .replace(/<script[^>]*>.*?<\/script>/gi, '')
+    .replace(/<iframe[^>]*>.*?<\/iframe>/gi, '')
+    .replace(/on\w+\s*=/gi, '')
+    .trim();
+  
+  if (sanitized.length > maxLength) {
+    throw new Error(`${fieldName} exceeds maximum length of ${maxLength} characters`);
+  }
+  
+  return sanitized;
+}
+
+function validateEmail(email) {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!email || typeof email !== 'string' || !emailRegex.test(email.trim())) {
+    throw new Error('Invalid email format');
+  }
+  return email.trim().toLowerCase();
+}
+
+function validateDate(dateString) {
+  if (!dateString || typeof dateString !== 'string') {
+    throw new Error('Date is required');
+  }
+  
+  const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+  if (!dateRegex.test(dateString)) {
+    throw new Error('Date must be in YYYY-MM-DD format');
+  }
+  
+  const date = new Date(dateString + 'T00:00:00Z');
+  if (isNaN(date.getTime())) {
+    throw new Error('Invalid date');
+  }
+  
+  const today = getTodayDateString();
+  if (dateString < today) {
+    throw new Error('Ride date cannot be in the past');
+  }
+  
+  return dateString;
+}
+
+function validateUserNotSelf(userEmail, targetEmail, actionName = 'action') {
+  const userNorm = validateEmail(userEmail);
+  const targetNorm = validateEmail(targetEmail);
+  
+  if (userNorm === targetNorm) {
+    throw new Error(`You cannot ${actionName} yourself`);
+  }
+}
+
+function toFiniteNumber(value, fieldName) {
+  const num = Number(value);
+  if (!Number.isFinite(num)) {
+    throw new Error(`${fieldName} must be a valid number`);
+  }
+  return num;
+}
+
+function validateTripLocations(trip) {
+  if (!trip || typeof trip !== 'object') {
+    throw new Error('Trip information is required');
+  }
+
+  const start = trip.startLocation;
+  const end = trip.endLocation;
+  if (!start || !end) {
+    throw new Error('Start and end locations are required');
+  }
+
+  const startTitle = sanitizeString(start.title || '', 'Start location', 200);
+  const endTitle = sanitizeString(end.title || '', 'End location', 200);
+  if (!startTitle || !endTitle) {
+    throw new Error('Start and end locations are required');
+  }
+
+  const startLat = toFiniteNumber(start?.gps_coordinates?.latitude, 'Start latitude');
+  const startLng = toFiniteNumber(start?.gps_coordinates?.longitude, 'Start longitude');
+  const endLat = toFiniteNumber(end?.gps_coordinates?.latitude, 'End latitude');
+  const endLng = toFiniteNumber(end?.gps_coordinates?.longitude, 'End longitude');
+
+  if (Math.abs(startLat - endLat) < 1e-7 && Math.abs(startLng - endLng) < 1e-7) {
+    throw new Error('Start and end locations cannot be the same');
+  }
+
+  return {
+    ...trip,
+    startLocation: {
+      ...start,
+      title: startTitle,
+      gps_coordinates: {
+        latitude: startLat,
+        longitude: startLng,
+      },
+    },
+    endLocation: {
+      ...end,
+      title: endTitle,
+      gps_coordinates: {
+        latitude: endLat,
+        longitude: endLng,
+      },
+    },
+  };
+}
+
 // In-memory cache for non-archived posts (avoids repeated slow Atlas queries)
-let postsCache = null;       // { data: [...], fetchedAt: timestamp }
-const CACHE_TTL_MS = 30000;  // serve cached data for up to 30 s
+let postsCache = null;
+const CACHE_TTL_MS = 30000;
 
 async function getActivePosts() {
   const now = Date.now();
@@ -74,7 +189,6 @@ async function archivePastRides() {
 async function enrichPostsWithGoogleIds(posts) {
   if (!posts || posts.length === 0) return posts;
 
-  // Collect emails that are missing a googleId
   const emails = [
     ...new Set(
       posts
@@ -104,7 +218,6 @@ async function enrichPostsWithGoogleIds(posts) {
   return posts;
 }
 
-
 // READ ALL POSTS (non-archived only)
 router.get('/', async (req, res) => {
   const t0 = Date.now();
@@ -114,22 +227,43 @@ router.get('/', async (req, res) => {
   const enrichedPosts = await getActivePosts();
   const t2 = Date.now();
 
-  console.log(`[GET /posts] archive=${t1-t0}ms  total=${t2-t0}ms`);
+  console.log(`[GET /posts] archive=${t1 - t0}ms  total=${t2 - t0}ms`);
   res.json(enrichedPosts);
 });
 
 // READ ARCHIVED POSTS
 router.get('/archived', async (req, res) => {
   const posts = await getDB().collection('posts').find({ archived: true }).toArray();
-  
-  // Enrich posts with Google IDs for user navigation
   const enrichedPosts = await enrichPostsWithGoogleIds(posts);
-  
   res.json(enrichedPosts);
 });
 
+// GET /posts/starred?email=... — fetch all starred posts for a user
+router.get('/starred', async (req, res) => {
+  try {
+    let { email } = req.query;
+    if (!email) return res.status(400).json({ error: 'Email required' });
+    try { email = validateEmail(email); } catch (e) { return res.status(400).json({ error: e.message }); }
+
+    const db = getDB();
+    const user = await db.collection('users').findOne({ email });
+    if (!user || !user.starredPosts?.length) return res.json([]);
+
+    const objectIds = user.starredPosts
+      .map(id => toObjectId(id))
+      .filter(Boolean);
+
+    const posts = await db.collection('posts').find({ _id: { $in: objectIds } }).toArray();
+    const enriched = await enrichPostsWithGoogleIds(posts);
+    res.json(enriched);
+  } catch (err) {
+    console.error('Get starred posts error:', err);
+    res.status(500).json({ error: err.message || 'Failed to fetch starred posts' });
+  }
+});
+
 // GET ONE POST
-router.get('/:id', async (req, res) => { 
+router.get('/:id', async (req, res) => {
   const postId = toObjectId(req.params.id);
   if (!postId) {
     return res.status(400).json({ error: 'Invalid post id' });
@@ -140,32 +274,51 @@ router.get('/:id', async (req, res) => {
   if (!post) {
     return res.status(404).json({ error: 'Post not found' });
   }
-  
-  // Enrich single post with Google ID for user navigation
+
   const enrichedPosts = await enrichPostsWithGoogleIds([post]);
-  
   res.json(enrichedPosts[0]);
 });
 
 // CREATE
-router.post('/', async (req, res) => { 
+router.post('/', async (req, res) => {
   try {
     const postInfo = req.body || {};
-      // validate the post info
-  if (postInfo.title===null || postInfo.description===null) {
-    return res.status(400).json({ error: 'Title and description are required' });
-  }
+    
+    // Validation: required fields
+    if (!postInfo.title) {
+      return res.status(400).json({ error: 'Title is required' });
+    }
+    
+    // Validation: sanitize and validate string fields
+    try {
+      postInfo.title = sanitizeString(postInfo.title, 'Title', 200);
+      postInfo.description = sanitizeString(postInfo.description ?? '', 'Description', 5000);
+      
+      if (postInfo.trip?.date) {
+        postInfo.trip.date = validateDate(postInfo.trip.date);
+      }
+      if (postInfo.trip) {
+        postInfo.trip = validateTripLocations(postInfo.trip);
+      }
+      
+      // Validate email if present
+      if (postInfo.user?.email) {
+        postInfo.user.email = validateEmail(postInfo.user.email);
+      }
+    } catch (validationError) {
+      return res.status(400).json({ error: validationError.message });
+    }
+    
     const db = getDB();
     const postsCollection = db.collection('posts');
     const tripsCollection = db.collection('trips');
 
     postInfo.confirmationCode = generateConfirmationCode();
-    postInfo.archived = false; // New posts are not archived
+    postInfo.archived = false;
     const postResult = await postsCollection.insertOne(postInfo);
     let tripId = null;
 
     if (postInfo.trip) {
-      // insert the trip and get the tripId
       const tripResult = await tripsCollection.insertOne({
         ...postInfo.trip,
         postId: postResult.insertedId,
@@ -192,25 +345,51 @@ router.post('/', async (req, res) => {
 });
 
 
-// DELETE
+// DELETE - Only post owner can delete
 router.delete('/:id', async (req, res) => { 
-  const postId = toObjectId(req.params.id);
-  
-  if (!postId) {
-    return res.status(400).json({ error: 'Invalid post id' });
-  }
-  const postDeleteResult = await getDB().collection('posts').deleteOne({ _id: postId });
+  try {
+    const postId = toObjectId(req.params.id);
+    if (!postId) {
+      return res.status(400).json({ error: 'Invalid post id' });
+    }
+    
+    const { userEmail } = req.body;
+    const db = getDB();
+    const post = await db.collection('posts').findOne({ _id: postId });
+    
+    if (!post) {
+      return res.status(404).json({ error: 'Post not found' });
+    }
+    
+    // Authorization check: only post owner can delete
+    if (!userEmail || !post.user?.email) {
+      return res.status(403).json({ error: 'Unauthorized: cannot verify ownership' });
+    }
+    
+    const userNorm = validateEmail(userEmail);
+    const ownerNorm = validateEmail(post.user.email);
+    
+    if (userNorm !== ownerNorm) {
+      return res.status(403).json({ error: 'Unauthorized: only post owner can delete' });
+    }
+    
+    const postDeleteResult = await db.collection('posts').deleteOne({ _id: postId });
 
-  if (postDeleteResult.deletedCount === 0) {
-    return res.status(404).json({ error: 'Post not found' });
+    if (postDeleteResult.deletedCount === 0) {
+      return res.status(404).json({ error: 'Post not found' });
+    }
+    
+    // delete the related trips
+    await db.collection('trips').deleteMany({ postId });
+    invalidatePostsCache();
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error deleting post:', error);
+    res.status(400).json({ error: error.message || 'Failed to delete post' });
   }
-  // delete the related trips
-  await getDB().collection('trips').deleteMany({ postId });
-  invalidatePostsCache();
-  res.json({ success: true });
 });
 
-// UPDATE
+// UPDATE - Only post owner can update
 router.put('/:id', async (req, res) => { 
   try {
     const postId = toObjectId(req.params.id);
@@ -218,20 +397,63 @@ router.put('/:id', async (req, res) => {
       return res.status(400).json({ error: 'Invalid post id' });
     }
 
-    // get the update data
+    const { userEmail } = req.body;
     const updateData = { ...(req.body || {}) };
     delete updateData._id;
+    delete updateData.userEmail; // Remove from update payload
+    
+    const db = getDB();
+    const post = await db.collection('posts').findOne({ _id: postId });
+    
+    if (!post) {
+      return res.status(404).json({ error: 'Post not found' });
+    }
+    
+    // Authorization check: only post owner can update
+    if (!userEmail || !post.user?.email) {
+      return res.status(403).json({ error: 'Unauthorized: cannot verify ownership' });
+    }
+    
+    try {
+      const userNorm = validateEmail(userEmail);
+      const ownerNorm = validateEmail(post.user.email);
+      
+      if (userNorm !== ownerNorm) {
+        return res.status(403).json({ error: 'Unauthorized: only post owner can update' });
+      }
+      
+      // Validate and sanitize update fields
+      if (updateData.title) {
+        updateData.title = sanitizeString(updateData.title, 'Title', 200);
+      }
+      if (Object.prototype.hasOwnProperty.call(updateData, 'description')) {
+        updateData.description = sanitizeString(updateData.description ?? '', 'Description', 5000);
+      }
+    } catch (validationError) {
+      return res.status(400).json({ error: validationError.message });
+    }
 
-    // If trip.date is updated, check if it should be unarchived
     if (updateData.trip?.date) {
-      const today = getTodayDateString();
-      if (updateData.trip.date >= today) {
-        updateData.archived = false;
-        updateData.archivedAt = null;
+      try {
+        updateData.trip.date = validateDate(updateData.trip.date);
+        const today = getTodayDateString();
+        if (updateData.trip.date >= today) {
+          updateData.archived = false;
+          updateData.archivedAt = null;
+        }
+      } catch (validationError) {
+        return res.status(400).json({ error: validationError.message });
       }
     }
 
-    const db = getDB();
+    if (updateData.trip) {
+      try {
+        updateData.trip = validateTripLocations(updateData.trip);
+      } catch (validationError) {
+        return res.status(400).json({ error: validationError.message });
+      }
+    }
+
     const postsCollection = db.collection('posts');
     const tripsCollection = db.collection('trips');
 
@@ -246,19 +468,14 @@ router.put('/:id', async (req, res) => {
 
     let tripId = null;
 
-    // update the trip
     if (Object.prototype.hasOwnProperty.call(updateData, 'trip')) {
-      // check if trip field has content (not null/empty object)
       const hasTripValue =
-        updateData.trip &&(typeof updateData.trip !== 'object' || Object.keys(updateData.trip).length > 0);
+        updateData.trip && (typeof updateData.trip !== 'object' || Object.keys(updateData.trip).length > 0);
 
-      // create/update trip only when trip has content
       if (hasTripValue) {
-        // get the existing trip by postID
         const existingTrip = await tripsCollection.findOne({ postId });
 
         if (existingTrip) {
-          // update the trip
           await tripsCollection.updateOne(
             { _id: existingTrip._id },
             { $set: { ...updateData.trip, postId } }
@@ -277,7 +494,6 @@ router.put('/:id', async (req, res) => {
           { $set: { tripId } }
         );
       } else {
-        // trip is null/empty object, delete related trip and remove trip fields from post
         await tripsCollection.deleteMany({ postId });
         await postsCollection.updateOne(
           { _id: postId },
@@ -285,7 +501,6 @@ router.put('/:id', async (req, res) => {
         );
       }
     } else {
-      // no trip field in update data, keep the existing tripId
       const post = await postsCollection.findOne(
         { _id: postId },
         { projection: { tripId: 1 } }
@@ -296,57 +511,101 @@ router.put('/:id', async (req, res) => {
     invalidatePostsCache();
     res.json({ success: true, updatedCount: result.modifiedCount, postId, tripId });
   } catch (err) {
-    res.status(500).json({ error: 'Failed to update post' });
+    console.error('Update post error:', err);
+    res.status(500).json({ error: err.message || 'Failed to update post' });
   }
 });
 
-// JOIN rider list
+// JOIN rider list - prevent self-join and validate input
 router.post('/:id/join', async (req, res) => {
   try {
     const postId = toObjectId(req.params.id);
     if (!postId) return res.status(400).json({ error: 'Invalid post id' });
 
-    const { email, senderName, senderId, message } = req.body;
+    let { email, senderName, senderId, message } = req.body;
     if (!email) return res.status(400).json({ error: 'User email required' });
+
+    // Validate and normalize input
+    try {
+      email = validateEmail(email);
+      if (senderName) {
+        senderName = sanitizeString(senderName, 'Name', 200);
+      }
+      if (message) {
+        message = sanitizeString(message, 'Message', 2000);
+      }
+    } catch (validationError) {
+      return res.status(400).json({ error: validationError.message });
+    }
 
     const db = getDB();
     const post = await db.collection('posts').findOne({ _id: postId });
     if (!post) return res.status(404).json({ error: 'Post not found' });
 
-    const riderList = post.riderList || [];
-    const pendingJoins = post.pendingJoins || [];
+    // PREVENT SELF-JOIN: user cannot join their own post
+    try {
+      validateUserNotSelf(email, post.user?.email, 'join your own ride');
+    } catch (err) {
+      return res.status(400).json({ error: err.message });
+    }
 
-    if (riderList.some(u => u.email === email) || pendingJoins.includes(email)) {
+    const riderList = post.riderList || [];
+
+    // Check if already joined
+    if (riderList.some(u => u.email === email)) {
       return res.json({ success: true, alreadyJoined: true });
     }
 
-    await db.collection('posts').updateOne(
+    if (post.maxRiders != null && riderList.length >= post.maxRiders) {
+      return res.status(400).json({ error: 'This ride is full.' });
+    }
+
+    const joinResult = await db.collection('posts').updateOne(
       { _id: postId },
-      { $push: { pendingJoins: email } }
+      { $addToSet: { pendingJoins: email } }
     );
 
-    // Notify the post owner — look up by _id first, fall back to email
+    // No-op if request is already pending.
+    if (joinResult.modifiedCount === 0) {
+      return res.json({ success: true, alreadyJoined: true });
+    }
+
+    // Notify the post owner
     const ownerEmail = post.user?.email;
     if (ownerEmail) {
       const ownerUser = await db.collection('users').findOne(
-        { email: { $regex: `^${ownerEmail.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, $options: 'i' } },
+        { email: { $regex: `^${escapeRegex(ownerEmail)}$`, $options: 'i' } },
         { projection: { _id: 1 } }
       );
       if (ownerUser) {
-        const baseMsg = `${senderName || email} wants to join your rider list for the ride from ${post.trip?.startLocation?.title || 'start'} to ${post.trip?.endLocation?.title || 'destination'}.`;
-        const finalMsg = message?.trim() ? `${baseMsg}\n\nMessage: _${message.trim()}_` : baseMsg;
-        await db.collection('notifications').insertOne({
+        // Check for duplicate notification (same user, same post, within last minute)
+        const recentNotification = await db.collection('notifications').findOne({
           recipientId: ownerUser._id,
-          senderName: senderName || email,
-          senderId: senderId && ObjectId.isValid(senderId) ? new ObjectId(senderId) : null,
-          message: finalMsg,
           postId,
-          replyToMessage: null,
           type: 'join_list',
-          response: null,
-          read: false,
-          createdAt: new Date(),
+          $or: [
+            { senderName: senderName || email },
+            { senderName: email }
+          ],
+          createdAt: { $gte: new Date(Date.now() - 60000) }
         });
+
+        if (!recentNotification) {
+          const baseMsg = `${senderName || email} wants to join your rider list for the ride from ${post.trip?.startLocation?.title || 'start'} to ${post.trip?.endLocation?.title || 'destination'}.`;
+          const finalMsg = message?.trim() ? `${baseMsg}\n\nMessage: _${message.trim()}_` : baseMsg;
+          await db.collection('notifications').insertOne({
+            recipientId: ownerUser._id,
+            senderName: senderName || email,
+            senderId: senderId && ObjectId.isValid(senderId) ? new ObjectId(senderId) : null,
+            message: finalMsg,
+            postId,
+            replyToMessage: null,
+            type: 'join_list',
+            response: null,
+            read: false,
+            createdAt: new Date(),
+          });
+        }
       }
     }
 
@@ -354,22 +613,39 @@ router.post('/:id/join', async (req, res) => {
     res.json({ success: true });
   } catch (err) {
     console.error('Join list error:', err);
-    res.status(500).json({ error: 'Failed to join list' });
+    res.status(500).json({ error: err.message || 'Failed to join list' });
   }
 });
 
-// TAKE a ride request (driver offers to drive — persisted so it survives refresh)
+// TAKE a ride request (driver offers to drive) - prevent self-take and validate input
 router.post('/:id/take', async (req, res) => {
   try {
     const postId = toObjectId(req.params.id);
     if (!postId) return res.status(400).json({ error: 'Invalid post id' });
 
-    const { name, email, picture, avatar, googleId } = req.body;
+    let { name, email, picture, avatar, googleId } = req.body;
     if (!email) return res.status(400).json({ error: 'User email required' });
+
+    // Validate and normalize input
+    try {
+      email = validateEmail(email);
+      if (name) {
+        name = sanitizeString(name, 'Name', 200);
+      }
+    } catch (validationError) {
+      return res.status(400).json({ error: validationError.message });
+    }
 
     const db = getDB();
     const post = await db.collection('posts').findOne({ _id: postId });
     if (!post) return res.status(404).json({ error: 'Post not found' });
+
+    // PREVENT SELF-TAKE: user cannot be driver on their own post
+    try {
+      validateUserNotSelf(email, post.user?.email, 'take your own ride');
+    } catch (err) {
+      return res.status(400).json({ error: err.message });
+    }
 
     const drivers = post.drivers || [];
     const pendingDrivers = post.pendingDrivers || [];
@@ -386,41 +662,91 @@ router.post('/:id/take', async (req, res) => {
     res.json({ success: true });
   } catch (err) {
     console.error('Take ride error:', err);
-    res.status(500).json({ error: 'Failed to take ride' });
+    res.status(500).json({ error: err.message || 'Failed to take ride' });
   }
 });
 
 
-// REMOVE a member from riderList (offer) or waitlist (request) — owner action
+// REMOVE a member from riderList (offer) or waitlist (request) — owner action only
 router.post('/:id/remove-member', async (req, res) => {
   try {
     const postId = toObjectId(req.params.id);
     if (!postId) return res.status(400).json({ error: 'Invalid post id' });
 
-    const { email, name, actorEmail, actorName, actorId } = req.body;
-    if (!email) return res.status(400).json({ error: 'Email required' });
+    let { email, name, actorEmail, actorName, actorId } = req.body;
+    if (!email && !name) return res.status(400).json({ error: 'Email or name required' });
+
+    // Validate input
+    try {
+      if (email) {
+        email = validateEmail(email);
+      }
+      if (actorEmail) {
+        actorEmail = validateEmail(actorEmail);
+      }
+      if (actorName) {
+        actorName = sanitizeString(actorName, 'Actor Name', 200);
+      }
+      if (name) {
+        name = sanitizeString(name, 'Name', 200);
+      }
+    } catch (validationError) {
+      return res.status(400).json({ error: validationError.message });
+    }
 
     const db = getDB();
     const post = await db.collection('posts').findOne({ _id: postId });
     if (!post) return res.status(404).json({ error: 'Post not found' });
 
+    // AUTHORIZATION CHECK:
+    // - post owner can remove any rider
+    // - a rider can remove themself (leave the ride)
+    if (!actorEmail || !post.user?.email) {
+      return res.status(403).json({ error: 'Unauthorized: cannot verify actor' });
+    }
+
+    let actorNorm;
+    let ownerNorm;
+    try {
+      actorNorm = validateEmail(actorEmail);
+      ownerNorm = validateEmail(post.user.email);
+    } catch (err) {
+      return res.status(400).json({ error: err.message });
+    }
+
+    const targetNorm = email || '';
+    const isOwnerAction = actorNorm === ownerNorm;
+    const isSelfLeave = Boolean(targetNorm) && actorNorm === targetNorm;
+
+    if (!isOwnerAction && !isSelfLeave) {
+      return res.status(403).json({ error: 'Unauthorized: only the post owner can remove riders' });
+    }
+
     const riderListBefore = post.riderList || [];
-    const removedMember = riderListBefore.find((member) => member.email === email)
-      || riderListBefore.find((member) => name && member.name === name)
-      || null;
+    const removedMember = riderListBefore.find((member) => {
+      const memberEmail = typeof member.email === 'string' ? member.email.trim().toLowerCase() : '';
+      if (targetNorm && memberEmail === targetNorm) return true;
+      return !targetNorm && name && member.name === name;
+    }) || null;
+
+    if (!removedMember) {
+      return res.status(404).json({ error: 'Rider not found in this ride' });
+    }
+
+    if (isSelfLeave && !targetNorm) {
+      return res.status(400).json({ error: 'Self-leave requires a valid email' });
+    }
 
     await db.collection('posts').updateOne(
       { _id: postId },
-      { $pull: { riderList: { email: email || null } } }
+      { $pull: { riderList: { email: removedMember.email || null } } }
     );
     // Also remove any entry that matched on name if email was blank
-    if (!email) {
-      if (name) {
-        await db.collection('posts').updateOne(
-          { _id: postId },
-          { $pull: { riderList: { name } } }
-        );
-      }
+    if (!email && name) {
+      await db.collection('posts').updateOne(
+        { _id: postId },
+        { $pull: { riderList: { name } } }
+      );
     }
 
     const updatedPost = await db.collection('posts').findOne({ _id: postId });
@@ -428,35 +754,33 @@ router.post('/:id/remove-member', async (req, res) => {
     let notifiedCount = 0;
 
     const removedDisplayName = removedMember?.name || name || email;
-    const actorDisplayName = actorName || removedDisplayName;
-    const removedOwnself = actorEmail && actorEmail === email;
+    const actorDisplayName = actorName || post.user?.name || 'The poster';
+    const removedOwnself = isSelfLeave;
     const routeSummary = `${post.trip?.startLocation?.title || 'start'} to ${post.trip?.endLocation?.title || 'destination'}`;
     const dateSummary = post.trip?.date ? ` on ${post.trip.date}` : '';
     const timeSummary = post.trip?.time ? ` at ${post.trip.time}` : '';
     const rideSummary = `${routeSummary}${dateSummary}${timeSummary}`;
     const notificationMessage = removedOwnself
       ? `${removedDisplayName} left your riding list for ${rideSummary}.`
-      : `${removedDisplayName} was removed from your riding list for ${rideSummary} by ${actorDisplayName}.`;
+      : `You were removed from the riding list for ${rideSummary} by ${actorDisplayName}.`;
 
-    // Notify all remaining riders and the post owner.
-    const recipientEmailSet = new Set(
-      remainingRiders
-        .map((member) => (typeof member.email === 'string' ? member.email.trim() : ''))
-        .filter(Boolean)
-    );
-    if (typeof post.user?.email === 'string' && post.user.email.trim()) {
-      recipientEmailSet.add(post.user.email.trim());
-    }
-    if (typeof email === 'string' && email.trim()) {
-      // Don't notify the member who just left/was removed.
-      recipientEmailSet.delete(email.trim());
+    const recipientEmailSet = new Set();
+    if (removedOwnself) {
+      // Self-leave: notify post owner.
+      if (typeof post.user?.email === 'string' && post.user.email.trim()) {
+        recipientEmailSet.add(post.user.email.trim());
+      }
+    } else {
+      // Owner removal: notify the removed rider.
+      if (typeof email === 'string' && email.trim()) {
+        recipientEmailSet.add(email.trim());
+      }
     }
 
     const recipientEmails = Array.from(recipientEmailSet);
 
     const recipients = [];
     for (const recipientEmail of recipientEmails) {
-      // Use exact match first, then a case-insensitive fallback for inconsistent email casing.
       let user = await db.collection('users').findOne(
         { email: recipientEmail },
         { projection: { _id: 1, email: 1 } }
@@ -500,20 +824,47 @@ router.post('/:id/remove-member', async (req, res) => {
     res.json({ success: true, notifiedCount });
   } catch (err) {
     console.error('Remove member error:', err);
-    res.status(500).json({ error: 'Failed to remove member' });
+    res.status(500).json({ error: err.message || 'Failed to remove member' });
   }
 });
 
-// REMOVE a driver — owner action
+// REMOVE a driver — owner action only
 router.post('/:id/remove-driver', async (req, res) => {
   try {
     const postId = toObjectId(req.params.id);
     if (!postId) return res.status(400).json({ error: 'Invalid post id' });
 
-    const { email } = req.body;
+    let { email, actorEmail } = req.body;
     if (!email) return res.status(400).json({ error: 'Email required' });
 
+    // Validate input
+    try {
+      email = validateEmail(email);
+      if (actorEmail) {
+        actorEmail = validateEmail(actorEmail);
+      }
+    } catch (validationError) {
+      return res.status(400).json({ error: validationError.message });
+    }
+
     const db = getDB();
+    const post = await db.collection('posts').findOne({ _id: postId });
+    if (!post) return res.status(404).json({ error: 'Post not found' });
+
+    // AUTHORIZATION CHECK: only post owner can remove drivers
+    if (actorEmail && post.user?.email) {
+      try {
+        const actorNorm = validateEmail(actorEmail);
+        const ownerNorm = validateEmail(post.user.email);
+        
+        if (actorNorm !== ownerNorm) {
+          return res.status(403).json({ error: 'Unauthorized: only post owner can remove drivers' });
+        }
+      } catch (err) {
+        return res.status(400).json({ error: err.message });
+      }
+    }
+
     await db.collection('posts').updateOne(
       { _id: postId },
       { $pull: { drivers: { email }, pendingDrivers: { email } } }
@@ -523,7 +874,36 @@ router.post('/:id/remove-driver', async (req, res) => {
     res.json({ success: true });
   } catch (err) {
     console.error('Remove driver error:', err);
-    res.status(500).json({ error: 'Failed to remove driver' });
+    res.status(500).json({ error: err.message || 'Failed to remove driver' });
+  }
+});
+
+// POST /posts/:id/star — toggle star on a post for a user
+router.post('/:id/star', async (req, res) => {
+  try {
+    const postId = toObjectId(req.params.id);
+    if (!postId) return res.status(400).json({ error: 'Invalid post id' });
+
+    let { email } = req.body;
+    if (!email) return res.status(400).json({ error: 'Email required' });
+    try { email = validateEmail(email); } catch (e) { return res.status(400).json({ error: e.message }); }
+
+    const db = getDB();
+    const postIdStr = postId.toString();
+    const user = await db.collection('users').findOne({ email });
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    const alreadyStarred = (user.starredPosts || []).includes(postIdStr);
+    if (alreadyStarred) {
+      await db.collection('users').updateOne({ email }, { $pull: { starredPosts: postIdStr } });
+    } else {
+      await db.collection('users').updateOne({ email }, { $addToSet: { starredPosts: postIdStr } });
+    }
+
+    res.json({ starred: !alreadyStarred });
+  } catch (err) {
+    console.error('Star post error:', err);
+    res.status(500).json({ error: err.message || 'Failed to star post' });
   }
 });
 

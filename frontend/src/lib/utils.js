@@ -60,39 +60,50 @@ export function getRouteCenter(start, end) {
 }
 
 export function filterPostsByRouteRadius(posts, route, radiusKm) {
-    const searchCenter = getRouteCenter(route?.start, route?.end);
+    const searchStart = getCoordinatePair(route?.start);
+    const searchEnd = getCoordinatePair(route?.end);
     const maxDistanceKm = Number(radiusKm);
 
-    if (!searchCenter || !Number.isFinite(maxDistanceKm) || maxDistanceKm < 0) {
+    if (!searchStart || !searchEnd || !Number.isFinite(maxDistanceKm) || maxDistanceKm < 0) {
         return [];
     }
 
     return posts
         .map((post) => {
-            const postCenter = getRouteCenter(
-                post?.trip?.startLocation?.gps_coordinates,
-                post?.trip?.endLocation?.gps_coordinates
-            );
+            const postStart = getCoordinatePair(post?.trip?.startLocation?.gps_coordinates);
+            const postEnd = getCoordinatePair(post?.trip?.endLocation?.gps_coordinates);
 
-            if (!postCenter) {
+            if (!postStart || !postEnd) {
                 return null;
             }
 
-            const routeDistanceKm = getDistanceFromLatLonInKm(
-                searchCenter.latitude,
-                searchCenter.longitude,
-                postCenter.latitude,
-                postCenter.longitude
+            const startDistanceKm = getDistanceFromLatLonInKm(
+                searchStart.latitude,
+                searchStart.longitude,
+                postStart.latitude,
+                postStart.longitude
+            );
+            const endDistanceKm = getDistanceFromLatLonInKm(
+                searchEnd.latitude,
+                searchEnd.longitude,
+                postEnd.latitude,
+                postEnd.longitude
             );
 
-            if (routeDistanceKm > maxDistanceKm) {
+            // A route is a match only when both endpoints are within the selected radius.
+            if (startDistanceKm > maxDistanceKm || endDistanceKm > maxDistanceKm) {
                 return null;
             }
 
-            return { post, routeDistanceKm };
+            return {
+                post,
+                startDistanceKm,
+                endDistanceKm,
+                maxEndpointDistanceKm: Math.max(startDistanceKm, endDistanceKm),
+            };
         })
         .filter(Boolean)
-        .sort((left, right) => left.routeDistanceKm - right.routeDistanceKm)
+        .sort((left, right) => left.maxEndpointDistanceKm - right.maxEndpointDistanceKm)
         .map(({ post }) => post);
 }
 

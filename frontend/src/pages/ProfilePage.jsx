@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { User, Mail, Phone, BookOpen, Calendar, MapPin, Edit3, Save, X, Camera, Upload, ArrowLeft } from 'lucide-react';
+import { User, Mail, Phone, BookOpen, Calendar, MapPin, Edit3, Save, X, Camera, Upload } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { formatTime, formatDate } from '@/lib/utils';
 
@@ -48,7 +47,6 @@ async function parseApiResponse(response) {
 }
 
 function ProfilePage({ currentUser, onUserUpdate }) {
-  const navigate = useNavigate();
   const [isEditing, setIsEditing] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
@@ -283,15 +281,6 @@ function ProfilePage({ currentUser, onUserUpdate }) {
   return (
     <div className="min-h-screen bg-gray-50 pb-20">
       <div className="container mx-auto px-6 py-8 max-w-4xl">
-        <Button
-          variant="outline"
-          onClick={() => navigate('/')}
-          className="mb-4"
-        >
-          <ArrowLeft className="w-4 h-4 mr-2" />
-          Back to Home
-        </Button>
-
         <div className="bg-white rounded-lg shadow-sm border border-gray-200">
           <div className="px-6 py-8">
             {/* Header */}

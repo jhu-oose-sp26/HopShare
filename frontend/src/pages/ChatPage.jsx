@@ -27,10 +27,10 @@ import placeholderAvatar from '@/user-placeholder.png';
 import { io } from "socket.io-client";
 
 const API_ROOT = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '');
-const CHAT_URL = import.meta.env.VITE_CHAT_URL || API_ROOT;
+const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || API_ROOT;
 const PROFILE_CACHE_KEY = 'profileCache';
 const PROFILE_CACHE_TTL = 1000 * 60 * 60 * 24; // 24 hours
-const socket = io(CHAT_URL);
+const socket = io(SOCKET_URL);
 
 const loadProfileCache = () => {
   if (typeof window === 'undefined') return {};
@@ -121,7 +121,12 @@ const ChatPage = ({ currentUser }) => {
 
     const fetchChat = async () => {
       try {
-        const response = await fetch(`${API_ROOT}/chat/${chatId}`);
+        const viewerEmail = encodeURIComponent(currentUser?.email || '');
+        const response = await fetch(`${API_ROOT}/chat/${chatId}?viewerEmail=${viewerEmail}`);
+        if (!response.ok) {
+          const payload = await response.json().catch(() => ({}));
+          throw new Error(payload.error || 'Failed to load chat');
+        }
         const chat = await response.json();
         setMessages(chat.messages || []);
       } catch (err) {
@@ -133,7 +138,7 @@ const ChatPage = ({ currentUser }) => {
     };
 
     fetchChat();
-  }, [chatId]);
+  }, [chatId, currentUser?.email]);
 
   useEffect(() => {
     if (messages.length === 0) return;
@@ -255,9 +260,41 @@ const ChatPage = ({ currentUser }) => {
   }, [messages, usersMap]);
 
   const participantCount = 1 + (post?.riderList?.length || 0) + (post?.drivers?.length || 0);
+  const currentEmail = (currentUser?.email || '').trim().toLowerCase();
+  const isOwner = currentEmail && (post?.user?.email || '').trim().toLowerCase() === currentEmail;
+  const isRider = Array.isArray(post?.riderList)
+    && post.riderList.some((rider) => (rider?.email || '').trim().toLowerCase() === currentEmail);
+  const isDriver = Array.isArray(post?.drivers)
+    && post.drivers.some((driver) => (driver?.email || '').trim().toLowerCase() === currentEmail);
+  const canSendMessages = Boolean(currentEmail && (isOwner || isRider || isDriver));
   
   const handleSendMessage = async () => {
     if (!message.trim() || !chatId) return;
+
+    if (!canSendMessages) {
+      setError('You can view this chat history, but you are no longer allowed to send messages for this ride.');
+      return;
+    }
+
+    // FRONTEND VALIDATION: Prevent sending empty messages
+    const trimmedMessage = message.trim();
+    if (!trimmedMessage || trimmedMessage.length === 0) {
+      setError('Message cannot be empty');
+      return;
+    }
+
+    // FRONTEND VALIDATION: Prevent messages exceeding max length
+    if (trimmedMessage.length > 10000) {
+      setError('Message is too long (max 10,000 characters)');
+      return;
+    }
+
+    // FRONTEND VALIDATION: Basic XSS check
+    const xssPatterns = /<script|javascript:|on\w+\s*=/i;
+    if (xssPatterns.test(trimmedMessage)) {
+      setError('Invalid characters in message');
+      return;
+    }
 
     try {
       const response = await fetch(`${API_ROOT}/chat/${chatId}/messages`, {
@@ -266,20 +303,23 @@ const ChatPage = ({ currentUser }) => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          sender: currentUser._id,
-          message: message.trim(),
+          sender: currentUser.email || currentUser._id,
+          message: trimmedMessage,
+          recipientEmail: post?.user?.email, // Optional: for backend validation of self-messaging
         }),
       });
 
       if (!response.ok) {
-        throw new Error('Failed to send message');
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to send message');
       }
 
       const newMessage = await response.json();
       setMessage('');
+      setError(null); // Clear any previous errors
     } catch (err) {
       console.error('Error sending message:', err);
-      setError('Failed to send message');
+      setError(err.message || 'Failed to send message');
     }
   };
 
@@ -381,13 +421,21 @@ const ChatPage = ({ currentUser }) => {
           value={message}
           onChange={(e) => setMessage(e.target.value)}
           onSubmit={() => handleSendMessage()}
+          placeholder={!canSendMessages ? 'cannot sent message in quitted group chat' : 'Type your message...'}
+          className={!canSendMessages ? 'text-center placeholder:text-center' : ''}
+          disabled={!canSendMessages}
         />
         <ChatToolbarAddon align="inline-end">
-          <ChatToolbarButton onClick={handleSendMessage}>
+          <ChatToolbarButton onClick={handleSendMessage} disabled={!canSendMessages}>
             <SquareChevronRightIcon />
           </ChatToolbarButton>
         </ChatToolbarAddon>
       </ChatToolbar>
+      {!canSendMessages && (
+        <div className="px-4 pb-2 text-xs text-amber-700">
+          You were removed from this ride. Chat history remains visible, but sending new messages is disabled.
+        </div>
+      )}
 
       <Dialog open={detailsOpen} onOpenChange={setDetailsOpen}>
         <DialogContent className='sm:max-w-2xl max-h-[85vh] overflow-y-auto'>

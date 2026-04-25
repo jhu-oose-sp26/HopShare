@@ -1,6 +1,13 @@
 import { useState, useEffect } from 'react';
 import { User, Mail, Phone, BookOpen, Calendar, MapPin, ArrowLeft, UserPlus, UserMinus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from '@/components/ui/dialog';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useFriends } from '@/hooks/useFriends';
 
@@ -12,19 +19,35 @@ function UserProfile({ currentUser }) {
   const [profile, setProfile] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
-  const { isFriend, addFriend, removeFriend } = useFriends(currentUser?._id);
+  const { isFriend, addFriend, removeFriend, hasSentRequest } = useFriends(currentUser?._id);
   const [friendLoading, setFriendLoading] = useState(false);
+  const [requestSent, setRequestSent] = useState(false);
+  const [removeConfirmOpen, setRemoveConfirmOpen] = useState(false);
 
   const handleToggleFriend = async () => {
     if (!profile?._id) return;
-    
+    if (isFriend(profile._id)) {
+      setRemoveConfirmOpen(true);
+      return;
+    }
+    if (!hasSentRequest(profile._id) && !requestSent) {
+      setFriendLoading(true);
+      try {
+        await addFriend(profile._id);
+        setRequestSent(true);
+      } catch (err) {
+        alert(err.message);
+      } finally {
+        setFriendLoading(false);
+      }
+    }
+  };
+
+  const confirmRemoveFriend = async () => {
+    setRemoveConfirmOpen(false);
     setFriendLoading(true);
     try {
-      if (isFriend(profile._id)) {
-        await removeFriend(profile._id);
-      } else {
-        await addFriend(profile._id);
-      }
+      await removeFriend(profile._id);
     } catch (err) {
       alert(err.message);
     } finally {
@@ -110,7 +133,7 @@ function UserProfile({ currentUser }) {
         <div className="container mx-auto px-6 py-8 max-w-4xl">
           <Button
             variant="outline"
-            onClick={() => navigate('/')}
+            onClick={() => navigate('/home')}
             className="mb-4"
           >
             <ArrowLeft className="w-4 h-4 mr-2" />
@@ -123,7 +146,7 @@ function UserProfile({ currentUser }) {
             </div>
             <h2 className="text-xl font-semibold text-gray-900 mb-2">Profile Not Found</h2>
             <p className="text-gray-600 mb-4">{error}</p>
-            <Button onClick={() => navigate('/')}>Return to Home</Button>
+            <Button onClick={() => navigate('/home')}>Return to Home</Button>
           </div>
         </div>
       </div>
@@ -137,7 +160,7 @@ function UserProfile({ currentUser }) {
       <div className="container mx-auto px-6 py-8 max-w-4xl">
         <Button
           variant="outline"
-          onClick={() => navigate('/')}
+          onClick={() => navigate('/home')}
           className="mb-4"
         >
           <ArrowLeft className="w-4 h-4 mr-2" />
@@ -165,26 +188,34 @@ function UserProfile({ currentUser }) {
                 </div>
               </div>
 
-              <Button
-                onClick={handleToggleFriend}
-                disabled={friendLoading}
-                variant={isFriend(profile._id) ? "outline" : "default"}
-                className={isFriend(profile._id) ? "text-red-600 hover:bg-red-50" : ""}
-              >
-                {friendLoading ? (
-                  'Loading...'
-                ) : isFriend(profile._id) ? (
-                  <>
-                    <UserMinus className="w-4 h-4 mr-2" />
-                    Remove Friend
-                  </>
-                ) : (
-                  <>
-                    <UserPlus className="w-4 h-4 mr-2" />
-                    Add Friend
-                  </>
-                )}
-              </Button>
+              {(() => {
+                const isAlreadyFriend = isFriend(profile._id);
+                const isPending = requestSent || hasSentRequest(profile._id);
+                return (
+                  <Button
+                    onClick={handleToggleFriend}
+                    disabled={friendLoading || isPending}
+                    variant={isAlreadyFriend ? 'outline' : 'default'}
+                    className={isAlreadyFriend ? 'text-red-600 hover:bg-red-50' : ''}
+                  >
+                    {friendLoading ? (
+                      'Loading...'
+                    ) : isAlreadyFriend ? (
+                      <>
+                        <UserMinus className="w-4 h-4 mr-2" />
+                        Remove Friend
+                      </>
+                    ) : isPending ? (
+                      'Request Sent'
+                    ) : (
+                      <>
+                        <UserPlus className="w-4 h-4 mr-2" />
+                        Add Friend
+                      </>
+                    )}
+                  </Button>
+                );
+              })()}
             </div>
 
             {/* Profile Information */}
@@ -254,6 +285,27 @@ function UserProfile({ currentUser }) {
           </div>
         </div>
       </div>
+
+      <Dialog open={removeConfirmOpen} onOpenChange={setRemoveConfirmOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Remove Friend</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to remove{' '}
+              <span className="font-medium text-gray-900">{profile?.name}</span>{' '}
+              from your friends?
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-end gap-2 mt-4">
+            <Button variant="outline" onClick={() => setRemoveConfirmOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={confirmRemoveFriend} className="bg-red-600 hover:bg-red-700 text-white border-0">
+              Remove
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

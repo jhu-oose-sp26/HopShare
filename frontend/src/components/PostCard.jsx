@@ -5,7 +5,7 @@ import WeatherForecastDialog from './WeatherForecastDialog';
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { formatTime, formatDate } from '@/lib/utils';
-import { MapPin, Calendar, Clock, MessageCircle, Pencil, Trash2, Info, User, Mail, Phone, Navigation, ExternalLink, UserPlus, Users, UserMinus } from 'lucide-react';
+import { MapPin, Calendar, Clock, MessageCircle, Pencil, Trash2, Info, User, Mail, Phone, Navigation, ExternalLink, UserPlus, Users, UserMinus, CheckCircle, Star } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { HoverCard, HoverCardTrigger, HoverCardContent } from '@/components/ui/hover-card';
@@ -24,7 +24,7 @@ import SubmitBox from './SubmitBox';
 const API_ROOT = (import.meta.env.VITE_API_BASE_URL || '/api').replace(/\/$/, '');
 const NOTIFICATIONS_ENDPOINT = `${API_ROOT}/notifications`;
 
-const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, routeSearch, distanceFilter, currentUser }) => {
+const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, routeSearch, distanceFilter, currentUser, initialStarred = false, onStarChange }) => {
     const { _id, title, description, user, trip, type = 'request', createdAt, suggestedPrice } = post;
     const navigate = useNavigate();
     const isOffer = type === 'offer';
@@ -67,7 +67,26 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
         if (!currentUser) return false;
         return (post.pendingJoins || []).includes(currentUser.email);
     });
+    const [isStarred, setIsStarred] = useState(initialStarred);
 
+    const handleStarToggle = async () => {
+        if (!currentUser) return;
+        const next = !isStarred;
+        setIsStarred(next);
+        try {
+            await fetch(`${API_ROOT}/posts/${_id}/star`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email: currentUser.email }),
+            });
+            onStarChange?.(_id, next);
+        } catch {
+            setIsStarred(!next);
+        }
+    };
+
+    const maxRiders = post.maxRiders ?? null;
+    const isFull = maxRiders != null && listMembers.length >= maxRiders;
     const isOwner = currentUser && post.user?.email && currentUser.email === post.user.email;
     const canManagePost = showActions && isOwner;
     const riderRequestStatus = !currentUser || isOwner || !isOffer
@@ -112,7 +131,8 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
     // Function to handle chatting
     const handleChatClick = async () => {
         try {
-            const response = await fetch(`${API_ROOT}/chat/${_id}`);
+            const viewerEmail = encodeURIComponent(currentUser?.email || '');
+            const response = await fetch(`${API_ROOT}/chat/${_id}?viewerEmail=${viewerEmail}`);
             if (!response.ok) {
                 throw new Error('Failed to get/create chat');
             }
@@ -234,7 +254,8 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
         date: trip?.date ?? '',
         time: trip?.time ?? '',
         description: description ?? '',
-    }), [type, user, trip, description]);
+        maxRiders: post.maxRiders ?? '',
+    }), [type, user, trip, description, post.maxRiders]);
 
     const handleEditSubmit = async (formData) => {
         await onUpdate?.(formData);
@@ -259,6 +280,16 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
 
     return (
         <div className={`relative rounded-xl border border-gray-200 bg-white px-6 pb-6 shadow-sm hover:shadow-md transition-shadow ${canManagePost ? 'pt-10' : 'pt-6'}`}>
+            {/* Star button — top right, visible to all logged-in users */}
+            {currentUser && (
+                <button
+                    className='absolute top-3 right-3 p-1.5 rounded-md transition-colors hover:bg-yellow-50'
+                    onClick={handleStarToggle}
+                    aria-label={isStarred ? 'Unstar ride' : 'Star ride'}
+                >
+                    <Star className={`w-4 h-4 ${isStarred ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300 hover:text-yellow-400'}`} />
+                </button>
+            )}
             {canManagePost && (
                 <>
                     {/* Edit button — top left */}
@@ -284,10 +315,10 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
                         </DialogContent>
                     </Dialog>
 
-                    {/* Delete button — top right */}
+                    {/* Delete button — shifted left to make room for star */}
                     <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
                         <DialogTrigger asChild>
-                            <button className='absolute top-3 right-3 p-1.5 rounded-md text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors'>
+                            <button className='absolute top-3 right-9 p-1.5 rounded-md text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors'>
                                 <Trash2 className='w-4 h-4' />
                             </button>
                         </DialogTrigger>
@@ -626,7 +657,15 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
             <div className='flex items-center gap-2 mb-4 text-sm flex-wrap'>
                 <Users className='w-4 h-4 text-gray-400 shrink-0' />
                 {listMembers.length === 0 ? (
-                    <span className='text-gray-400 italic'>No sharing people yet</span>
+                    maxRiders != null ? (
+                        <span className='text-gray-400 italic'>0 / {maxRiders} riders</span>
+                    ) : (
+                        <span className='text-gray-400 italic'>No sharing people yet</span>
+                    )
+                ) : maxRiders != null ? (
+                    <span className={isFull ? 'text-red-600 font-medium' : 'text-gray-700'}>
+                        {listMembers.length} / {maxRiders} riders{isFull ? ' — Full' : ''}
+                    </span>
                 ) : listMembers.length > 1 ? (
                     <span className='text-gray-700'>{listMembers.length} riders sharing this trip</span>
                 ) : (
@@ -685,7 +724,7 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
                     <Button
                         variant='default'
                         size='sm'
-                        className='flex-1'
+                        className='w-full'
                         onClick={handleChatClick}
                     >
                         <MessageCircle className='w-4 h-4 mr-1' />
@@ -693,7 +732,55 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
                     </Button>
                 ) : null}
 
-                {listJoinError && <p className='text-xs text-red-500 w-full'>{listJoinError}</p>}
+                {/* Join the rider list — only for non-owners */}
+                {currentUser && !isOwner && (
+                    <div className='flex-1 flex flex-col gap-1'>
+                        {!listJoined && <Button
+                            variant={listJoined || listRequestSent || isFull ? 'outline' : 'default'}
+                            size='sm'
+                            className={`w-full ${listJoined || listRequestSent || isFull ? 'text-gray-400' : 'bg-green-600 hover:bg-green-700'}`}
+                            disabled={listJoined || listRequestSent || listJoinLoading || isFull}
+                            onClick={async () => {
+                                setListJoinError('');
+                                setListJoinLoading(true);
+                                try {
+                                    const res = await fetch(`${API_ROOT}/posts/${post._id}/join`, {
+                                        method: 'POST',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({
+                                            email: currentUser.email,
+                                            senderName: currentUser.name,
+                                            senderId: currentUser._id,
+                                        }),
+                                    });
+                                    if (res.ok) {
+                                        setListRequestSent(true);
+                                    } else {
+                                        const data = await res.json().catch(() => ({}));
+                                        setListJoinError(data.error || 'Failed to send request. Please try again.');
+                                    }
+                                } catch (err) {
+                                    setListJoinError('Network error. Please try again.');
+                                } finally {
+                                    setListJoinLoading(false);
+                                }
+                            }}
+                        >
+                            {listJoinLoading ? (
+                                'Sending...'
+                            ) : listJoined ? (
+                                <><CheckCircle className='w-4 h-4 mr-1' />Request Accepted</>
+                            ) : listRequestSent ? (
+                                <><CheckCircle className='w-4 h-4 mr-1' />Awaiting Approval</>
+                            ) : isFull ? (
+                                <><Users className='w-4 h-4 mr-1' />Ride Full</>
+                            ) : (
+                                <><Users className='w-4 h-4 mr-1' />Join the Rider List</>
+                            )}
+                        </Button>}
+                        {listJoinError && <p className='text-xs text-red-500'>{listJoinError}</p>}
+                    </div>
+                )}
 
                 {/* Join Rider List Message Dialog */}
                 <Dialog open={joinListMessageOpen} onOpenChange={setJoinListMessageOpen}>
@@ -1188,7 +1275,7 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
                                                     <RouteMap
                                                         userRoute={userRouteForMap}
                                                         posts={[post]}
-                                                        searchRadius={distanceFilter !== Infinity ? distanceFilter : 10}
+                                                        searchRadius={routeSearch?.radiusKm ?? (distanceFilter !== Infinity ? distanceFilter : 10)}
                                                         className="h-80"
                                                         showZoomControls={true}
                                                     />

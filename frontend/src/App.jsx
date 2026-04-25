@@ -7,6 +7,7 @@ import UserProfile from '@/pages/UserProfile';
 import FriendsPage from '@/pages/FriendsPage';
 import ChatPage from '@/pages/ChatPage';
 import MessagesPage from '@/pages/MessagesPage';
+import StatusPage from '@/pages/StatusPage';
 import BottomNav from '@/components/BottomNav';
 
 const USER_STORAGE_KEY = 'hopshare.user';
@@ -24,11 +25,15 @@ function readStoredUser() {
 
 function AppRoutes({ currentUser, authApi }) {
   const location = useLocation();
-  const showNav = currentUser && location.pathname !== '/landing';
+  const showNav = currentUser && location.pathname !== '/landing' && !location.pathname.startsWith('/status');
 
   return (
     <>
       <Routes>
+        <Route
+          path='/'
+          element={<Navigate to={currentUser ? '/home' : '/landing'} replace />}
+        />
         <Route
           path='/landing'
           element={currentUser ? <Navigate to='/home' replace /> : <LandingPage onLogin={authApi.login} />}
@@ -39,27 +44,31 @@ function AppRoutes({ currentUser, authApi }) {
         />
         <Route
           path='/friends'
-          element={currentUser ? <FriendsPage currentUser={currentUser} /> : <Navigate to='/landing' replace />}
+          element={currentUser ? <FriendsPage currentUser={currentUser} /> : <Navigate to='/status/401' replace />}
         />
         <Route
           path='/messages'
-          element={currentUser ? <MessagesPage currentUser={currentUser} /> : <Navigate to='/landing' replace />}
+          element={currentUser ? <MessagesPage currentUser={currentUser} /> : <Navigate to='/status/401' replace />}
         />
         <Route
           path='/chat'
-          element={currentUser ? <ChatPage currentUser={currentUser} /> : <Navigate to='/landing' replace />}
+          element={currentUser ? <ChatPage currentUser={currentUser} /> : <Navigate to='/status/401' replace />}
         />
         <Route
           path='/profile'
-          element={currentUser ? <ProfilePage currentUser={currentUser} onUserUpdate={authApi.updateUser} /> : <Navigate to='/landing' replace />}
+          element={currentUser ? <ProfilePage currentUser={currentUser} onUserUpdate={authApi.updateUser} /> : <Navigate to='/status/401' replace />}
         />
         <Route
           path='/user/:googleId'
-          element={currentUser ? <UserProfile currentUser={currentUser} /> : <Navigate to='/landing' replace />}
+          element={currentUser ? <UserProfile currentUser={currentUser} /> : <Navigate to='/status/401' replace />}
+        />
+        <Route
+          path='/status/:code'
+          element={<StatusPage currentUser={currentUser} />}
         />
         <Route
           path='*'
-          element={<Navigate to={currentUser ? '/home' : '/landing'} replace />}
+          element={<Navigate to='/status/404' replace />}
         />
       </Routes>
       {showNav && <BottomNav />}

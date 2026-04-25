@@ -65,6 +65,28 @@ router.get('/search', async (req, res) => {
   }
 });
 
+// Get user profile by email
+router.get('/by-email/:email', async (req, res) => {
+  try {
+    const email = req.params.email.trim().toLowerCase();
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({ error: 'Invalid email' });
+    }
+
+    const user = await getDB().collection('users').findOne(
+      { email },
+      { projection: { _id: 1, googleId: 1, name: 1, email: 1, picture: 1, avatar: 1, phone: 1, bio: 1, major: 1, graduationYear: 1 } }
+    );
+
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    return res.json({ user });
+  } catch (error) {
+    console.error('Failed to get user profile by email:', error);
+    return res.status(500).json({ error: 'Failed to get user profile' });
+  }
+});
+
 // Get user profile by Google ID
 router.get('/google/:googleId', async (req, res) => {
   try {
