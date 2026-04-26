@@ -3,6 +3,9 @@ const router = express.Router();
 const { getDB } = require('../db');
 const { ObjectId } = require('mongodb');
 
+// Email helper
+const encodeEmail = (email) => email.replace(/\./g, '(dot)');
+
 // Validation helpers
 function sanitizeString(str, fieldName = 'input', maxLength = 5000) {
   if (typeof str !== 'string') {
@@ -194,7 +197,7 @@ router.post('/:chatId/messages', async (req, res) => {
     const unreadUpdates = {};
     participants.forEach(p => {
       if (p !== sender) {
-        unreadUpdates[`unreadCount.${p}`] = 1;
+        unreadUpdates[`unreadCount.${encodeEmail(p)}`] = 1;
       }
     });
 
@@ -464,7 +467,7 @@ router.post('/dm/:chatId/messages', async (req, res) => {
     const unreadUpdates = {};
     for (const participant of participants) {
       if (normalizeEmail(participant) !== normalizedSender) {
-        unreadUpdates[`unreadCount.${participant}`] = 1;
+        unreadUpdates[`unreadCount.${encodeEmail(participant)}`] = 1;
       }
     }
 
@@ -527,7 +530,7 @@ router.post('/:chatId/read', async (req, res) => {
 
     await db.collection('chats').updateOne(
       { _id: chatObjectId },
-      { $set: { [`unreadCount.${viewer}`]: 0 } }
+      { $set: { [`unreadCount.${encodeEmail(viewer)}`]: 0 } }
     );
 
     res.json({ success: true });

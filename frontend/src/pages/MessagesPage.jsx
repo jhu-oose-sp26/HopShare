@@ -37,6 +37,8 @@ const PROFILE_CACHE_TTL = 1000 * 60 * 60 * 24;
 
 const socket = io(SOCKET_URL);
 
+const encodeEmail = (email) => email?.replace(/\./g, '(dot)') || '';
+
 const loadProfileCache = () => {
   try { return JSON.parse(localStorage.getItem(PROFILE_CACHE_KEY) || '{}'); }
   catch { return {}; }
@@ -123,7 +125,7 @@ export default function MessagesPage({ currentUser }) {
     };
     
     fetchChats();
-  }, [currentUser]);
+  }, [currentUser, location.key]);
 
   // ── Handle initial state from navigation (DM from UserProfile) ────────────
   useEffect(() => {
@@ -159,7 +161,7 @@ export default function MessagesPage({ currentUser }) {
     if (prevChatId && prevChatId !== chat._id) {
       const prevChat = chats.find(c => c._id === prevChatId);
 
-      if (prevChat?.unreadCount?.[currentUser.email] > 0) {
+      if (prevChat?.unreadCount?.[encodeEmail(currentUser.email)] > 0) {
         fetch(`${API_ROOT}/chat/${prevChatId}/read`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -175,7 +177,7 @@ export default function MessagesPage({ currentUser }) {
               ...c,
               unreadCount: {
                 ...c.unreadCount,
-                [currentUser.email]: 0,
+                [encodeEmail(currentUser.email)]: 0,
               },
             }
           : c
@@ -191,7 +193,7 @@ export default function MessagesPage({ currentUser }) {
     setMessageText('');
     setMobileView('chat');
 
-    if ((chat.unreadCount?.[currentUser.email] || 0) > 0) {
+    if ((chat.unreadCount?.[encodeEmail(currentUser.email)] || 0) > 0) {
       fetch(`${API_ROOT}/chat/${chat._id}/read`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -205,7 +207,7 @@ export default function MessagesPage({ currentUser }) {
                 ...c,
                 unreadCount: {
                   ...c.unreadCount,
-                  [currentUser.email]: 0,
+                  [encodeEmail(currentUser.email)]: 0,
                 },
               }
             : c
@@ -238,7 +240,6 @@ export default function MessagesPage({ currentUser }) {
   useEffect(() => {
     const handleUnreadUpdate = ({ chatId, sender }) => {
       if (sender === currentUser?.email) return;
-
       setChats(prev =>
         prev.map(chat =>
           chat._id === chatId
@@ -246,8 +247,7 @@ export default function MessagesPage({ currentUser }) {
                 ...chat,
                 unreadCount: {
                   ...chat.unreadCount,
-                  [currentUser.email]:
-                    (chat.unreadCount?.[currentUser.email] || 0) + 1,
+                  [encodeEmail(currentUser.email)]: (chat.unreadCount?.[encodeEmail(currentUser.email)] || 0) + 1,
                 },
               }
             : chat
@@ -256,7 +256,6 @@ export default function MessagesPage({ currentUser }) {
     };
 
     socket.on('unreadUpdate', handleUnreadUpdate);
-
     return () => socket.off('unreadUpdate', handleUnreadUpdate);
   }, [currentUser?.email]);
 
@@ -425,7 +424,7 @@ export default function MessagesPage({ currentUser }) {
           ) : (
             chats.map(chat => {
               const isActive = chat._id === selectedChatId;
-              const unreadForMe = chat.unreadCount?.[currentUser.email] || 0;
+              const unreadForMe = chat.unreadCount?.[encodeEmail(currentUser.email)] || 0;
               return (
                 <button
                   key={chat._id}
