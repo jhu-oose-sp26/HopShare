@@ -315,6 +315,23 @@ router.post('/', async (req, res) => {
 
     postInfo.confirmationCode = generateConfirmationCode();
     postInfo.archived = false;
+
+    // For offer posts, auto-add the author as the driver
+    if (postInfo.type === 'offer' && postInfo.user?.email) {
+      const authorUser = await db.collection('users').findOne(
+        { email: postInfo.user.email },
+        { projection: { name: 1, email: 1, picture: 1, avatar: 1, googleId: 1 } }
+      );
+      postInfo.drivers = [{
+        name: authorUser?.name || postInfo.user.name || '',
+        email: postInfo.user.email,
+        picture: authorUser?.picture || null,
+        avatar: authorUser?.avatar || null,
+        googleId: authorUser?.googleId || null,
+        takenAt: new Date().toISOString(),
+      }];
+    }
+
     const postResult = await postsCollection.insertOne(postInfo);
     let tripId = null;
 
