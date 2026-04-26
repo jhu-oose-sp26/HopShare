@@ -661,23 +661,6 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
                 ) : (
                     <span className='text-gray-700'>1 rider sharing this trip</span>
                 )}
-                {currentUser && !isOwner && !listJoined && (
-                    <button
-                        className={`text-xs px-2 py-0.5 rounded border font-medium transition-colors ${
-                            listRequestSent
-                                ? 'border-gray-300 text-gray-400 cursor-default'
-                                : 'border-green-500 text-green-600 hover:bg-green-50'
-                        }`}
-                        disabled={listRequestSent || listJoinLoading}
-                        onClick={() => {
-                            if (listRequestSent) return;
-                            setJoinListMessage('');
-                            setJoinListMessageOpen(true);
-                        }}
-                    >
-                        {listJoinLoading ? 'Sending…' : listRequestSent ? 'Awaiting Approval' : '+ Join'}
-                    </button>
-                )}
                 {currentUser && !isOwner && listJoined && (
                     <button
                         className='text-xs px-2 py-0.5 rounded border font-medium transition-colors border-red-300 text-red-500 hover:bg-red-50'
@@ -730,30 +713,10 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
                             size='sm'
                             className={`w-full ${listJoined || listRequestSent || isFull ? 'text-gray-400' : 'bg-green-600 hover:bg-green-700'}`}
                             disabled={listJoined || listRequestSent || listJoinLoading || isFull}
-                            onClick={async () => {
-                                setListJoinError('');
-                                setListJoinLoading(true);
-                                try {
-                                    const res = await fetch(`${API_ROOT}/posts/${post._id}/join`, {
-                                        method: 'POST',
-                                        headers: { 'Content-Type': 'application/json' },
-                                        body: JSON.stringify({
-                                            email: currentUser.email,
-                                            senderName: currentUser.name,
-                                            senderId: currentUser._id,
-                                        }),
-                                    });
-                                    if (res.ok) {
-                                        setListRequestSent(true);
-                                    } else {
-                                        const data = await res.json().catch(() => ({}));
-                                        setListJoinError(data.error || 'Failed to send request. Please try again.');
-                                    }
-                                } catch (err) {
-                                    setListJoinError('Network error. Please try again.');
-                                } finally {
-                                    setListJoinLoading(false);
-                                }
+                            onClick={() => {
+                                if (listRequestSent || listJoinLoading || isFull) return;
+                                setJoinListMessage('');
+                                setJoinListMessageOpen(true);
                             }}
                         >
                             {listJoinLoading ? (
