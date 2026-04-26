@@ -81,19 +81,33 @@ const ChatPage = ({ currentUser }) => {
     socket.emit("joinChat", chatId);
 
     return () => {
-      socket.off("joinChat");
+      socket.emit("leaveChat", chatId);
     };
   }, [chatId]);
 
   useEffect(() => {
-    socket.on("newMessage", (message) => {
-      setMessages((prev) => [...prev, message]);
-    });
+    const handleNewMessage = (incomingMessage) => {
+      setMessages(prev => {
+        const exists = prev.some(m => m._id === incomingMessage._id);
+        if (exists) return prev;
+        return [...prev, incomingMessage];
+      });
+
+      if (incomingMessage.sender !== currentUser?.email) {
+        fetch(`${API_ROOT}/chat/${chatId}/read`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userEmail: currentUser.email }),
+        }).catch(() => {});
+      }
+    };
+
+    socket.on("newMessage", handleNewMessage);
 
     return () => {
-      socket.off("newMessage");
+      socket.off("newMessage", handleNewMessage);
     };
-  }, []);
+  }, [chatId, currentUser?.email]);
 
   useEffect(() => {
     if (!post?.user?.googleId) return;
@@ -134,7 +148,9 @@ const ChatPage = ({ currentUser }) => {
           }
           chat = await response.json();
           // For DMs, get the other participant's info
-          const otherEmail = chat.participants?.find(p => p.toLowerCase() !== viewerEmail.toLowerCase());
+          const otherEmail = chat.participants?.find(
+            p => p.toLowerCase() !== currentUser.email.toLowerCase()
+          );
           if (otherEmail) {
             const profileRes = await fetch(`${API_ROOT}/profile/by-email/${encodeURIComponent(otherEmail)}`);
             if (profileRes.ok) {
@@ -153,6 +169,16 @@ const ChatPage = ({ currentUser }) => {
         }
         
         setMessages(chat.messages || []);
+
+        await fetch(`${API_ROOT}/chat/${chatId}/read`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            userEmail: currentUser.email,
+          }),
+        }).catch(err => console.error('Failed to mark chat as read:', err));
       } catch (err) {
         console.error('Error loading chat:', err);
         setError(err.message);
