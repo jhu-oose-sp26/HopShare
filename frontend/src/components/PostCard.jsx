@@ -498,28 +498,6 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
                 </div>
             )}
 
-            {/* Suggested price — offers only */}
-            {isOffer && suggestedPrice != null && suggestedPrice !== '' && (
-                <div className='flex items-center gap-2 mb-4 text-sm'>
-                    <span className='text-gray-400 shrink-0 font-medium'>$</span>
-                    <span className='text-gray-700'>
-                        Suggested price: <span className='font-medium text-green-700'>${Number(suggestedPrice).toFixed(2)}</span>
-                    </span>
-                </div>
-            )}
-
-            <div className='flex items-center gap-2 mb-4 text-sm'>
-                <ExternalLink className='w-4 h-4 text-gray-400 shrink-0' />
-                <a
-                    href='https://www.uber.com/global/en/price-estimate/'
-                    target='_blank'
-                    rel='noreferrer'
-                    className='font-medium text-blue-600 hover:text-blue-800 hover:underline'
-                >
-                    See price estimation here
-                </a>
-            </div>
-
             {/* Driver status */}
             {(() => {
                 const driver = driverList[0];
@@ -587,7 +565,7 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
                                                     <textarea
                                                         value={offerMessage}
                                                         onChange={(e) => setOfferMessage(e.target.value)}
-                                                        placeholder="Optional message (e.g., 'I can pick you up early', leave blank to skip)"
+                                                        placeholder="Optional message (e.g., 'I can pick you up early' or 'I can drive for $5', leave blank to skip)"
                                                         className="w-full min-h-[80px] rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                                                     />
                                                 </div>
@@ -1020,6 +998,35 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
                                 <div className='bg-gray-50 rounded-lg p-3 space-y-2'>
                                     <p className='text-xs font-semibold uppercase tracking-wide text-gray-400'>Description</p>
                                     <p className='text-gray-700 break-all whitespace-pre-wrap'>{description}</p>
+                                </div>
+                            )}
+
+                            {isOffer && suggestedPrice != null && suggestedPrice !== '' && (
+                                <div className='bg-gray-50 rounded-lg p-3 space-y-2'>
+                                    <p className='text-xs font-semibold uppercase tracking-wide text-gray-400'>Suggested Price</p>
+                                    <div className='flex items-center gap-2 text-sm'>
+                                        <span className='text-gray-400 shrink-0 font-medium'>$</span>
+                                        <span className='text-gray-700'>
+                                            Suggested price: <span className='font-medium text-green-700'>${Number(suggestedPrice).toFixed(2)}</span>
+                                        </span>
+                                    </div>
+                                </div>
+                            )}
+
+                            {!isOffer && driverList.length === 0 && (
+                                <div className='bg-gray-50 rounded-lg p-3 space-y-2'>
+                                    <p className='text-xs font-semibold uppercase tracking-wide text-gray-400'>Price Estimation</p>
+                                    <div className='flex items-center gap-2 text-sm'>
+                                        <ExternalLink className='w-4 h-4 text-gray-400 shrink-0' />
+                                        <a
+                                            href='https://www.uber.com/global/en/price-estimate/'
+                                            target='_blank'
+                                            rel='noreferrer'
+                                            className='font-medium text-blue-600 hover:text-blue-800 hover:underline'
+                                        >
+                                            See price estimation here
+                                        </a>
+                                    </div>
                                 </div>
                             )}
 
