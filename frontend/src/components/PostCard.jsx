@@ -434,33 +434,35 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
                             </div>
                         )}
                         
-                        {/* Weather forecast for start location - only for dates within 14 days */}
-                        {trip.startLocation?.gps_coordinates && trip.date && shouldShowWeather() && (
-                            <div className='mt-3'>
-                                <div className='text-xs font-medium text-gray-700 mb-2'>Weather at departure:</div>
-                                <WeatherDisplay 
-                                    latitude={trip.startLocation.gps_coordinates.latitude}
-                                    longitude={trip.startLocation.gps_coordinates.longitude}
-                                    date={trip.date}
-                                    time={trip.time || '12:00'}
-                                    location={trip.startLocation.title}
-                                    compact={true}
-                                />
-                            </div>
-                        )}
-                        
-                        {/* Weather forecast for end location - only for dates within 14 days */}
-                        {trip.endLocation?.gps_coordinates && trip.date && shouldShowWeather() && (
-                            <div className='mt-2'>
-                                <div className='text-xs font-medium text-gray-700 mb-2'>Weather at destination:</div>
-                                <WeatherDisplay 
-                                    latitude={trip.endLocation.gps_coordinates.latitude}
-                                    longitude={trip.endLocation.gps_coordinates.longitude}
-                                    date={trip.date}
-                                    time={trip.time || '12:00'}
-                                    location={trip.endLocation.title}
-                                    compact={true}
-                                />
+                        {/* Weather forecast - departure and destination in one row */}
+                        {trip.date && shouldShowWeather() && (trip.startLocation?.gps_coordinates || trip.endLocation?.gps_coordinates) && (
+                            <div className='mt-3 flex gap-3 divide-x divide-gray-200'>
+                                {trip.startLocation?.gps_coordinates && (
+                                    <div className='flex-1 min-w-0'>
+                                        <div className='text-xs font-medium text-gray-500 mb-1'>Departure</div>
+                                        <WeatherDisplay
+                                            latitude={trip.startLocation.gps_coordinates.latitude}
+                                            longitude={trip.startLocation.gps_coordinates.longitude}
+                                            date={trip.date}
+                                            time={trip.time || '12:00'}
+                                            location={trip.startLocation.title}
+                                            compact={true}
+                                        />
+                                    </div>
+                                )}
+                                {trip.endLocation?.gps_coordinates && (
+                                    <div className='flex-1 min-w-0 pl-3'>
+                                        <div className='text-xs font-medium text-gray-500 mb-1'>Destination</div>
+                                        <WeatherDisplay
+                                            latitude={trip.endLocation.gps_coordinates.latitude}
+                                            longitude={trip.endLocation.gps_coordinates.longitude}
+                                            date={trip.date}
+                                            time={trip.time || '12:00'}
+                                            location={trip.endLocation.title}
+                                            compact={true}
+                                        />
+                                    </div>
+                                )}
                             </div>
                         )}
                         
@@ -661,23 +663,6 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
                 ) : (
                     <span className='text-gray-700'>1 rider sharing this trip</span>
                 )}
-                {currentUser && !isOwner && !listJoined && (
-                    <button
-                        className={`text-xs px-2 py-0.5 rounded border font-medium transition-colors ${
-                            listRequestSent
-                                ? 'border-gray-300 text-gray-400 cursor-default'
-                                : 'border-green-500 text-green-600 hover:bg-green-50'
-                        }`}
-                        disabled={listRequestSent || listJoinLoading}
-                        onClick={() => {
-                            if (listRequestSent) return;
-                            setJoinListMessage('');
-                            setJoinListMessageOpen(true);
-                        }}
-                    >
-                        {listJoinLoading ? 'Sending…' : listRequestSent ? 'Awaiting Approval' : '+ Join'}
-                    </button>
-                )}
                 {currentUser && !isOwner && listJoined && (
                     <button
                         className='text-xs px-2 py-0.5 rounded border font-medium transition-colors border-red-300 text-red-500 hover:bg-red-50'
@@ -730,30 +715,10 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
                             size='sm'
                             className={`w-full ${listJoined || listRequestSent || isFull ? 'text-gray-400' : 'bg-green-600 hover:bg-green-700'}`}
                             disabled={listJoined || listRequestSent || listJoinLoading || isFull}
-                            onClick={async () => {
-                                setListJoinError('');
-                                setListJoinLoading(true);
-                                try {
-                                    const res = await fetch(`${API_ROOT}/posts/${post._id}/join`, {
-                                        method: 'POST',
-                                        headers: { 'Content-Type': 'application/json' },
-                                        body: JSON.stringify({
-                                            email: currentUser.email,
-                                            senderName: currentUser.name,
-                                            senderId: currentUser._id,
-                                        }),
-                                    });
-                                    if (res.ok) {
-                                        setListRequestSent(true);
-                                    } else {
-                                        const data = await res.json().catch(() => ({}));
-                                        setListJoinError(data.error || 'Failed to send request. Please try again.');
-                                    }
-                                } catch (err) {
-                                    setListJoinError('Network error. Please try again.');
-                                } finally {
-                                    setListJoinLoading(false);
-                                }
+                            onClick={() => {
+                                if (listRequestSent || listJoinLoading || isFull) return;
+                                setJoinListMessage('');
+                                setJoinListMessageOpen(true);
                             }}
                         >
                             {listJoinLoading ? (
