@@ -128,6 +128,7 @@ router.get('/:postId', async (req, res) => {
         postId,
         messages: [],
         allowedReaders: [viewer],
+        unreadCount: {},
         createdAt: new Date(),
         updatedAt: new Date()
       };
@@ -163,37 +164,39 @@ router.post('/:chatId/messages', async (req, res) => {
       return res.status(400).json({ error: 'Sender and message are required' });
     }
 
-    // Validate and sanitize input
     try {
       sender = validateEmail(sender);
       message = sanitizeString(message, 'Message', 10000);
-      
-      if (recipientEmail) {
-        recipientEmail = validateEmail(recipientEmail);
-      }
     } catch (validationError) {
       return res.status(400).json({ error: validationError.message });
     }
 
-    // PREVENT SELF-MESSAGING: user cannot message themselves
-    if (recipientEmail && sender === recipientEmail) {
-      return res.status(400).json({ error: 'You cannot message yourself' });
-    }
-
     const db = getDB();
     const chatObjectId = toObjectId(chatId);
-    if (!chatObjectId) {
-      return res.status(400).json({ error: 'Invalid chat ID' });
-    }
-
+    
     const post = await db.collection('posts').findOne({ _id: chatObjectId });
-    if (!post) {
-      return res.status(404).json({ error: 'Ride post not found' });
-    }
+    if (!post) return res.status(404).json({ error: 'Ride post not found' });
 
     if (!isActiveRideParticipant(post, sender)) {
-      return res.status(403).json({ error: 'You are no longer part of this ride and cannot send new messages' });
+      return res.status(403).json({ error: 'You are no longer part of this ride' });
     }
+
+    // 1. Identify all active participants in the ride
+    const participants = [
+      post.user?.email,
+      ...(post.riderList || []).map(r => r.email),
+      ...(post.drivers || []).map(d => d.email)
+    ]
+    .map(e => (typeof e === 'string' ? e.trim().toLowerCase() : ''))
+    .filter((email, index, self) => email && self.indexOf(email) === index); // Unique emails
+
+    // 2. Prepare unread increments for everyone EXCEPT the sender
+    const unreadUpdates = {};
+    participants.forEach(p => {
+      if (p !== sender) {
+        unreadUpdates[`unreadCount.${p}`] = 1;
+      }
+    });
 
     const newMessage = {
       _id: new ObjectId(),
@@ -206,25 +209,26 @@ router.post('/:chatId/messages', async (req, res) => {
       { _id: chatObjectId },
       {
         $push: { messages: newMessage },
-        $addToSet: { allowedReaders: sender },
-        $set: { updatedAt: new Date() }
+        $set: { updatedAt: new Date() },
+        $inc: unreadUpdates // Increment counts for others
       }
     );
+  
+    if (result.matchedCount === 0) return res.status(404).json({ error: 'Chat not found' });
 
-    if (result.matchedCount === 0) {
-      return res.status(404).json({ error: 'Chat not found' });
-    }
+    req.app.get('io').to(chatId).emit('newMessage', { ...newMessage, chatId });
 
-    req.app.get('io').to(req.params.chatId).emit('newMessage', { ...newMessage, chatId: req.params.chatId });
+    req.app.get('io').emit('unreadUpdate', {
+      chatId: chatId.toString(),
+      sender: sender,
+      participants: participants
+    });
 
     res.status(201).json(newMessage);
   } catch (error) {
-    console.error('Error adding message:', error);
-    res.status(500).json({ error: error.message || 'Internal server error' });
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
-
-// Add this to your chat.js file
 
 // GET all chats for a user
 router.get('/user/:email', async (req, res) => {
@@ -272,6 +276,7 @@ router.get('/user/:email', async (req, res) => {
         tripDate: postInfo.tripDate || null,
         tripTime: postInfo.tripTime || null,
         participantCount: postInfo.participantCount ?? null,
+        unreadCount: chat.unreadCount || {},
         lastMessage: lastMessage,
         updatedAt: chat.updatedAt || chat.createdAt
       };
@@ -398,6 +403,7 @@ router.get('/dm/:identifier', async (req, res) => {
       participants: [viewer, otherUserEmail],
       messages: [],
       allowedReaders: [viewer, otherUserEmail],
+      unreadCount: {},
       createdAt: new Date(),
       updatedAt: new Date()
     };
@@ -454,11 +460,20 @@ router.post('/dm/:chatId/messages', async (req, res) => {
       timestamp: new Date()
     };
 
+    // Increment unread count for all participants except sender
+    const unreadUpdates = {};
+    for (const participant of participants) {
+      if (normalizeEmail(participant) !== normalizedSender) {
+        unreadUpdates[`unreadCount.${participant}`] = 1;
+      }
+    }
+
     const result = await db.collection('chats').updateOne(
       { _id: chatObjectId },
       {
         $push: { messages: newMessage },
-        $set: { updatedAt: new Date() }
+        $set: { updatedAt: new Date() },
+        $inc: unreadUpdates
       }
     );
 
@@ -468,10 +483,56 @@ router.post('/dm/:chatId/messages', async (req, res) => {
 
     req.app.get('io').to(chatId).emit('newMessage', { ...newMessage, chatId });
 
+    // Emit unread update to all participants
+    req.app.get('io').emit('unreadUpdate', {
+      chatId: chatId.toString(),
+      sender: sender,
+      participants: participants
+    });
+
     res.status(201).json(newMessage);
   } catch (error) {
     console.error('Error adding DM message:', error);
     res.status(500).json({ error: error.message || 'Internal server error' });
+  }
+});
+
+// Reset unread count for a user when they view the chat
+router.post('/:chatId/read', async (req, res) => {
+  try {
+    const { chatId } = req.params;
+    const { userEmail } = req.body;
+
+    if (!userEmail) return res.status(400).json({ error: 'userEmail is required' });
+    const viewer = validateEmail(userEmail);
+    
+    const db = getDB();
+    const chatObjectId = toObjectId(chatId);
+
+    const chat = await db.collection('chats').findOne({ _id: chatObjectId });
+    if (!chat) return res.status(404).json({ error: 'Chat not found' });
+
+    let isAuthorized = false;
+    if (chat.type === 'dm') {
+      isAuthorized = chat.participants?.map(p => normalizeEmail(p)).includes(viewer);
+    } else {
+      // For group chats, check the post participant list
+      const post = await db.collection('posts').findOne({ _id: chatObjectId });
+      isAuthorized = isActiveRideParticipant(post, viewer);
+    }
+
+    if (!isAuthorized) {
+      return res.status(403).json({ error: 'You are not a participant of this chat' });
+    }
+
+    await db.collection('chats').updateOne(
+      { _id: chatObjectId },
+      { $set: { [`unreadCount.${viewer}`]: 0 } }
+    );
+
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -523,6 +584,7 @@ router.get('/dm/user/:email', async (req, res) => {
         type: 'dm',
         postId: null,
         postTitle: null,
+        unreadCount: chat.unreadCount || {},
         otherUser: otherUser ? {
           _id: otherUser._id,
           googleId: otherUser.googleId,

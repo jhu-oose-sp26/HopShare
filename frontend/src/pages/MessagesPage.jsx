@@ -153,6 +153,35 @@ export default function MessagesPage({ currentUser }) {
 
     setSelectedChatId(chat._id);
     selectedChatIdRef.current = chat._id;
+
+    const prevChatId = selectedChatIdRef.current; // when switching chats 
+
+    if (prevChatId && prevChatId !== chat._id) {
+      const prevChat = chats.find(c => c._id === prevChatId);
+
+      if (prevChat?.unreadCount?.[currentUser.email] > 0) {
+        fetch(`${API_ROOT}/chat/${prevChatId}/read`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userEmail: currentUser.email }),
+        }).catch(() => {});
+      }
+    }
+
+    setChats(prev =>
+      prev.map(c =>
+        c._id === chat._id
+          ? {
+              ...c,
+              unreadCount: {
+                ...c.unreadCount,
+                [currentUser.email]: 0,
+              },
+            }
+          : c
+      )
+    );
+
     setSelectedPostId(chat.postId);
     setIsDmChat(chat.type === 'dm');
     setMessages([]);
@@ -161,6 +190,28 @@ export default function MessagesPage({ currentUser }) {
     setChatError(null);
     setMessageText('');
     setMobileView('chat');
+
+    if ((chat.unreadCount?.[currentUser.email] || 0) > 0) {
+      fetch(`${API_ROOT}/chat/${chat._id}/read`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userEmail: currentUser.email }),
+      }).catch(err => console.error('Failed to reset unread:', err));
+
+      setChats(prev =>
+        prev.map(c =>
+          c._id === chat._id
+            ? {
+                ...c,
+                unreadCount: {
+                  ...c.unreadCount,
+                  [currentUser.email]: 0,
+                },
+              }
+            : c
+        )
+      );
+    }
   };
 
   // ── Socket: join room & listen ────────────────────────────────────────────
@@ -183,6 +234,31 @@ export default function MessagesPage({ currentUser }) {
     socket.on('newMessage', handler);
     return () => socket.off('newMessage', handler);
   }, []);
+
+  useEffect(() => {
+    const handleUnreadUpdate = ({ chatId, sender }) => {
+      if (sender === currentUser?.email) return;
+
+      setChats(prev =>
+        prev.map(chat =>
+          chat._id === chatId
+            ? {
+                ...chat,
+                unreadCount: {
+                  ...chat.unreadCount,
+                  [currentUser.email]:
+                    (chat.unreadCount?.[currentUser.email] || 0) + 1,
+                },
+              }
+            : chat
+        )
+      );
+    };
+
+    socket.on('unreadUpdate', handleUnreadUpdate);
+
+    return () => socket.off('unreadUpdate', handleUnreadUpdate);
+  }, [currentUser?.email]);
 
   // ── Fetch messages ────────────────────────────────────────────────────────
   useEffect(() => {
@@ -278,6 +354,15 @@ export default function MessagesPage({ currentUser }) {
       })
   ), [messages, usersMap]);
 
+  const roleMap = useMemo(() => {
+    if (!post) return {};
+    const map = {};
+    if (post.user?.email) map[post.user.email] = 'Author';
+    (post.riderList || []).forEach(r => { if (r.email) map[r.email] = 'Rider'; });
+    (post.drivers || []).forEach(d => { if (d.email) map[d.email] = 'Driver'; });
+    return map;
+  }, [post]);
+
   // ── Send message ──────────────────────────────────────────────────────────
   const handleSendMessage = async () => {
     const trimmed = messageText.trim();
@@ -340,6 +425,7 @@ export default function MessagesPage({ currentUser }) {
           ) : (
             chats.map(chat => {
               const isActive = chat._id === selectedChatId;
+              const unreadForMe = chat.unreadCount?.[currentUser.email] || 0;
               return (
                 <button
                   key={chat._id}
@@ -360,11 +446,20 @@ export default function MessagesPage({ currentUser }) {
                         : (chat.postTitle && chat.postTitle !== 'Unknown Ride' ? chat.postTitle : 'Untitled ride')
                       }
                     </p>
-                    {chat.lastMessage?.timestamp && (
-                      <span className="text-xs text-gray-400 shrink-0 mt-0.5">
-                        {formatChatTime(chat.lastMessage.timestamp)}
-                      </span>
-                    )}
+
+                    <div className="flex items-center gap-2 shrink-0">
+                      {unreadForMe > 0 && (
+                        <span className="min-w-[20px] h-5 px-1 rounded-full bg-red-500 text-white text-xs flex items-center justify-center font-medium">
+                          {unreadForMe > 99 ? '99+' : unreadForMe}
+                        </span>
+                      )}
+
+                      {chat.lastMessage?.timestamp && (
+                        <span className="text-xs text-gray-400 mt-0.5">
+                          {formatChatTime(chat.lastMessage.timestamp)}
+                        </span>
+                      )}
+                    </div>
                   </div>
 
                   {/* Date / time / people */}
@@ -477,6 +572,7 @@ export default function MessagesPage({ currentUser }) {
                           avatarAlt={msg.sender.username}
                           avatarFallback={msg.sender.avatarFallback}
                           senderName={msg.sender.name}
+                          senderTag={!isDmChat ? roleMap[msg.sender.username] : undefined}
                           content={msg.content}
                           timestamp={msg.timestamp}
                           onAvatarClick={msg.sender.googleId ? () => navigate(`/user/${msg.sender.googleId}`) : undefined}
@@ -498,6 +594,7 @@ export default function MessagesPage({ currentUser }) {
                       avatarAlt={msg.sender.username}
                       avatarFallback={msg.sender.avatarFallback}
                       senderName={msg.sender.name}
+                      senderTag={!isDmChat ? roleMap[msg.sender.username] : undefined}
                       content={msg.content}
                       timestamp={msg.timestamp}
                       onAvatarClick={msg.sender.googleId ? () => navigate(`/user/${msg.sender.googleId}`) : undefined}
