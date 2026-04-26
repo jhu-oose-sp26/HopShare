@@ -14,6 +14,7 @@ export function PrimaryMessage({
   avatarAlt,
   avatarFallback,
   senderName,
+  senderTag,
   content,
   timestamp,
   className,
@@ -33,6 +34,9 @@ export function PrimaryMessage({
       <ChatEventBody>
         <ChatEventTitle>
           <span className="font-medium">{senderName}</span>
+          {senderTag && (
+            <span className="text-xs font-medium text-gray-400">{senderTag}</span>
+          )}
           <ChatEventTime timestamp={timestamp} />
         </ChatEventTitle>
         <ChatEventContent>{content}</ChatEventContent>

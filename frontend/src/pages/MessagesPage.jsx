@@ -354,6 +354,15 @@ export default function MessagesPage({ currentUser }) {
       })
   ), [messages, usersMap]);
 
+  const roleMap = useMemo(() => {
+    if (!post) return {};
+    const map = {};
+    if (post.user?.email) map[post.user.email] = 'Author';
+    (post.riderList || []).forEach(r => { if (r.email) map[r.email] = 'Rider'; });
+    (post.drivers || []).forEach(d => { if (d.email) map[d.email] = 'Driver'; });
+    return map;
+  }, [post]);
+
   // ── Send message ──────────────────────────────────────────────────────────
   const handleSendMessage = async () => {
     const trimmed = messageText.trim();
@@ -563,6 +572,7 @@ export default function MessagesPage({ currentUser }) {
                           avatarAlt={msg.sender.username}
                           avatarFallback={msg.sender.avatarFallback}
                           senderName={msg.sender.name}
+                          senderTag={!isDmChat ? roleMap[msg.sender.username] : undefined}
                           content={msg.content}
                           timestamp={msg.timestamp}
                           onAvatarClick={msg.sender.googleId ? () => navigate(`/user/${msg.sender.googleId}`) : undefined}
@@ -584,6 +594,7 @@ export default function MessagesPage({ currentUser }) {
                       avatarAlt={msg.sender.username}
                       avatarFallback={msg.sender.avatarFallback}
                       senderName={msg.sender.name}
+                      senderTag={!isDmChat ? roleMap[msg.sender.username] : undefined}
                       content={msg.content}
                       timestamp={msg.timestamp}
                       onAvatarClick={msg.sender.googleId ? () => navigate(`/user/${msg.sender.googleId}`) : undefined}
