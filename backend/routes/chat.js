@@ -321,9 +321,10 @@ router.get('/user/:email', async (req, res) => {
 });
 
 // Get or create a DM chat between two users (not tied to a post)
-router.get('/dm/:otherUserId', async (req, res) => {
+// Get or create a DM chat between two users, OR fetch an existing DM by chatId
+router.get('/dm/:identifier', async (req, res) => {
   try {
-    const { otherUserId } = req.params;
+    const { identifier } = req.params;
     const { viewerEmail } = req.query;
 
     if (!viewerEmail) {
@@ -339,19 +340,37 @@ router.get('/dm/:otherUserId', async (req, res) => {
 
     const db = getDB();
 
-    // Get the other user's profile to find their email
-    let otherUserEmail = otherUserId;
-    if (ObjectId.isValid(otherUserId) && otherUserId.length === 24) {
-      const otherUser = await db.collection('users').findOne({ _id: new ObjectId(otherUserId) });
+    // 1. Check if the identifier is an existing DM Chat ID
+    if (ObjectId.isValid(identifier)) {
+      const chat = await db.collection('chats').findOne({ 
+        _id: new ObjectId(identifier), 
+        type: 'dm' 
+      });
+      
+      if (chat) {
+        // Verify viewer is actually a participant of this DM
+        const participants = chat.participants?.map(p => normalizeEmail(p)) || [];
+        if (!participants.includes(viewer)) {
+          return res.status(403).json({ error: 'You are not a participant of this DM chat' });
+        }
+        return res.json(chat);
+      }
+    }
+
+    // 2. If it's not a chat ID, treat it as a User ID or Email to find/create a DM
+    let otherUserEmail = identifier;
+    if (ObjectId.isValid(identifier)) {
+      const otherUser = await db.collection('users').findOne({ _id: new ObjectId(identifier) });
       if (otherUser) {
         otherUserEmail = otherUser.email;
       }
-    } else if (otherUserId.includes('@')) {
-      otherUserEmail = otherUserId;
+    } else if (identifier.includes('@')) {
+      otherUserEmail = identifier;
     }
 
-    if (!otherUserEmail) {
-      return res.status(400).json({ error: 'Invalid user ID' });
+    // If it STILL isn't a valid email after database lookups, reject it
+    if (!otherUserEmail || !otherUserEmail.includes('@')) {
+      return res.status(400).json({ error: 'Invalid user ID or chat ID' });
     }
 
     otherUserEmail = validateEmail(otherUserEmail);
