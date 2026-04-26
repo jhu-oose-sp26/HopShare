@@ -164,37 +164,39 @@ router.post('/:chatId/messages', async (req, res) => {
       return res.status(400).json({ error: 'Sender and message are required' });
     }
 
-    // Validate and sanitize input
     try {
       sender = validateEmail(sender);
       message = sanitizeString(message, 'Message', 10000);
-      
-      if (recipientEmail) {
-        recipientEmail = validateEmail(recipientEmail);
-      }
     } catch (validationError) {
       return res.status(400).json({ error: validationError.message });
     }
 
-    // PREVENT SELF-MESSAGING: user cannot message themselves
-    if (recipientEmail && sender === recipientEmail) {
-      return res.status(400).json({ error: 'You cannot message yourself' });
-    }
-
     const db = getDB();
     const chatObjectId = toObjectId(chatId);
-    if (!chatObjectId) {
-      return res.status(400).json({ error: 'Invalid chat ID' });
-    }
-
+    
     const post = await db.collection('posts').findOne({ _id: chatObjectId });
-    if (!post) {
-      return res.status(404).json({ error: 'Ride post not found' });
-    }
+    if (!post) return res.status(404).json({ error: 'Ride post not found' });
 
     if (!isActiveRideParticipant(post, sender)) {
-      return res.status(403).json({ error: 'You are no longer part of this ride and cannot send new messages' });
+      return res.status(403).json({ error: 'You are no longer part of this ride' });
     }
+
+    // 1. Identify all active participants in the ride
+    const participants = [
+      post.user?.email,
+      ...(post.riderList || []).map(r => r.email),
+      ...(post.drivers || []).map(d => d.email)
+    ]
+    .map(e => (typeof e === 'string' ? e.trim().toLowerCase() : ''))
+    .filter((email, index, self) => email && self.indexOf(email) === index); // Unique emails
+
+    // 2. Prepare unread increments for everyone EXCEPT the sender
+    const unreadUpdates = {};
+    participants.forEach(p => {
+      if (p !== sender) {
+        unreadUpdates[`unreadCount.${p}`] = 1;
+      }
+    });
 
     const newMessage = {
       _id: new ObjectId(),
@@ -207,26 +209,26 @@ router.post('/:chatId/messages', async (req, res) => {
       { _id: chatObjectId },
       {
         $push: { messages: newMessage },
-        $addToSet: { allowedReaders: sender },
         $set: { updatedAt: new Date() },
-        $inc: { [`unreadCount.${sender}`]: 0 }  // Initialize for sender
+        $inc: unreadUpdates // Increment counts for others
       }
     );
+  
+    if (result.matchedCount === 0) return res.status(404).json({ error: 'Chat not found' });
 
-    if (result.matchedCount === 0) {
-      return res.status(404).json({ error: 'Chat not found' });
-    }
+    req.app.get('io').to(chatId).emit('newMessage', { ...newMessage, chatId });
 
-    req.app.get('io').to(req.params.chatId).emit('newMessage', { ...newMessage, chatId: req.params.chatId });
+    req.app.get('io').emit('unreadUpdate', {
+      chatId: chatId.toString(),
+      sender: sender,
+      participants: participants
+    });
 
     res.status(201).json(newMessage);
   } catch (error) {
-    console.error('Error adding message:', error);
-    res.status(500).json({ error: error.message || 'Internal server error' });
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
-
-// Add this to your chat.js file
 
 // GET all chats for a user
 router.get('/user/:email', async (req, res) => {
@@ -501,30 +503,28 @@ router.post('/:chatId/read', async (req, res) => {
     const { chatId } = req.params;
     const { userEmail } = req.body;
 
-    if (!userEmail) {
-      return res.status(400).json({ error: 'userEmail is required' });
-    }
-
+    if (!userEmail) return res.status(400).json({ error: 'userEmail is required' });
     const viewer = validateEmail(userEmail);
+    
     const db = getDB();
     const chatObjectId = toObjectId(chatId);
 
-    if (!chatObjectId) {
-      return res.status(400).json({ error: 'Invalid chat ID' });
-    }
-
-    // Verify user is a participant
     const chat = await db.collection('chats').findOne({ _id: chatObjectId });
-    if (!chat) {
-      return res.status(404).json({ error: 'Chat not found' });
+    if (!chat) return res.status(404).json({ error: 'Chat not found' });
+
+    let isAuthorized = false;
+    if (chat.type === 'dm') {
+      isAuthorized = chat.participants?.map(p => normalizeEmail(p)).includes(viewer);
+    } else {
+      // For group chats, check the post participant list
+      const post = await db.collection('posts').findOne({ _id: chatObjectId });
+      isAuthorized = isActiveRideParticipant(post, viewer);
     }
 
-    const participants = chat.participants?.map(p => normalizeEmail(p)) || [];
-    if (!participants.includes(viewer)) {
+    if (!isAuthorized) {
       return res.status(403).json({ error: 'You are not a participant of this chat' });
     }
 
-    // Reset unread count for this user
     await db.collection('chats').updateOne(
       { _id: chatObjectId },
       { $set: { [`unreadCount.${viewer}`]: 0 } }
@@ -532,7 +532,6 @@ router.post('/:chatId/read', async (req, res) => {
 
     res.json({ success: true });
   } catch (error) {
-    console.error('Error resetting unread:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
