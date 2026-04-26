@@ -188,12 +188,19 @@ export default function MessagesPage({ currentUser }) {
   useEffect(() => {
     if (!selectedChatId) return;
     setChatLoading(true);
-    fetch(`${API_ROOT}/chat/${selectedChatId}`)
-      .then(r => r.json())
+    const viewerEmail = encodeURIComponent(currentUser?.email || '');
+    const url = isDmChat
+      ? `${API_ROOT}/chat/dm/${selectedChatId}?viewerEmail=${viewerEmail}`
+      : `${API_ROOT}/chat/${selectedChatId}?viewerEmail=${viewerEmail}`;
+    fetch(url)
+      .then(r => {
+        if (!r.ok) return r.json().then(e => Promise.reject(new Error(e.error || 'Failed to load chat')));
+        return r.json();
+      })
       .then(data => setMessages(data.messages || []))
       .catch(err => setChatError(err.message))
       .finally(() => setChatLoading(false));
-  }, [selectedChatId]);
+  }, [selectedChatId, isDmChat, currentUser?.email]);
 
   // ── Fetch post details ────────────────────────────────────────────────────
   useEffect(() => {
