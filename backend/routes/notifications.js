@@ -123,12 +123,11 @@ router.patch('/:id/respond', async (req, res) => {
           }
           await db.collection('posts').updateOne(
             { _id: notif.postId },
-            {
-              $pull: {
-                pendingJoins: senderEmail,
-                riderList: { email: senderEmail },
-              },
-              $push: { riderList: {
+            { $pull: { pendingJoins: senderEmail, riderList: { email: senderEmail } } }
+          );
+          await db.collection('posts').updateOne(
+            { _id: notif.postId },
+            { $push: { riderList: {
                 name: senderUser.name || senderUser.displayName || notif.senderName || '',
                 email: senderEmail,
                 picture: senderUser.picture || null,
@@ -154,12 +153,11 @@ router.patch('/:id/respond', async (req, res) => {
         if (response === 'accepted') {
           await db.collection('posts').updateOne(
             { _id: notif.postId },
-            {
-              $pull: {
-                pendingDrivers: { email: senderUser.email },
-                drivers: { email: senderUser.email },
-              },
-              $push: { drivers: {
+            { $pull: { pendingDrivers: { email: senderUser.email }, drivers: { email: senderUser.email } } }
+          );
+          await db.collection('posts').updateOne(
+            { _id: notif.postId },
+            { $push: { drivers: {
                 name: senderUser.name || notif.senderName || '',
                 email: senderUser.email,
                 picture: senderUser.picture || null,
