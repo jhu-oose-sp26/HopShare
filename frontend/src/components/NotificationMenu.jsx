@@ -93,13 +93,13 @@ function NotificationMenu({ currentUser }) {
           </SheetDescription>
         </SheetHeader>
 
-        <div className="mt-4 px-4">
           {error ? (
-            <p className='mb-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600'>
-              {error}
-            </p>
+            <div className="mt-4 px-4">
+              <p className='mb-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600'>
+                {error}
+              </p>
+            </div>
           ) : null}
-        </div>
 
         <div className="space-y-3 px-4 overflow-y-auto max-h-[calc(100vh-10rem)]">
           {isLoading ? (
