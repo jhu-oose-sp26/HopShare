@@ -290,7 +290,7 @@ function RidesMapView({ posts, isLoading = false, currentUser, coords, routeSear
           <p className='text-gray-500 text-lg'>No rides with location data to display.</p>
         </div>
       ) : (
-        <div className='rounded-xl overflow-hidden border border-gray-200 shadow-sm' style={{ height: '520px', position: 'relative', zIndex: 0 }}>
+        <div className='rounded-xl overflow-hidden border border-gray-200 shadow-sm' style={{ height: '620px', position: 'relative', zIndex: 0 }}>
           <MapContainer
             center={center}
             zoom={initialZoom}
