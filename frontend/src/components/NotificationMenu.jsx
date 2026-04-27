@@ -39,10 +39,7 @@ function NotificationMenu({ currentUser }) {
     notifications,
     unreadCount,
     isLoading,
-    isRefreshing,
     error,
-    lastUpdatedAt,
-    refreshNotifications,
     markAllAsRead,
     sendReply: sendNotificationReply,
     respondToNotification,
@@ -97,14 +94,6 @@ function NotificationMenu({ currentUser }) {
         </SheetHeader>
 
         <div className="mt-4 px-4">
-          <div className="mb-3 flex items-center justify-between text-xs text-gray-500">
-            <span>
-              {lastUpdatedAt
-                ? `Updated ${new Date(lastUpdatedAt).toLocaleTimeString()}`
-                : 'Waiting for updates'}
-            </span>
-          </div>
-
           {error ? (
             <p className='mb-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600'>
               {error}
