@@ -59,6 +59,8 @@ const CSS = `
   .hs-btn-hero-primary:hover { opacity: 0.85; }
   .hs-btn-hero-ghost { background: none; color: ${BLACK}; border: ${BORDER}; border-radius: ${RADIUS}; padding: 13px 28px; font-family: ${FONT}; font-size: 15px; font-weight: 500; cursor: pointer; transition: background 0.15s; text-decoration: none; display: inline-block; }
   .hs-btn-hero-ghost:hover { background: ${GRAY1}; }
+  .hs-nav-link { color: ${GRAY3}; font-family: ${FONT}; font-size: 14px; font-weight: 600; text-decoration: none; letter-spacing: 0.01em; transition: color 0.15s; }
+  .hs-nav-link:hover { color: ${BLACK}; }
   @media (max-width: 800px) {
     .hs-hero-inner { grid-template-columns: 1fr; }
     .hs-steps-grid { grid-template-columns: 1fr; }
@@ -121,6 +123,17 @@ export default function LandingPage({ onLogin }) {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [googleReady, setGoogleReady] = useState(false);
+
+  const handleNavScroll = (event, sectionId) => {
+    event.preventDefault();
+    const section = document.getElementById(sectionId);
+    if (!section) return;
+
+    const navOffset = 20;
+    const top = section.getBoundingClientRect().top + window.scrollY - navOffset;
+    window.history.replaceState(null, '', `#${sectionId}`);
+    window.scrollTo({ top, behavior: 'smooth' });
+  };
 
   useEffect(() => {
     if (!document.getElementById('dm-sans-font')) {
@@ -186,7 +199,8 @@ export default function LandingPage({ onLogin }) {
           <a href="#" style={{ fontSize: 26, fontWeight: 700, letterSpacing: '-0.5px', color: BLACK, textDecoration: 'none' }}>HopShare</a>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             {isLoading && <span style={{ fontSize: 14, color: GRAY3 }}>Loading…</span>}
-            <a className="hs-btn-hero-ghost" href="#how" style={{ padding: '7px 18px', fontSize: 14 }}>See how it works</a>
+            <a className="hs-nav-link" href="#how" onClick={(event) => handleNavScroll(event, 'how')}>How to use</a>
+            <a className="hs-nav-link" href="#features" onClick={(event) => handleNavScroll(event, 'features')}>Features</a>
           </div>
         </nav>
 
