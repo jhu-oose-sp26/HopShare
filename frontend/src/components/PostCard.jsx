@@ -4,15 +4,11 @@ import WeatherDisplay from './WeatherDisplay';
 import WeatherForecastDialog from './WeatherForecastDialog';
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { cn, formatTime, formatDate } from '@/lib/utils';
-import { MapPin, Calendar, Clock, MessageCircle, Pencil, Trash2, Info, User, Mail, Phone, Navigation, ExternalLink, UserPlus, Car, Users, CheckCircle, UserMinus, Hash } from 'lucide-react';
+import { formatTime, formatDate } from '@/lib/utils';
+import { MapPin, Calendar, Clock, MessageCircle, Pencil, Trash2, Info, User, Mail, Phone, Navigation, ExternalLink, UserPlus, Users, UserMinus, CheckCircle, Star } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import {
-    HoverCard,
-    HoverCardTrigger,
-    HoverCardContent,
-} from '@/components/ui/hover-card';
+import { HoverCard, HoverCardTrigger, HoverCardContent } from '@/components/ui/hover-card';
 import {
     Dialog,
     DialogClose,
@@ -28,8 +24,8 @@ import SubmitBox from './SubmitBox';
 const API_ROOT = (import.meta.env.VITE_API_BASE_URL || '/api').replace(/\/$/, '');
 const NOTIFICATIONS_ENDPOINT = `${API_ROOT}/notifications`;
 
-const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, routeSearch, distanceFilter, currentUser }) => {
-    const { _id, title, description, user, trip, type = 'request', createdAt } = post;
+const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, routeSearch, distanceFilter, currentUser, initialStarred = false, onStarChange }) => {
+    const { _id, title, description, user, trip, type = 'request', createdAt, suggestedPrice } = post;
     const navigate = useNavigate();
     const isOffer = type === 'offer';
     const truncatedDescription = description 
@@ -41,12 +37,16 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
     const avatarSrc = user?.avatar || user?.picture || avatarFallback;
     const [editOpen, setEditOpen] = useState(false);
     const [detailsOpen, setDetailsOpen] = useState(false);
+    const [showCode, setShowCode] = useState(false);
     const [deleteOpen, setDeleteOpen] = useState(false);
-    const [contactOpen, setContactOpen] = useState(false);
-    const [codeOpen, setCodeOpen] = useState(false);
+    const [joinListMessageOpen, setJoinListMessageOpen] = useState(false);
+    const [offerMessageOpen, setOfferMessageOpen] = useState(false);
     const [weatherForecastOpen, setWeatherForecastOpen] = useState(false);
+    const [offerConfirmOpen, setOfferConfirmOpen] = useState(false);
+    const [removeConfirm, setRemoveConfirm] = useState({ open: false, title: '', message: '', onConfirm: null });
     const [selectedWeatherLocation, setSelectedWeatherLocation] = useState(null);
-    const [message, setMessage] = useState('');
+    const [joinListMessage, setJoinListMessage] = useState('');
+    const [offerMessage, setOfferMessage] = useState('');
     const [isDeleting, setIsDeleting] = useState(false);
     const [deleteError, setDeleteError] = useState('');
     const [activeMapTab, setActiveMapTab] = useState("route"); // "route" or "distance"
@@ -67,7 +67,26 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
         if (!currentUser) return false;
         return (post.pendingJoins || []).includes(currentUser.email);
     });
+    const [isStarred, setIsStarred] = useState(initialStarred);
 
+    const handleStarToggle = async () => {
+        if (!currentUser) return;
+        const next = !isStarred;
+        setIsStarred(next);
+        try {
+            await fetch(`${API_ROOT}/posts/${_id}/star`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email: currentUser.email }),
+            });
+            onStarChange?.(_id, next);
+        } catch {
+            setIsStarred(!next);
+        }
+    };
+
+    const maxRiders = post.maxRiders ?? null;
+    const isFull = maxRiders != null && listMembers.length >= maxRiders;
     const isOwner = currentUser && post.user?.email && currentUser.email === post.user.email;
     const canManagePost = showActions && isOwner;
     const riderRequestStatus = !currentUser || isOwner || !isOffer
@@ -112,7 +131,8 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
     // Function to handle chatting
     const handleChatClick = async () => {
         try {
-            const response = await fetch(`${API_ROOT}/chat/${_id}`);
+            const viewerEmail = encodeURIComponent(currentUser?.email || '');
+            const response = await fetch(`${API_ROOT}/chat/${_id}?viewerEmail=${viewerEmail}`);
             if (!response.ok) {
                 throw new Error('Failed to get/create chat');
             }
@@ -234,7 +254,8 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
         date: trip?.date ?? '',
         time: trip?.time ?? '',
         description: description ?? '',
-    }), [type, user, trip, description]);
+        maxRiders: post.maxRiders ?? '',
+    }), [type, user, trip, description, post.maxRiders]);
 
     const handleEditSubmit = async (formData) => {
         await onUpdate?.(formData);
@@ -259,6 +280,16 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
 
     return (
         <div className={`relative rounded-xl border border-gray-200 bg-white px-6 pb-6 shadow-sm hover:shadow-md transition-shadow ${canManagePost ? 'pt-10' : 'pt-6'}`}>
+            {/* Star button — top right, visible to all logged-in users */}
+            {currentUser && (
+                <button
+                    className='absolute top-3 right-3 p-1.5 rounded-md transition-colors hover:bg-yellow-50'
+                    onClick={handleStarToggle}
+                    aria-label={isStarred ? 'Unstar ride' : 'Star ride'}
+                >
+                    <Star className={`w-4 h-4 ${isStarred ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300 hover:text-yellow-400'}`} />
+                </button>
+            )}
             {canManagePost && (
                 <>
                     {/* Edit button — top left */}
@@ -284,10 +315,10 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
                         </DialogContent>
                     </Dialog>
 
-                    {/* Delete button — top right */}
+                    {/* Delete button — shifted left to make room for star */}
                     <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
                         <DialogTrigger asChild>
-                            <button className='absolute top-3 right-3 p-1.5 rounded-md text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors'>
+                            <button className='absolute top-3 right-9 p-1.5 rounded-md text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors'>
                                 <Trash2 className='w-4 h-4' />
                             </button>
                         </DialogTrigger>
@@ -369,7 +400,7 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
                         </p>
                     </div>
                 </div>
-                <span className='text-xs text-gray-400 shrink-0'>#{_id?.slice(-6)}</span>
+                {/* <span className='text-xs text-gray-400 shrink-0'>#{_id?.slice(-6)}</span> */}
             </div>
 
             {/* Post content */}
@@ -403,33 +434,35 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
                             </div>
                         )}
                         
-                        {/* Weather forecast for start location - only for dates within 14 days */}
-                        {trip.startLocation?.gps_coordinates && trip.date && shouldShowWeather() && (
-                            <div className='mt-3'>
-                                <div className='text-xs font-medium text-gray-700 mb-2'>Weather at departure:</div>
-                                <WeatherDisplay 
-                                    latitude={trip.startLocation.gps_coordinates.latitude}
-                                    longitude={trip.startLocation.gps_coordinates.longitude}
-                                    date={trip.date}
-                                    time={trip.time || '12:00'}
-                                    location={trip.startLocation.title}
-                                    compact={true}
-                                />
-                            </div>
-                        )}
-                        
-                        {/* Weather forecast for end location - only for dates within 14 days */}
-                        {trip.endLocation?.gps_coordinates && trip.date && shouldShowWeather() && (
-                            <div className='mt-2'>
-                                <div className='text-xs font-medium text-gray-700 mb-2'>Weather at destination:</div>
-                                <WeatherDisplay 
-                                    latitude={trip.endLocation.gps_coordinates.latitude}
-                                    longitude={trip.endLocation.gps_coordinates.longitude}
-                                    date={trip.date}
-                                    time={trip.time || '12:00'}
-                                    location={trip.endLocation.title}
-                                    compact={true}
-                                />
+                        {/* Weather forecast - departure and destination in one row */}
+                        {trip.date && shouldShowWeather() && (trip.startLocation?.gps_coordinates || trip.endLocation?.gps_coordinates) && (
+                            <div className='mt-3 flex gap-3 divide-x divide-gray-200'>
+                                {trip.startLocation?.gps_coordinates && (
+                                    <div className='flex-1 min-w-0'>
+                                        <div className='text-xs font-medium text-gray-500 mb-1'>Departure</div>
+                                        <WeatherDisplay
+                                            latitude={trip.startLocation.gps_coordinates.latitude}
+                                            longitude={trip.startLocation.gps_coordinates.longitude}
+                                            date={trip.date}
+                                            time={trip.time || '12:00'}
+                                            location={trip.startLocation.title}
+                                            compact={true}
+                                        />
+                                    </div>
+                                )}
+                                {trip.endLocation?.gps_coordinates && (
+                                    <div className='flex-1 min-w-0 pl-3'>
+                                        <div className='text-xs font-medium text-gray-500 mb-1'>Destination</div>
+                                        <WeatherDisplay
+                                            latitude={trip.endLocation.gps_coordinates.latitude}
+                                            longitude={trip.endLocation.gps_coordinates.longitude}
+                                            date={trip.date}
+                                            time={trip.time || '12:00'}
+                                            location={trip.endLocation.title}
+                                            compact={true}
+                                        />
+                                    </div>
+                                )}
                             </div>
                         )}
                         
@@ -488,170 +521,204 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
                                 )}
                             </span>
                         ) : (
-                            <span className='text-gray-400 italic'>No driver yet - use Uber/Lyft</span>
+                            <span className='flex items-center gap-2'>
+                                <span className='text-gray-400 italic'>No driver yet</span>
+                                <HoverCard openDelay={100} closeDelay={100}>
+                                    <HoverCardTrigger asChild>
+                                        <span className='cursor-pointer text-gray-400 hover:text-gray-600'>
+                                            <Info className='w-3.5 h-3.5' />
+                                        </span>
+                                    </HoverCardTrigger>
+                                    <HoverCardContent className='w-72 text-sm text-gray-600'>
+                                        There are no Blue Jays available to take this ride. Please coordinate to take an Uber or Lyft for this trip.
+                                    </HoverCardContent>
+                                </HoverCard>
+                                {currentUser && !isOwner && !isOffer && !driverList.some(d => d.email === currentUser.email) && (
+                                    <>
+                                        <button
+                                            className={`text-xs px-2 py-0.5 rounded border font-medium transition-colors ${
+                                                joinRequested
+                                                    ? 'text-gray-400 border-gray-200 cursor-default'
+                                                    : 'text-blue-600 border-blue-300 hover:bg-blue-50'
+                                            }`}
+                                            disabled={joinRequested}
+                                            onClick={() => {
+                                                if (!joinRequested) {
+                                                    setOfferMessage('');
+                                                    setOfferConfirmOpen(true);
+                                                }
+                                            }}
+                                        >
+                                            {joinRequested ? 'Request Sent' : 'Offer to drive'}
+                                        </button>
+                                        <Dialog open={offerConfirmOpen} onOpenChange={setOfferConfirmOpen}>
+                                            <DialogContent className='max-w-sm'>
+                                                <DialogHeader>
+                                                    <DialogTitle>Offer to be a driver?</DialogTitle>
+                                                </DialogHeader>
+                                                <p className='text-sm text-gray-600'>
+                                                    You are offering to drive from{' '}
+                                                    <span className='font-medium'>{post.trip?.startLocation?.title || 'start'}</span>
+                                                    {' '}to{' '}
+                                                    <span className='font-medium'>{post.trip?.endLocation?.title || 'destination'}</span>.
+                                                    The ride poster will be notified and can accept or decline.
+                                                </p>
+                                                <div className="space-y-3">
+                                                    <textarea
+                                                        value={offerMessage}
+                                                        onChange={(e) => setOfferMessage(e.target.value)}
+                                                        placeholder="Optional message (e.g., 'I can pick you up early' or 'I can drive for $5', leave blank to skip)"
+                                                        className="w-full min-h-[80px] rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                    />
+                                                </div>
+                                                <DialogFooter className='gap-2'>
+                                                    <Button variant='outline' size='sm' onClick={() => {
+                                                        setOfferConfirmOpen(false);
+                                                        setOfferMessage('');
+                                                    }}>
+                                                        Cancel
+                                                    </Button>
+                                                    <Button
+                                                        size='sm'
+                                                        className='bg-blue-600 hover:bg-blue-700'
+                                                        onClick={async () => {
+                                                            setOfferConfirmOpen(false);
+                                                            setJoinRequested(true);
+                                                            const takeRes = await fetch(`${API_ROOT}/posts/${post._id}/take`, {
+                                                                method: 'POST',
+                                                                headers: { 'Content-Type': 'application/json' },
+                                                                body: JSON.stringify({
+                                                                    name: currentUser.name,
+                                                                    email: currentUser.email,
+                                                                    picture: currentUser.picture || null,
+                                                                    avatar: currentUser.avatar || null,
+                                                                    googleId: currentUser.googleId || null,
+                                                                }),
+                                                            });
+                                                            const takeData = await takeRes.json().catch(() => ({}));
+                                                            if (takeData.alreadyTaken) { setJoinRequested(true); return; }
+                                                            if (!takeRes.ok) return;
+
+                                                            const baseMsg = `${currentUser.name} can take you from ${post.trip?.startLocation?.title || 'start'} to ${post.trip?.endLocation?.title || 'destination'}.`;
+                                                            const finalMsg = offerMessage.trim() ? `${baseMsg}\n\nMessage: _${offerMessage}_` : baseMsg;
+                                                            await fetch(NOTIFICATIONS_ENDPOINT, {
+                                                                method: 'POST',
+                                                                headers: { 'Content-Type': 'application/json' },
+                                                                body: JSON.stringify({
+                                                                    recipientEmail: post.user.email,
+                                                                    senderName: currentUser.name,
+                                                                    senderId: currentUser._id,
+                                                                    message: finalMsg,
+                                                                    postId: post._id,
+                                                                    type: 'ride_request',
+                                                                }),
+                                                            });
+                                                            for (const member of listMembers) {
+                                                                if (member.email !== currentUser.email) {
+                                                                    await fetch(NOTIFICATIONS_ENDPOINT, {
+                                                                        method: 'POST',
+                                                                        headers: { 'Content-Type': 'application/json' },
+                                                                        body: JSON.stringify({
+                                                                            recipientEmail: member.email,
+                                                                            senderName: currentUser.name,
+                                                                            senderId: currentUser._id,
+                                                                            message: `${currentUser.name} is offering to drive from ${post.trip?.startLocation?.title || 'start'} to ${post.trip?.endLocation?.title || 'destination'}.${offerMessage.trim() ? ` _${currentUser.name} says: ${offerMessage}_` : ''} Check the post for details!`,
+                                                                            postId: post._id,
+                                                                            type: 'ride_request',
+                                                                        }),
+                                                                    });
+                                                                }
+                                                            }
+                                                            setOfferMessage('');
+                                                        }}
+                                                    >
+                                                        Confirm
+                                                    </Button>
+                                                </DialogFooter>
+                                            </DialogContent>
+                                        </Dialog>
+                                    </>
+                                )}
+                            </span>
                         )}
                     </div>
                 );
             })()}
 
             {/* Sharing status */}
-            <div className='flex items-center gap-2 mb-4 text-sm'>
+            <div className='flex items-center gap-2 mb-4 text-sm flex-wrap'>
                 <Users className='w-4 h-4 text-gray-400 shrink-0' />
                 {listMembers.length === 0 ? (
-                    <span className='text-gray-400 italic'>No sharing people yet</span>
+                    maxRiders != null ? (
+                        <span className='text-gray-400 italic'>0 / {maxRiders} riders</span>
+                    ) : (
+                        <span className='text-gray-400 italic'>No sharing people yet</span>
+                    )
+                ) : maxRiders != null ? (
+                    <span className={isFull ? 'text-red-600 font-medium' : 'text-gray-700'}>
+                        {listMembers.length} / {maxRiders} riders{isFull ? ' — Full' : ''}
+                    </span>
                 ) : listMembers.length > 1 ? (
                     <span className='text-gray-700'>{listMembers.length} riders sharing this trip</span>
                 ) : (
                     <span className='text-gray-700'>1 rider sharing this trip</span>
                 )}
+                {currentUser && !isOwner && listJoined && (
+                    <button
+                        className='text-xs px-2 py-0.5 rounded border font-medium transition-colors border-red-300 text-red-500 hover:bg-red-50'
+                        onClick={() => setRemoveConfirm({
+                            open: true,
+                            title: 'Leave Rider List?',
+                            message: 'Are you sure you want to leave the rider list for this ride? You will need to be re-accepted if you request to join the ride again.',
+                            onConfirm: async () => {
+                                const res = await fetch(`${API_ROOT}/posts/${post._id}/remove-member`, {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({
+                                        email: currentUser.email,
+                                        name: currentUser.name,
+                                        actorEmail: currentUser.email,
+                                        actorName: currentUser.name,
+                                        actorId: currentUser._id,
+                                    }),
+                                });
+                                if (res.ok) {
+                                    setListMembers(prev => prev.filter(m => m.email !== currentUser.email));
+                                }
+                            },
+                        })}
+                    >
+                        − Leave
+                    </button>
+                )}
             </div>
 
             {/* Action buttons */}
             <div className='flex flex-wrap gap-2'>
-                {currentUser && (isOwner || listJoined || isDriverListMember) ? (
-                    <Button 
-                        variant='default' 
-                        size='sm' 
-                        className='flex-1' 
+                {showActions && currentUser && (isOwner || listJoined || isDriverListMember) ? (
+                    <Button
+                        variant='default'
+                        size='sm'
+                        className='w-full'
                         onClick={handleChatClick}
                     >
                         <MessageCircle className='w-4 h-4 mr-1' />
                         Chat
                     </Button>
-                ) : currentUser && !isOwner && !listJoined && !isDriverListMember ? (
-                    <HoverCard openDelay={10} closeDelay={100}>
-                        <HoverCardTrigger asChild>
-                            <div className='flex-1'>
-                                <Button 
-                                variant='default' 
-                                size='sm' 
-                                className='w-full' 
-                                disabled={true}
-                                >
-                                    <MessageCircle className='w-4 h-4 mr-1' />
-                                    Chat
-                                </Button>
-                            </div>
-                        </HoverCardTrigger>
-                        <HoverCardContent className="w-80">
-                            <div className="space-y-2">
-                                <p className="text-sm font-semibold">Chat Unavailable</p>
-                                <p className="text-sm text-gray-600">
-                                    You must be on the rider list or driver list to chat about this ride. Request to join first!
-                                </p>
-                            </div>
-                        </HoverCardContent>
-                    </HoverCard>
                 ) : null}
-
-                {/* Contact Dialog */}
-
-                <Dialog open={contactOpen} onOpenChange={setContactOpen}>
-                    <DialogTrigger asChild>
-                        <Button variant='default' size='sm' className='flex-1'>
-                            <MessageCircle className='w-4 h-4 mr-1' />
-                            Contact
-                        </Button>
-                    </DialogTrigger>
-
-                    <DialogContent className="sm:max-w-md">
-                        <DialogHeader>
-                            <DialogTitle className="truncate max-w-[20rem]">
-                                Contact {user?.name}
-                            </DialogTitle>
-                            <DialogDescription>
-                                Send a message about this ride.
-                            </DialogDescription>
-                        </DialogHeader>
-
-                        <div className="space-y-3">
-                        <textarea
-                            value={message}
-                            onChange={(e) => setMessage(e.target.value)}
-                            placeholder="Write your message..."
-                            className="w-full min-h-[100px] rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        />
-                        </div>
-
-                        <DialogFooter>
-                            <Button
-                                variant="outline"
-                                onClick={() => {
-                                setContactOpen(false);
-                                setMessage('');
-                                }}
-                            >
-                                Cancel
-                            </Button>
-
-                            <Button
-                                onClick={async () => {
-                                    await fetch(NOTIFICATIONS_ENDPOINT, {
-                                        method: 'POST',
-                                        headers: {
-                                            'Content-Type': 'application/json',
-                                        },
-                                        body: JSON.stringify({
-                                            recipientEmail: post.user.email,
-                                            senderName: currentUser.name,
-                                            senderId: currentUser._id,
-                                            message,
-                                            postId: post._id,
-                                        }),
-                                    });
-
-                                    setContactOpen(false);
-                                    setMessage('');
-                                }}
-                                disabled={!message.trim()}
-                            >
-                                Send Message
-                            </Button>
-                        </DialogFooter>
-                    </DialogContent>
-                </Dialog>
 
                 {/* Join the rider list — only for non-owners */}
                 {currentUser && !isOwner && (
                     <div className='flex-1 flex flex-col gap-1'>
                         {!listJoined && <Button
-                            variant={listJoined || listRequestSent ? 'outline' : 'default'}
+                            variant={listJoined || listRequestSent || isFull ? 'outline' : 'default'}
                             size='sm'
-                            className={`w-full ${listJoined || listRequestSent ? 'text-gray-400' : 'bg-green-600 hover:bg-green-700'}`}
-                            disabled={listJoined || listRequestSent || listJoinLoading}
-                            onClick={async () => {
-                                setListJoinError('');
-                                setListJoinLoading(true);
-                                try {
-                                    const res = await fetch(`${API_ROOT}/posts/${post._id}/join`, {
-                                        method: 'POST',
-                                        headers: { 'Content-Type': 'application/json' },
-                                        body: JSON.stringify({ email: currentUser.email }),
-                                    });
-                                    if (res.ok) {
-                                        const msg = `${currentUser.name} wants to join your rider list for the ride from ${post.trip?.startLocation?.title || 'start'} to ${post.trip?.endLocation?.title || 'destination'}.`;
-                                        await fetch(NOTIFICATIONS_ENDPOINT, {
-                                            method: 'POST',
-                                            headers: { 'Content-Type': 'application/json' },
-                                            body: JSON.stringify({
-                                                recipientEmail: post.user.email,
-                                                senderName: currentUser.name,
-                                                senderId: currentUser._id,
-                                                message: msg,
-                                                postId: post._id,
-                                                type: 'join_list',
-                                            }),
-                                        });
-                                        setListRequestSent(true);
-                                    } else {
-                                        const data = await res.json().catch(() => ({}));
-                                        setListJoinError(data.error || 'Failed to send request. Please try again.');
-                                    }
-                                } catch (err) {
-                                    setListJoinError('Network error. Please try again.');
-                                } finally {
-                                    setListJoinLoading(false);
-                                }
+                            className={`w-full ${listJoined || listRequestSent || isFull ? 'text-gray-400' : 'bg-green-600 hover:bg-green-700'}`}
+                            disabled={listJoined || listRequestSent || listJoinLoading || isFull}
+                            onClick={() => {
+                                if (listRequestSent || listJoinLoading || isFull) return;
+                                setJoinListMessage('');
+                                setJoinListMessageOpen(true);
                             }}
                         >
                             {listJoinLoading ? (
@@ -660,108 +727,85 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
                                 <><CheckCircle className='w-4 h-4 mr-1' />Request Accepted</>
                             ) : listRequestSent ? (
                                 <><CheckCircle className='w-4 h-4 mr-1' />Awaiting Approval</>
+                            ) : isFull ? (
+                                <><Users className='w-4 h-4 mr-1' />Ride Full</>
                             ) : (
                                 <><Users className='w-4 h-4 mr-1' />Join the Rider List</>
                             )}
                         </Button>}
-                        {listJoined && (
-                            <Button
-                                variant='outline'
-                                size='sm'
-                                className='w-full text-xs text-red-600 border-red-300 hover:bg-red-50 hover:text-red-700'
-                                onClick={async () => {
-                                    const res = await fetch(`${API_ROOT}/posts/${post._id}/remove-member`, {
-                                        method: 'POST',
-                                        headers: { 'Content-Type': 'application/json' },
-                                        body: JSON.stringify({
-                                            email: currentUser.email,
-                                            name: currentUser.name,
-                                            actorEmail: currentUser.email,
-                                            actorName: currentUser.name,
-                                            actorId: currentUser._id,
-                                        }),
-                                    });
-                                    if (res.ok) {
-                                        setListMembers(prev => prev.filter(m => m.email !== currentUser.email));
-                                    }
-                                }}
-                            >
-                                <UserMinus className='w-3 h-3 mr-1' />Leave Rider List
-                            </Button>
-                        )}
                         {listJoinError && <p className='text-xs text-red-500'>{listJoinError}</p>}
                     </div>
                 )}
 
-                {/* Take button — only for non-owners on request posts (driver offering to take) */}
-                {currentUser && !isOwner && !isOffer && !driverList.some(d => d.email === currentUser.email) && (
-                    <Button
-                        variant={joinRequested ? 'outline' : 'default'}
-                        size='sm'
-                        className={`flex-1 ${joinRequested ? 'text-gray-400' : 'bg-blue-600 hover:bg-blue-700'}`}
-                        disabled={joinRequested}
-                        onClick={async () => {
-                            // Persist the take on the post so it survives refresh
-                            const takeRes = await fetch(`${API_ROOT}/posts/${post._id}/take`, {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({
-                                    name: currentUser.name,
-                                    email: currentUser.email,
-                                    picture: currentUser.picture || null,
-                                    avatar: currentUser.avatar || null,
-                                    googleId: currentUser.googleId || null,
-                                }),
-                            });
-                            const takeData = await takeRes.json().catch(() => ({}));
-                            // If already taken, just update UI silently
-                            if (takeData.alreadyTaken) {
-                                setJoinRequested(true);
-                                return;
-                            }
-                            if (!takeRes.ok) return;
+                {/* Join Rider List Message Dialog */}
+                <Dialog open={joinListMessageOpen} onOpenChange={setJoinListMessageOpen}>
+                    <DialogContent className="sm:max-w-md">
+                        <DialogHeader>
+                            <DialogTitle className="truncate max-w-[20rem]">
+                                Join Rider List
+                            </DialogTitle>
+                            <DialogDescription>
+                                Add an optional message with your request.
+                            </DialogDescription>
+                        </DialogHeader>
 
-                            const msg = `${currentUser.name} can take you from ${post.trip?.startLocation?.title || 'start'} to ${post.trip?.endLocation?.title || 'destination'}.`;
-                            // Notify post owner
-                            await fetch(NOTIFICATIONS_ENDPOINT, {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({
-                                    recipientEmail: post.user.email,
-                                    senderName: currentUser.name,
-                                    senderId: currentUser._id,
-                                    message: msg,
-                                    postId: post._id,
-                                    type: 'ride_request',
-                                }),
-                            });
-                            // Also notify all rider list members
-                            for (const member of listMembers) {
-                                if (member.email !== currentUser.email) {
-                                    await fetch(NOTIFICATIONS_ENDPOINT, {
-                                        method: 'POST',
-                                        headers: { 'Content-Type': 'application/json' },
-                                        body: JSON.stringify({
-                                            recipientEmail: member.email,
-                                            senderName: currentUser.name,
-                                            senderId: currentUser._id,
-                                            message: `${currentUser.name} is offering to drive from ${post.trip?.startLocation?.title || 'start'} to ${post.trip?.endLocation?.title || 'destination'}. Check the post for details!`,
-                                            postId: post._id,
-                                            type: 'ride_request',
-                                        }),
-                                    });
-                                }
-                            }
-                            setJoinRequested(true);
-                        }}
-                    >
-                        {joinRequested ? (
-                            <><CheckCircle className='w-4 h-4 mr-1' />Request Sent</>
-                        ) : (
-                            <><Car className='w-4 h-4 mr-1' />Offer to Be a Driver</>
-                        )}
-                    </Button>
-                )}
+                        <div className="space-y-3">
+                            <textarea
+                                value={joinListMessage}
+                                onChange={(e) => setJoinListMessage(e.target.value)}
+                                placeholder="Optional message (e.g., 'I'm flexible with pickup time')"
+                                className="w-full min-h-[100px] rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            />
+                        </div>
+
+                        <DialogFooter>
+                            <Button
+                                variant="outline"
+                                onClick={() => {
+                                    setJoinListMessageOpen(false);
+                                    setJoinListMessage('');
+                                }}
+                            >
+                                Cancel
+                            </Button>
+
+                            <Button
+                                onClick={async () => {
+                                    setListJoinError('');
+                                    setListJoinLoading(true);
+                                    try {
+                                        const res = await fetch(`${API_ROOT}/posts/${post._id}/join`, {
+                                            method: 'POST',
+                                            headers: { 'Content-Type': 'application/json' },
+                                            body: JSON.stringify({
+                                                email: currentUser.email,
+                                                senderName: currentUser.name,
+                                                senderId: currentUser._id,
+                                                message: joinListMessage.trim() || '',
+                                            }),
+                                        });
+                                        if (res.ok) {
+                                            setListRequestSent(true);
+                                            setJoinListMessageOpen(false);
+                                            setJoinListMessage('');
+                                        } else {
+                                            const data = await res.json().catch(() => ({}));
+                                            setListJoinError(data.error || 'Failed to send request. Please try again.');
+                                        }
+                                    } catch (err) {
+                                        setListJoinError('Network error. Please try again.');
+                                    } finally {
+                                        setListJoinLoading(false);
+                                    }
+                                }}
+                                disabled={listJoinLoading}
+                                className='bg-green-600 hover:bg-green-700'
+                            >
+                                {listJoinLoading ? 'Sending...' : 'Send Request'}
+                            </Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
 
                 {/* Leave as driver — only if current user is an accepted driver */}
                 {currentUser && !isOwner && driverList.some(d => d.email === currentUser.email) && (
@@ -769,56 +813,32 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
                         variant='outline'
                         size='sm'
                         className='flex-1 text-red-600 border-red-300 hover:bg-red-50 hover:text-red-700'
-                        onClick={async () => {
-                            const res = await fetch(`${API_ROOT}/posts/${post._id}/remove-driver`, {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ email: currentUser.email }),
-                            });
-                            if (res.ok) {
-                                setDriverList(prev => prev.filter(d => d.email !== currentUser.email));
-                                setJoinRequested(false);
-                            }
-                        }}
+                        onClick={() => setRemoveConfirm({
+                            open: true,
+                            title: 'Leave as Driver?',
+                            message: 'Are you sure you want to remove yourself as the driver for this ride?',
+                            onConfirm: async () => {
+                                const res = await fetch(`${API_ROOT}/posts/${post._id}/remove-driver`, {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ email: currentUser.email }),
+                                });
+                                if (res.ok) {
+                                    setDriverList(prev => prev.filter(d => d.email !== currentUser.email));
+                                    setJoinRequested(false);
+                                }
+                            },
+                        })}
                     >
                         <UserMinus className='w-4 h-4 mr-1' />Leave as Driver
                     </Button>
                 )}
 
-                {/* Confirmation Code — only for the owner in My Rides */}
-                {canManagePost && (
-                    <Dialog open={codeOpen} onOpenChange={setCodeOpen}>
-                        <DialogTrigger asChild>
-                            <Button variant='outline' size='sm'>
-                                <Hash className='w-4 h-4 mr-1' />
-                                Show Code
-                            </Button>
-                        </DialogTrigger>
-                        <DialogContent className='sm:max-w-xs'>
-                            <DialogHeader>
-                                <DialogTitle>Confirmation Code</DialogTitle>
-                                <DialogDescription>
-                                    Share this code with your riders to confirm the trip.
-                                </DialogDescription>
-                            </DialogHeader>
-                            <div className='flex items-center justify-center py-4'>
-                                <span className='text-3xl font-bold tracking-widest text-gray-900 font-mono'>
-                                    {post.confirmationCode || '—'}
-                                </span>
-                            </div>
-                            <DialogFooter>
-                                <DialogClose asChild>
-                                    <Button variant='outline'>Close</Button>
-                                </DialogClose>
-                            </DialogFooter>
-                        </DialogContent>
-                    </Dialog>
-                )}
 
                 {/* Details Dialog */}
-                <Dialog open={detailsOpen} onOpenChange={setDetailsOpen}>
+                <Dialog open={detailsOpen} onOpenChange={(open) => { setDetailsOpen(open); if (!open) setShowCode(false); }}>
                     <DialogTrigger asChild>
-                        <Button variant='outline' size='sm'>
+                        <Button variant='outline' size='sm' className='w-full'>
                             <Info className='w-4 h-4 mr-1' />
                             Details
                         </Button>
@@ -915,14 +935,19 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
                                                 variant='outline'
                                                 size='sm'
                                                 className='shrink-0 text-xs text-red-600 border-red-300 hover:bg-red-50 hover:text-red-700'
-                                                onClick={async () => {
-                                                    const res = await fetch(`${API_ROOT}/posts/${post._id}/remove-driver`, {
-                                                        method: 'POST',
-                                                        headers: { 'Content-Type': 'application/json' },
-                                                        body: JSON.stringify({ email: driver.email }),
-                                                    });
-                                                    if (res.ok) setDriverList(prev => prev.filter(d => d.email !== driver.email));
-                                                }}
+                                                onClick={() => setRemoveConfirm({
+                                                    open: true,
+                                                    title: 'Remove Driver?',
+                                                    message: `Are you sure you want to remove ${driver.name || driver.email} as the driver? The driver will be notified and the new driver will need to be re-accepted.`,
+                                                    onConfirm: async () => {
+                                                        const res = await fetch(`${API_ROOT}/posts/${post._id}/remove-driver`, {
+                                                            method: 'POST',
+                                                            headers: { 'Content-Type': 'application/json' },
+                                                            body: JSON.stringify({ email: driver.email }),
+                                                        });
+                                                        if (res.ok) setDriverList(prev => prev.filter(d => d.email !== driver.email));
+                                                    },
+                                                })}
                                             >
                                                 <UserMinus className='w-3 h-3 mr-1' />Remove
                                             </Button>
@@ -938,6 +963,35 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
                                 <div className='bg-gray-50 rounded-lg p-3 space-y-2'>
                                     <p className='text-xs font-semibold uppercase tracking-wide text-gray-400'>Description</p>
                                     <p className='text-gray-700 break-all whitespace-pre-wrap'>{description}</p>
+                                </div>
+                            )}
+
+                            {isOffer && suggestedPrice != null && suggestedPrice !== '' && (
+                                <div className='bg-gray-50 rounded-lg p-3 space-y-2'>
+                                    <p className='text-xs font-semibold uppercase tracking-wide text-gray-400'>Suggested Price</p>
+                                    <div className='flex items-center gap-2 text-sm'>
+                                        <span className='text-gray-400 shrink-0 font-medium'>$</span>
+                                        <span className='text-gray-700'>
+                                            Suggested price: <span className='font-medium text-green-700'>${Number(suggestedPrice).toFixed(2)}</span>
+                                        </span>
+                                    </div>
+                                </div>
+                            )}
+
+                            {!isOffer && driverList.length === 0 && (
+                                <div className='bg-gray-50 rounded-lg p-3 space-y-2'>
+                                    <p className='text-xs font-semibold uppercase tracking-wide text-gray-400'>Price Estimation</p>
+                                    <div className='flex items-center gap-2 text-sm'>
+                                        <ExternalLink className='w-4 h-4 text-gray-400 shrink-0' />
+                                        <a
+                                            href='https://www.uber.com/global/en/price-estimate/'
+                                            target='_blank'
+                                            rel='noreferrer'
+                                            className='font-medium text-blue-600 hover:text-blue-800 hover:underline'
+                                        >
+                                            See price estimation here
+                                        </a>
+                                    </div>
                                 </div>
                             )}
 
@@ -982,21 +1036,26 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
                                                         variant='outline'
                                                         size='sm'
                                                         className='shrink-0 text-xs text-red-600 border-red-300 hover:bg-red-50 hover:text-red-700'
-                                                        onClick={async () => {
-                                                            const res = await fetch(`${API_ROOT}/posts/${post._id}/remove-member`, {
-                                                                method: 'POST',
-                                                                headers: { 'Content-Type': 'application/json' },
-                                                                body: JSON.stringify({
-                                                                    email: member.email,
-                                                                    name: member.name,
-                                                                    actorEmail: currentUser?.email,
-                                                                    actorName: currentUser?.name,
-                                                                    actorId: currentUser?._id,
-                                                                }),
-                                                            });
-                                                            if (!res.ok) return;
-                                                            setListMembers(prev => prev.filter(m => m.email !== member.email));
-                                                        }}
+                                                        onClick={() => setRemoveConfirm({
+                                                            open: true,
+                                                            title: 'Remove Rider?',
+                                                            message: `Are you sure you want to remove ${member.name || member.email} from the rider list? The rider will be notified and will need to be re-accepted to join the ride again.`,
+                                                            onConfirm: async () => {
+                                                                const res = await fetch(`${API_ROOT}/posts/${post._id}/remove-member`, {
+                                                                    method: 'POST',
+                                                                    headers: { 'Content-Type': 'application/json' },
+                                                                    body: JSON.stringify({
+                                                                        email: member.email,
+                                                                        name: member.name,
+                                                                        actorEmail: currentUser?.email,
+                                                                        actorName: currentUser?.name,
+                                                                        actorId: currentUser?._id,
+                                                                    }),
+                                                                });
+                                                                if (!res.ok) return;
+                                                                setListMembers(prev => prev.filter(m => m.email !== member.email));
+                                                            },
+                                                        })}
                                                     >
                                                         <UserMinus className='w-3 h-3 mr-1' />Remove
                                                     </Button>
@@ -1006,6 +1065,28 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
                                     </div>
                                 )}
                             </div>
+
+                            {/* Confirmation Code — only visible to the post owner */}
+                            {canManagePost && post.confirmationCode && (
+                                <div className='bg-gray-50 rounded-lg p-3 space-y-2'>
+                                    <p className='text-xs font-semibold uppercase tracking-wide text-gray-400'>Confirmation Code</p>
+                                    <p className='text-xs text-gray-500'>Share this code with your riders to confirm the trip.</p>
+                                    {showCode ? (
+                                        <>
+                                            <span className='text-3xl font-bold tracking-widest text-gray-900 font-mono block text-center py-2'>
+                                                {post.confirmationCode}
+                                            </span>
+                                            <Button variant='outline' size='sm' className='w-full' onClick={() => setShowCode(false)}>
+                                                Hide Code
+                                            </Button>
+                                        </>
+                                    ) : (
+                                        <Button variant='outline' size='sm' className='w-full' onClick={() => setShowCode(true)}>
+                                            Show Code
+                                        </Button>
+                                    )}
+                                </div>
+                            )}
 
                             {riderRequestStatus && (
                                 <div className='bg-gray-50 rounded-lg p-3 space-y-2'>
@@ -1178,7 +1259,7 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
                                                     <RouteMap
                                                         userRoute={userRouteForMap}
                                                         posts={[post]}
-                                                        searchRadius={distanceFilter !== Infinity ? distanceFilter : 10}
+                                                        searchRadius={routeSearch?.radiusKm ?? (distanceFilter !== Infinity ? distanceFilter : 10)}
                                                         className="h-80"
                                                         showZoomControls={true}
                                                     />
@@ -1269,6 +1350,31 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
                         <DialogClose asChild>
                             <Button variant='outline' className='w-full'>Close</Button>
                         </DialogClose>
+                    </DialogContent>
+                </Dialog>
+
+                {/* Remove confirmation dialog */}
+                <Dialog open={removeConfirm.open} onOpenChange={(open) => !open && setRemoveConfirm(prev => ({ ...prev, open: false }))}>
+                    <DialogContent className='max-w-sm'>
+                        <DialogHeader>
+                            <DialogTitle>{removeConfirm.title}</DialogTitle>
+                        </DialogHeader>
+                        <p className='text-sm text-gray-600'>{removeConfirm.message}</p>
+                        <DialogFooter className='gap-2'>
+                            <Button variant='outline' size='sm' onClick={() => setRemoveConfirm(prev => ({ ...prev, open: false }))}>
+                                Cancel
+                            </Button>
+                            <Button
+                                variant='destructive'
+                                size='sm'
+                                onClick={async () => {
+                                    setRemoveConfirm(prev => ({ ...prev, open: false }));
+                                    await removeConfirm.onConfirm?.();
+                                }}
+                            >
+                                Confirm
+                            </Button>
+                        </DialogFooter>
                     </DialogContent>
                 </Dialog>
 

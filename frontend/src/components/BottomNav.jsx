@@ -1,7 +1,7 @@
 import { NavLink } from 'react-router-dom';
 import { Home, Users, MessageCircle, User } from 'lucide-react';
 
-const BottomNav = () => {
+const BottomNav = ({ totalUnread = 0 }) => {
   const navItems = [
     { to: '/home', icon: Home, label: 'Home' },
     { to: '/friends', icon: Users, label: 'Friends' },
@@ -16,16 +16,23 @@ const BottomNav = () => {
           <NavLink
             key={to}
             to={to}
-            className={({ isActive }) =>
-              `flex flex-col items-center justify-center w-full h-full transition-colors ${
-                isActive
-                  ? 'text-black'
-                  : 'text-gray-400 hover:text-gray-600'
-              }`
-            }
+            className={() => 'flex flex-col items-center justify-center w-full h-full'}
           >
-            <Icon className="w-6 h-6 mb-1" strokeWidth={1.5} />
-            <span className="text-xs font-medium">{label}</span>
+            {({ isActive }) => (
+              <div className={`flex flex-col items-center justify-center w-full py-2.5 transition-colors ${
+                isActive ? 'bg-gray-400 text-white' : 'text-gray-400 hover:text-gray-600'
+              }`}>
+                <div className="relative">
+                  <Icon className="w-6 h-6 mb-1" strokeWidth={isActive ? 2 : 1.5} />
+                  {to === '/messages' && totalUnread > 0 && (
+                    <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-0.5 rounded-full bg-red-500 text-white text-[10px] flex items-center justify-center font-medium">
+                      {totalUnread > 99 ? '99+' : totalUnread}
+                    </span>
+                  )}
+                </div>
+                <span className="text-xs font-semibold w-14 text-center">{label}</span>
+              </div>
+            )}
           </NavLink>
         ))}
       </div>

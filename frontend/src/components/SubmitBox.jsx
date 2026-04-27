@@ -10,6 +10,9 @@ import {
     Phone,
     MessageCircle,
     CarFront,
+    Users,
+    DollarSign,
+    Info,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -19,9 +22,25 @@ import {
     PopoverContent,
     PopoverTrigger,
 } from '@/components/ui/popover';
+import { HoverCard, HoverCardTrigger, HoverCardContent } from '@/components/ui/hover-card';
 
 const inputBase =
     'flex h-9 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50';
+
+const getTodayDateString = () => {
+    const today = new Date();
+    return format(today, 'yyyy-MM-dd');
+};
+
+const isPastDateString = (dateString) => {
+    if (!dateString) return false;
+    return dateString < getTodayDateString();
+};
+
+const toFiniteCoord = (value) => {
+    const num = Number(value);
+    return Number.isFinite(num) ? num : null;
+};
 
 function SubmitBox({ onSubmit, coords, initialData = null, isEdit = false }) {
     const [name, setName] = useState(initialData?.name ?? '');
@@ -37,6 +56,8 @@ function SubmitBox({ onSubmit, coords, initialData = null, isEdit = false }) {
     const [time, setTime] = useState(initialData?.time ?? '');
     const [description, setDescription] = useState(initialData?.description ?? '');
     const [type, setType] = useState(initialData?.type ?? 'request');
+    const [maxRiders, setMaxRiders] = useState(initialData?.maxRiders ?? 4);
+    const [suggestedPrice, setSuggestedPrice] = useState(initialData?.suggestedPrice ?? '');
     const [submitError, setSubmitError] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -54,9 +75,22 @@ function SubmitBox({ onSubmit, coords, initialData = null, isEdit = false }) {
         setTime(initialData?.time ?? '');
         setDescription(initialData?.description ?? '');
         setType(initialData?.type ?? 'request');
+        setMaxRiders(initialData?.maxRiders ?? 4);
+        setSuggestedPrice(initialData?.suggestedPrice ?? '');
         setSubmitError('');
         setIsSubmitting(false);
     }, [initialData]);
+
+    useEffect(() => {
+        if (date && isPastDateString(date)) {
+            setSubmitError('You cannot input a past date.');
+            return;
+        }
+
+        if (submitError === 'You cannot input a past date.') {
+            setSubmitError('');
+        }
+    }, [date, submitError]);
 
     const handleStartChange = (nextValue) => {
         setStartTitle(nextValue);
@@ -73,8 +107,60 @@ function SubmitBox({ onSubmit, coords, initialData = null, isEdit = false }) {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
+        
+        // Validation: date is required
         if (!date) {
             setSubmitError('Please select a date.');
+            return;
+        }
+
+        // Validation: ensure locations are provided
+        if (!startTitle || !startTitle.trim()) {
+            setSubmitError('Please select a start location.');
+            return;
+        }
+        if (!endTitle || !endTitle.trim()) {
+            setSubmitError('Please select an end location.');
+            return;
+        }
+
+        const normalizedStartTitle = startTitle.trim().toLowerCase();
+        const normalizedEndTitle = endTitle.trim().toLowerCase();
+        if (normalizedStartTitle && normalizedStartTitle === normalizedEndTitle) {
+            setSubmitError('Start and end locations cannot be the same.');
+            return;
+        }
+
+        // Validation: require selecting suggestions (or current location) with coordinates
+        const startLat = toFiniteCoord(startLatitude);
+        const startLng = toFiniteCoord(startLongitude);
+        const endLat = toFiniteCoord(endLatitude);
+        const endLng = toFiniteCoord(endLongitude);
+
+        if (
+            startLat === null ||
+            startLng === null ||
+            endLat === null ||
+            endLng === null
+        ) {
+            setSubmitError('Please select start and end from location suggestions.');
+            return;
+        }
+
+        // Validation: block same start/end route
+        if (Math.abs(startLat - endLat) < 1e-7 && Math.abs(startLng - endLng) < 1e-7) {
+            setSubmitError('Start and end locations cannot be the same.');
+            return;
+        }
+
+        // Validation: check for XSS patterns (basic check)
+        const xssPatterns = /<script|javascript:|on\w+\s*=/i;
+        if (
+            xssPatterns.test(startTitle)
+            || xssPatterns.test(endTitle)
+            || (description && xssPatterns.test(description))
+        ) {
+            setSubmitError('Invalid characters in input. Please avoid HTML tags or scripts.');
             return;
         }
 
@@ -92,6 +178,8 @@ function SubmitBox({ onSubmit, coords, initialData = null, isEdit = false }) {
             time,
             description,
             type,
+            maxRiders: Number(maxRiders),
+            suggestedPrice: type === 'offer' ? suggestedPrice : '',
         };
 
         setSubmitError('');
@@ -115,6 +203,8 @@ function SubmitBox({ onSubmit, coords, initialData = null, isEdit = false }) {
                 setTime('');
                 setDescription('');
                 setType('request');
+                setMaxRiders(4);
+                setSuggestedPrice('');
             }
         } catch (err) {
             setSubmitError(
@@ -250,7 +340,7 @@ function SubmitBox({ onSubmit, coords, initialData = null, isEdit = false }) {
                     />
                 </div>
 
-                <div className='grid gap-4 sm:grid-cols-2'>
+                <div className='grid gap-4 sm:grid-cols-3'>
                     <div className='space-y-2'>
                         <label
                             htmlFor='submit-date'
@@ -284,7 +374,7 @@ function SubmitBox({ onSubmit, coords, initialData = null, isEdit = false }) {
                             <PopoverContent
                                 side='bottom'
                                 sideOffset={4}
-                                align='center' 
+                                align='center'
                                 className="p-0 w-full"
                                 style={{ minWidth: '100%' }}
                             >
@@ -293,8 +383,16 @@ function SubmitBox({ onSubmit, coords, initialData = null, isEdit = false }) {
                                         mode='single'
                                         selected={date ? parse(date,'yyyy-MM-dd', new Date()): undefined}
                                         onSelect={(selected) => {
-                                            if (selected) setDate(format(selected, 'yyyy-MM-dd'));
+                                            if (!selected) return;
+                                            const selectedDate = format(selected, 'yyyy-MM-dd');
+                                            if (isPastDateString(selectedDate)) {
+                                                setSubmitError('You cannot input a past date.');
+                                                return;
+                                            }
+                                            setSubmitError('');
+                                            setDate(selectedDate);
                                         }}
+                                        disabled={(day) => day < new Date(new Date().setHours(0, 0, 0, 0))}
                                         numberOfWeeks={7}
                                     />
                                 </div>
@@ -315,6 +413,25 @@ function SubmitBox({ onSubmit, coords, initialData = null, isEdit = false }) {
                             className={inputBase}
                             value={time}
                             onChange={(e) => setTime(e.target.value)}
+                            required
+                        />
+                    </div>
+                    <div className='space-y-2'>
+                        <label
+                            htmlFor='submit-max-riders'
+                            className='flex items-center gap-2 text-sm font-medium text-foreground'
+                        >
+                            <Users className='size-4 text-muted-foreground' />
+                            Max riders <span className='text-red-500'>*</span>
+                        </label>
+                        <input
+                            id='submit-max-riders'
+                            type='number'
+                            min='1'
+                            max='20'
+                            className={inputBase}
+                            value={maxRiders}
+                            onChange={(e) => setMaxRiders(e.target.value)}
                             required
                         />
                     </div>
@@ -340,6 +457,42 @@ function SubmitBox({ onSubmit, coords, initialData = null, isEdit = false }) {
                         {description.length}/500
                     </p>
                 </div>
+                {type === 'offer' && (
+                    <div className='space-y-2'>
+                        <label
+                            htmlFor='submit-price'
+                            className='flex items-center gap-2 text-sm font-medium text-foreground'
+                        >
+                            <DollarSign className='size-4 text-muted-foreground' />
+                            Suggested total price
+                            <span className='text-xs text-muted-foreground font-normal'>(optional)</span>
+                            <HoverCard openDelay={100} closeDelay={100}>
+                                <HoverCardTrigger asChild>
+                                    <span className='cursor-pointer text-muted-foreground hover:text-foreground'>
+                                        <Info className='size-3.5' />
+                                    </span>
+                                </HoverCardTrigger>
+                                <HoverCardContent className='w-64 text-sm text-muted-foreground font-normal'>
+                                    Total price you are requesting for the ride. This will be split between the riders.
+                                </HoverCardContent>
+                            </HoverCard>
+                        </label>
+                        <div className='relative'>
+                            <span className='absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm'>$</span>
+                            <input
+                                id='submit-price'
+                                type='number'
+                                min='0'
+                                step='0.01'
+                                className={`${inputBase} pl-7`}
+                                placeholder='0.00'
+                                value={suggestedPrice}
+                                onChange={(e) => setSuggestedPrice(e.target.value)}
+                            />
+                        </div>
+                    </div>
+                )}
+
                 {submitError && (
                     <p className='text-sm text-red-600'>{submitError}</p>
                 )}

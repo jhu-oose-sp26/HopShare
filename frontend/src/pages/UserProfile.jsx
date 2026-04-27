@@ -1,7 +1,15 @@
 import { useState, useEffect } from 'react';
-import { User, Mail, Phone, BookOpen, Calendar, MapPin, ArrowLeft } from 'lucide-react';
+import { User, Mail, Phone, BookOpen, Calendar, MapPin, ArrowLeft, UserPlus, UserMinus, MessageCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from '@/components/ui/dialog';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useFriends } from '@/hooks/useFriends';
 
 const API_ROOT = (import.meta.env.VITE_API_BASE_URL || '/api').replace(/\/$/, '');
 
@@ -11,8 +19,42 @@ function UserProfile({ currentUser }) {
   const [profile, setProfile] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
+  const { isFriend, addFriend, removeFriend, hasSentRequest } = useFriends(currentUser?._id);
+  const [friendLoading, setFriendLoading] = useState(false);
+  const [requestSent, setRequestSent] = useState(false);
+  const [removeConfirmOpen, setRemoveConfirmOpen] = useState(false);
 
-  // If viewing your own profile, redirect to the main profile page
+  const handleToggleFriend = async () => {
+    if (!profile?._id) return;
+    if (isFriend(profile._id)) {
+      setRemoveConfirmOpen(true);
+      return;
+    }
+    if (!hasSentRequest(profile._id) && !requestSent) {
+      setFriendLoading(true);
+      try {
+        await addFriend(profile._id);
+        setRequestSent(true);
+      } catch (err) {
+        alert(err.message);
+      } finally {
+        setFriendLoading(false);
+      }
+    }
+  };
+
+  const confirmRemoveFriend = async () => {
+    setRemoveConfirmOpen(false);
+    setFriendLoading(true);
+    try {
+      await removeFriend(profile._id);
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setFriendLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (googleId === currentUser?.googleId) {
       navigate('/profile', { replace: true });
@@ -28,7 +70,9 @@ function UserProfile({ currentUser }) {
       setError('');
 
       try {
-        const response = await fetch(`${API_ROOT}/profile/google/${googleId}`);
+        const response = await fetch(`${API_ROOT}/profile/google/${googleId}`, {
+          cache: 'no-store'
+        });
         
         if (!response.ok) {
           if (response.status === 404) {
@@ -89,7 +133,7 @@ function UserProfile({ currentUser }) {
         <div className="container mx-auto px-6 py-8 max-w-4xl">
           <Button
             variant="outline"
-            onClick={() => navigate('/')}
+            onClick={() => navigate('/home')}
             className="mb-4"
           >
             <ArrowLeft className="w-4 h-4 mr-2" />
@@ -102,7 +146,7 @@ function UserProfile({ currentUser }) {
             </div>
             <h2 className="text-xl font-semibold text-gray-900 mb-2">Profile Not Found</h2>
             <p className="text-gray-600 mb-4">{error}</p>
-            <Button onClick={() => navigate('/')}>Return to Home</Button>
+            <Button onClick={() => navigate('/home')}>Return to Home</Button>
           </div>
         </div>
       </div>
@@ -116,7 +160,7 @@ function UserProfile({ currentUser }) {
       <div className="container mx-auto px-6 py-8 max-w-4xl">
         <Button
           variant="outline"
-          onClick={() => navigate('/')}
+          onClick={() => navigate('/home')}
           className="mb-4"
         >
           <ArrowLeft className="w-4 h-4 mr-2" />
@@ -126,21 +170,75 @@ function UserProfile({ currentUser }) {
         <div className="bg-white rounded-lg shadow-sm border border-gray-200">
           <div className="px-6 py-8">
             {/* Header */}
-            <div className="flex items-center gap-4 mb-8">
-              <img
-                src={profile.avatar || profile.picture || `https://ui-avatars.com/api/?name=${encodeURIComponent(profile.name || 'User')}&background=e5e7eb&color=374151&size=128`}
-                alt={profile.name}
-                className="w-16 h-16 rounded-full border-2 border-gray-200 object-cover"
-                onError={(e) => {
-                  e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(profile.name || 'User')}&background=e5e7eb&color=374151&size=128`;
-                }}
-              />
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900">{profile.name}</h1>
-                <p className="text-sm text-gray-600">
-                  Member since {formatJoinDate(profile.createdAt)}
-                </p>
+            <div className="flex items-center justify-between mb-8">
+              <div className="flex items-center gap-4">
+                <img
+                  src={profile.avatar || profile.picture || `https://ui-avatars.com/api/?name=${encodeURIComponent(profile.name || 'User')}&background=e5e7eb&color=374151&size=128`}
+                  alt={profile.name}
+                  className="w-16 h-16 rounded-full border-2 border-gray-200 object-cover"
+                  onError={(e) => {
+                    e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(profile.name || 'User')}&background=e5e7eb&color=374151&size=128`;
+                  }}
+                />
+                <div>
+                  <h1 className="text-2xl font-bold text-gray-900">{profile.name}</h1>
+                  <p className="text-sm text-gray-600">
+                    Member since {formatJoinDate(profile.createdAt)}
+                  </p>
+                </div>
               </div>
+
+              {(() => {
+                const isAlreadyFriend = isFriend(profile._id);
+                const isPending = requestSent || hasSentRequest(profile._id);
+                return (
+                  <div className="flex gap-2">
+                    <Button
+                      onClick={handleToggleFriend}
+                      disabled={friendLoading || isPending}
+                      variant={isAlreadyFriend ? 'outline' : 'default'}
+                      className={isAlreadyFriend ? 'text-red-600 hover:bg-red-50' : ''}
+                    >
+                      {friendLoading ? (
+                        'Loading...'
+                      ) : isAlreadyFriend ? (
+                        <>
+                          <UserMinus className="w-4 h-4 mr-2" />
+                          Remove Friend
+                        </>
+                      ) : isPending ? (
+                        'Request Sent'
+                      ) : (
+                        <>
+                          <UserPlus className="w-4 h-4 mr-2" />
+                          Add Friend
+                        </>
+                      )}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={async () => {
+                        try {
+                          const response = await fetch(
+                            `${API_ROOT}/chat/dm/${profile._id}?viewerEmail=${encodeURIComponent(currentUser.email)}`
+                          );
+                          if (!response.ok) {
+                            throw new Error('Failed to create DM chat');
+                          }
+                          const chat = await response.json();
+                          navigate('/messages', { state: { chatId: chat._id, isDm: true } });
+                        } catch (error) {
+                          console.error('Error starting DM:', error);
+                          alert('Failed to start conversation. Please try again.');
+                        }
+                      }}
+                    >
+                      <MessageCircle className="w-4 h-4 mr-2" />
+                      Message
+                    </Button>
+                  </div>
+                );
+              })()}
             </div>
 
             {/* Profile Information */}
@@ -162,14 +260,6 @@ function UserProfile({ currentUser }) {
                   </label>
                   <p className="text-gray-900">{profile.email || '—'}</p>
                 </div>
-
-                {/* <div className="space-y-2">
-                  <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
-                    <User className="w-4 h-4" />
-                    Google ID
-                  </label>
-                  <p className="text-gray-600 text-sm font-mono break-all">{profile.googleId || '—'}</p>
-                </div> */}
 
                 <div className="space-y-2">
                   <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
@@ -218,6 +308,27 @@ function UserProfile({ currentUser }) {
           </div>
         </div>
       </div>
+
+      <Dialog open={removeConfirmOpen} onOpenChange={setRemoveConfirmOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Remove Friend</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to remove{' '}
+              <span className="font-medium text-gray-900">{profile?.name}</span>{' '}
+              from your friends?
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-end gap-2 mt-4">
+            <Button variant="outline" onClick={() => setRemoveConfirmOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={confirmRemoveFriend} className="bg-red-600 hover:bg-red-700 text-white border-0">
+              Remove
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
