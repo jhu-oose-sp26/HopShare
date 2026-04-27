@@ -152,12 +152,15 @@ function AutoFitAfterSearch({ routeSearch, rides }) {
 
 
 
-function RidesMapView({ posts, currentUser, coords, routeSearch, onDeletePost, onUpdatePost }) {
+function RidesMapView({ posts, isLoading = false, currentUser, coords, routeSearch, onDeletePost, onUpdatePost }) {
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
   const [fromOpen, setFromOpen] = useState(false);
   const [toOpen, setToOpen] = useState(false);
   const [selectedPost, setSelectedPost] = useState(null);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const pastDateMatcher = { before: today };
 
   const ridesWithCoords = posts.filter(
     (p) =>
@@ -228,11 +231,13 @@ function RidesMapView({ posts, currentUser, coords, routeSearch, onDeletePost, o
                   mode='single'
                   selected={fromDate ? parse(fromDate, 'yyyy-MM-dd', new Date()) : undefined}
                   onSelect={(d) => {
-                    if (!d) return;
+                    if (!d || d < today) return;
                     setFromDate(format(d, 'yyyy-MM-dd'));
                     setFromOpen(false);
                     setToOpen(true);
                   }}
+                  disabled={pastDateMatcher}
+                  startMonth={today}
                 />
               </PopoverContent>
             </Popover>
@@ -254,10 +259,12 @@ function RidesMapView({ posts, currentUser, coords, routeSearch, onDeletePost, o
                   mode='single'
                   selected={toDate ? parse(toDate, 'yyyy-MM-dd', new Date()) : undefined}
                   onSelect={(d) => {
-                    if (!d) return;
+                    if (!d || d < today) return;
                     setToDate(format(d, 'yyyy-MM-dd'));
                     setToOpen(false);
                   }}
+                  disabled={pastDateMatcher}
+                  startMonth={today}
                 />
               </PopoverContent>
             </Popover>
@@ -273,7 +280,12 @@ function RidesMapView({ posts, currentUser, coords, routeSearch, onDeletePost, o
         </div>
       </div>
 
-      {rides.length === 0 ? (
+      {isLoading ? (
+        <div className='rounded-xl border border-gray-200 shadow-sm h-[520px] flex flex-col items-center justify-center gap-4'>
+          <div className='w-10 h-10 rounded-full border-4 border-gray-200 border-t-gray-800 animate-spin' />
+          <p className='text-sm text-gray-400 animate-pulse'>Loading map rides...</p>
+        </div>
+      ) : rides.length === 0 ? (
         <div className='text-center py-12'>
           <p className='text-gray-500 text-lg'>No rides with location data to display.</p>
         </div>

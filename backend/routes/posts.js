@@ -285,14 +285,14 @@ router.post('/', async (req, res) => {
     const postInfo = req.body || {};
     
     // Validation: required fields
-    if (!postInfo.title || !postInfo.description) {
-      return res.status(400).json({ error: 'Title and description are required' });
+    if (!postInfo.title) {
+      return res.status(400).json({ error: 'Title is required' });
     }
     
     // Validation: sanitize and validate string fields
     try {
       postInfo.title = sanitizeString(postInfo.title, 'Title', 200);
-      postInfo.description = sanitizeString(postInfo.description, 'Description', 5000);
+      postInfo.description = sanitizeString(postInfo.description ?? '', 'Description', 5000);
       
       if (postInfo.trip?.date) {
         postInfo.trip.date = validateDate(postInfo.trip.date);
@@ -315,6 +315,23 @@ router.post('/', async (req, res) => {
 
     postInfo.confirmationCode = generateConfirmationCode();
     postInfo.archived = false;
+
+    // For offer posts, auto-add the author as the driver
+    if (postInfo.type === 'offer' && postInfo.user?.email) {
+      const authorUser = await db.collection('users').findOne(
+        { email: postInfo.user.email },
+        { projection: { name: 1, email: 1, picture: 1, avatar: 1, googleId: 1 } }
+      );
+      postInfo.drivers = [{
+        name: authorUser?.name || postInfo.user.name || '',
+        email: postInfo.user.email,
+        picture: authorUser?.picture || null,
+        avatar: authorUser?.avatar || null,
+        googleId: authorUser?.googleId || null,
+        takenAt: new Date().toISOString(),
+      }];
+    }
+
     const postResult = await postsCollection.insertOne(postInfo);
     let tripId = null;
 
@@ -426,8 +443,8 @@ router.put('/:id', async (req, res) => {
       if (updateData.title) {
         updateData.title = sanitizeString(updateData.title, 'Title', 200);
       }
-      if (updateData.description) {
-        updateData.description = sanitizeString(updateData.description, 'Description', 5000);
+      if (Object.prototype.hasOwnProperty.call(updateData, 'description')) {
+        updateData.description = sanitizeString(updateData.description ?? '', 'Description', 5000);
       }
     } catch (validationError) {
       return res.status(400).json({ error: validationError.message });
@@ -550,10 +567,9 @@ router.post('/:id/join', async (req, res) => {
     }
 
     const riderList = post.riderList || [];
-    const pendingJoins = post.pendingJoins || [];
 
-    // Check if already joined or pending
-    if (riderList.some(u => u.email === email) || pendingJoins.includes(email)) {
+    // Check if already joined
+    if (riderList.some(u => u.email === email)) {
       return res.json({ success: true, alreadyJoined: true });
     }
 
@@ -561,10 +577,15 @@ router.post('/:id/join', async (req, res) => {
       return res.status(400).json({ error: 'This ride is full.' });
     }
 
-    await db.collection('posts').updateOne(
+    const joinResult = await db.collection('posts').updateOne(
       { _id: postId },
-      { $push: { pendingJoins: email } }
+      { $addToSet: { pendingJoins: email } }
     );
+
+    // No-op if request is already pending.
+    if (joinResult.modifiedCount === 0) {
+      return res.json({ success: true, alreadyJoined: true });
+    }
 
     // Notify the post owner
     const ownerEmail = post.user?.email;
@@ -694,30 +715,48 @@ router.post('/:id/remove-member', async (req, res) => {
     const post = await db.collection('posts').findOne({ _id: postId });
     if (!post) return res.status(404).json({ error: 'Post not found' });
 
-    // AUTHORIZATION CHECK: only post owner can remove members
+    // AUTHORIZATION CHECK:
+    // - post owner can remove any rider
+    // - a rider can remove themself (leave the ride)
     if (!actorEmail || !post.user?.email) {
-      return res.status(403).json({ error: 'Unauthorized: cannot verify ownership' });
+      return res.status(403).json({ error: 'Unauthorized: cannot verify actor' });
     }
-    
+
+    let actorNorm;
+    let ownerNorm;
     try {
-      const actorNorm = validateEmail(actorEmail);
-      const ownerNorm = validateEmail(post.user.email);
-      
-      if (actorNorm !== ownerNorm) {
-        return res.status(403).json({ error: 'Unauthorized: only post owner can remove members' });
-      }
+      actorNorm = validateEmail(actorEmail);
+      ownerNorm = validateEmail(post.user.email);
     } catch (err) {
       return res.status(400).json({ error: err.message });
     }
 
+    const targetNorm = email || '';
+    const isOwnerAction = actorNorm === ownerNorm;
+    const isSelfLeave = Boolean(targetNorm) && actorNorm === targetNorm;
+
+    if (!isOwnerAction && !isSelfLeave) {
+      return res.status(403).json({ error: 'Unauthorized: only the post owner can remove riders' });
+    }
+
     const riderListBefore = post.riderList || [];
-    const removedMember = riderListBefore.find((member) => member.email === email)
-      || riderListBefore.find((member) => name && member.name === name)
-      || null;
+    const removedMember = riderListBefore.find((member) => {
+      const memberEmail = typeof member.email === 'string' ? member.email.trim().toLowerCase() : '';
+      if (targetNorm && memberEmail === targetNorm) return true;
+      return !targetNorm && name && member.name === name;
+    }) || null;
+
+    if (!removedMember) {
+      return res.status(404).json({ error: 'Rider not found in this ride' });
+    }
+
+    if (isSelfLeave && !targetNorm) {
+      return res.status(400).json({ error: 'Self-leave requires a valid email' });
+    }
 
     await db.collection('posts').updateOne(
       { _id: postId },
-      { $pull: { riderList: { email: email || null } } }
+      { $pull: { riderList: { email: removedMember.email || null } } }
     );
     // Also remove any entry that matched on name if email was blank
     if (!email && name) {
@@ -732,26 +771,27 @@ router.post('/:id/remove-member', async (req, res) => {
     let notifiedCount = 0;
 
     const removedDisplayName = removedMember?.name || name || email;
-    const actorDisplayName = actorName || removedDisplayName;
-    const removedOwnself = actorEmail && actorEmail === email;
+    const actorDisplayName = actorName || post.user?.name || 'The poster';
+    const removedOwnself = isSelfLeave;
     const routeSummary = `${post.trip?.startLocation?.title || 'start'} to ${post.trip?.endLocation?.title || 'destination'}`;
     const dateSummary = post.trip?.date ? ` on ${post.trip.date}` : '';
     const timeSummary = post.trip?.time ? ` at ${post.trip.time}` : '';
     const rideSummary = `${routeSummary}${dateSummary}${timeSummary}`;
     const notificationMessage = removedOwnself
       ? `${removedDisplayName} left your riding list for ${rideSummary}.`
-      : `${removedDisplayName} was removed from your riding list for ${rideSummary} by ${actorDisplayName}.`;
+      : `You were removed from the riding list for ${rideSummary} by ${actorDisplayName}.`;
 
-    const recipientEmailSet = new Set(
-      remainingRiders
-        .map((member) => (typeof member.email === 'string' ? member.email.trim() : ''))
-        .filter(Boolean)
-    );
-    if (typeof post.user?.email === 'string' && post.user.email.trim()) {
-      recipientEmailSet.add(post.user.email.trim());
-    }
-    if (typeof email === 'string' && email.trim()) {
-      recipientEmailSet.delete(email.trim());
+    const recipientEmailSet = new Set();
+    if (removedOwnself) {
+      // Self-leave: notify post owner.
+      if (typeof post.user?.email === 'string' && post.user.email.trim()) {
+        recipientEmailSet.add(post.user.email.trim());
+      }
+    } else {
+      // Owner removal: notify the removed rider.
+      if (typeof email === 'string' && email.trim()) {
+        recipientEmailSet.add(email.trim());
+      }
     }
 
     const recipientEmails = Array.from(recipientEmailSet);

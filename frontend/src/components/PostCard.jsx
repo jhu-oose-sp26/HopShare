@@ -131,7 +131,8 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
     // Function to handle chatting
     const handleChatClick = async () => {
         try {
-            const response = await fetch(`${API_ROOT}/chat/${_id}`);
+            const viewerEmail = encodeURIComponent(currentUser?.email || '');
+            const response = await fetch(`${API_ROOT}/chat/${_id}?viewerEmail=${viewerEmail}`);
             if (!response.ok) {
                 throw new Error('Failed to get/create chat');
             }
@@ -433,33 +434,35 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
                             </div>
                         )}
                         
-                        {/* Weather forecast for start location - only for dates within 14 days */}
-                        {trip.startLocation?.gps_coordinates && trip.date && shouldShowWeather() && (
-                            <div className='mt-3'>
-                                <div className='text-xs font-medium text-gray-700 mb-2'>Weather at departure:</div>
-                                <WeatherDisplay 
-                                    latitude={trip.startLocation.gps_coordinates.latitude}
-                                    longitude={trip.startLocation.gps_coordinates.longitude}
-                                    date={trip.date}
-                                    time={trip.time || '12:00'}
-                                    location={trip.startLocation.title}
-                                    compact={true}
-                                />
-                            </div>
-                        )}
-                        
-                        {/* Weather forecast for end location - only for dates within 14 days */}
-                        {trip.endLocation?.gps_coordinates && trip.date && shouldShowWeather() && (
-                            <div className='mt-2'>
-                                <div className='text-xs font-medium text-gray-700 mb-2'>Weather at destination:</div>
-                                <WeatherDisplay 
-                                    latitude={trip.endLocation.gps_coordinates.latitude}
-                                    longitude={trip.endLocation.gps_coordinates.longitude}
-                                    date={trip.date}
-                                    time={trip.time || '12:00'}
-                                    location={trip.endLocation.title}
-                                    compact={true}
-                                />
+                        {/* Weather forecast - departure and destination in one row */}
+                        {trip.date && shouldShowWeather() && (trip.startLocation?.gps_coordinates || trip.endLocation?.gps_coordinates) && (
+                            <div className='mt-3 flex gap-3 divide-x divide-gray-200'>
+                                {trip.startLocation?.gps_coordinates && (
+                                    <div className='flex-1 min-w-0'>
+                                        <div className='text-xs font-medium text-gray-500 mb-1'>Departure</div>
+                                        <WeatherDisplay
+                                            latitude={trip.startLocation.gps_coordinates.latitude}
+                                            longitude={trip.startLocation.gps_coordinates.longitude}
+                                            date={trip.date}
+                                            time={trip.time || '12:00'}
+                                            location={trip.startLocation.title}
+                                            compact={true}
+                                        />
+                                    </div>
+                                )}
+                                {trip.endLocation?.gps_coordinates && (
+                                    <div className='flex-1 min-w-0 pl-3'>
+                                        <div className='text-xs font-medium text-gray-500 mb-1'>Destination</div>
+                                        <WeatherDisplay
+                                            latitude={trip.endLocation.gps_coordinates.latitude}
+                                            longitude={trip.endLocation.gps_coordinates.longitude}
+                                            date={trip.date}
+                                            time={trip.time || '12:00'}
+                                            location={trip.endLocation.title}
+                                            compact={true}
+                                        />
+                                    </div>
+                                )}
                             </div>
                         )}
                         
@@ -494,16 +497,6 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
                         <p className='text-sm font-medium text-gray-900'>{riderRequestStatus.title}</p>
                     </div>
                     <p className='mt-1 text-sm text-gray-600'>{riderRequestStatus.description}</p>
-                </div>
-            )}
-
-            {/* Suggested price — offers only */}
-            {isOffer && suggestedPrice != null && suggestedPrice !== '' && (
-                <div className='flex items-center gap-2 mb-4 text-sm'>
-                    <span className='text-gray-400 shrink-0 font-medium'>$</span>
-                    <span className='text-gray-700'>
-                        Suggested price: <span className='font-medium text-green-700'>${Number(suggestedPrice).toFixed(2)}</span>
-                    </span>
                 </div>
             )}
 
@@ -574,7 +567,7 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
                                                     <textarea
                                                         value={offerMessage}
                                                         onChange={(e) => setOfferMessage(e.target.value)}
-                                                        placeholder="Optional message (e.g., 'I can pick you up early', leave blank to skip)"
+                                                        placeholder="Optional message (e.g., 'I can pick you up early' or 'I can drive for $5', leave blank to skip)"
                                                         className="w-full min-h-[80px] rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                                                     />
                                                 </div>
@@ -670,23 +663,6 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
                 ) : (
                     <span className='text-gray-700'>1 rider sharing this trip</span>
                 )}
-                {currentUser && !isOwner && !listJoined && (
-                    <button
-                        className={`text-xs px-2 py-0.5 rounded border font-medium transition-colors ${
-                            listRequestSent
-                                ? 'border-gray-300 text-gray-400 cursor-default'
-                                : 'border-green-500 text-green-600 hover:bg-green-50'
-                        }`}
-                        disabled={listRequestSent || listJoinLoading}
-                        onClick={() => {
-                            if (listRequestSent) return;
-                            setJoinListMessage('');
-                            setJoinListMessageOpen(true);
-                        }}
-                    >
-                        {listJoinLoading ? 'Sending…' : listRequestSent ? 'Awaiting Approval' : '+ Join'}
-                    </button>
-                )}
                 {currentUser && !isOwner && listJoined && (
                     <button
                         className='text-xs px-2 py-0.5 rounded border font-medium transition-colors border-red-300 text-red-500 hover:bg-red-50'
@@ -739,39 +715,10 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
                             size='sm'
                             className={`w-full ${listJoined || listRequestSent || isFull ? 'text-gray-400' : 'bg-green-600 hover:bg-green-700'}`}
                             disabled={listJoined || listRequestSent || listJoinLoading || isFull}
-                            onClick={async () => {
-                                setListJoinError('');
-                                setListJoinLoading(true);
-                                try {
-                                    const res = await fetch(`${API_ROOT}/posts/${post._id}/join`, {
-                                        method: 'POST',
-                                        headers: { 'Content-Type': 'application/json' },
-                                        body: JSON.stringify({ email: currentUser.email }),
-                                    });
-                                    if (res.ok) {
-                                        const msg = `${currentUser.name} wants to join your rider list for the ride from ${post.trip?.startLocation?.title || 'start'} to ${post.trip?.endLocation?.title || 'destination'}.`;
-                                        await fetch(NOTIFICATIONS_ENDPOINT, {
-                                            method: 'POST',
-                                            headers: { 'Content-Type': 'application/json' },
-                                            body: JSON.stringify({
-                                                recipientEmail: post.user.email,
-                                                senderName: currentUser.name,
-                                                senderId: currentUser._id,
-                                                message: msg,
-                                                postId: post._id,
-                                                type: 'join_list',
-                                            }),
-                                        });
-                                        setListRequestSent(true);
-                                    } else {
-                                        const data = await res.json().catch(() => ({}));
-                                        setListJoinError(data.error || 'Failed to send request. Please try again.');
-                                    }
-                                } catch (err) {
-                                    setListJoinError('Network error. Please try again.');
-                                } finally {
-                                    setListJoinLoading(false);
-                                }
+                            onClick={() => {
+                                if (listRequestSent || listJoinLoading || isFull) return;
+                                setJoinListMessage('');
+                                setJoinListMessageOpen(true);
                             }}
                         >
                             {listJoinLoading ? (
@@ -1016,6 +963,35 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
                                 <div className='bg-gray-50 rounded-lg p-3 space-y-2'>
                                     <p className='text-xs font-semibold uppercase tracking-wide text-gray-400'>Description</p>
                                     <p className='text-gray-700 break-all whitespace-pre-wrap'>{description}</p>
+                                </div>
+                            )}
+
+                            {isOffer && suggestedPrice != null && suggestedPrice !== '' && (
+                                <div className='bg-gray-50 rounded-lg p-3 space-y-2'>
+                                    <p className='text-xs font-semibold uppercase tracking-wide text-gray-400'>Suggested Price</p>
+                                    <div className='flex items-center gap-2 text-sm'>
+                                        <span className='text-gray-400 shrink-0 font-medium'>$</span>
+                                        <span className='text-gray-700'>
+                                            Suggested price: <span className='font-medium text-green-700'>${Number(suggestedPrice).toFixed(2)}</span>
+                                        </span>
+                                    </div>
+                                </div>
+                            )}
+
+                            {!isOffer && driverList.length === 0 && (
+                                <div className='bg-gray-50 rounded-lg p-3 space-y-2'>
+                                    <p className='text-xs font-semibold uppercase tracking-wide text-gray-400'>Price Estimation</p>
+                                    <div className='flex items-center gap-2 text-sm'>
+                                        <ExternalLink className='w-4 h-4 text-gray-400 shrink-0' />
+                                        <a
+                                            href='https://www.uber.com/global/en/price-estimate/'
+                                            target='_blank'
+                                            rel='noreferrer'
+                                            className='font-medium text-blue-600 hover:text-blue-800 hover:underline'
+                                        >
+                                            See price estimation here
+                                        </a>
+                                    </div>
                                 </div>
                             )}
 

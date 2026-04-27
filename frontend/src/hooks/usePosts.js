@@ -6,7 +6,20 @@ const API_ROOT = (import.meta.env.VITE_API_BASE_URL || '/api').replace(
     ''
 );
 const POSTS_ENDPOINT = `${API_ROOT}/posts`;
-const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || window.location.origin;
+const SOCKET_URL = (() => {
+    if (import.meta.env.VITE_SOCKET_URL) return import.meta.env.VITE_SOCKET_URL;
+    if (/^https?:\/\//i.test(API_ROOT)) {
+        try {
+            return new URL(API_ROOT, window.location.origin).origin;
+        } catch {
+            // Fall through to frontend origin.
+        }
+    }
+    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+        return `${window.location.protocol}//${window.location.hostname}:3000`;
+    }
+    return window.location.origin;
+})();
 
 function toShortPlaceName(value) {
     const raw = typeof value === 'string' ? value.trim() : '';
@@ -242,7 +255,7 @@ export const usePosts = (currentUser = null) => {
             throw new Error(await readErrorMessage(response));
         }
         // Change Stream will broadcast to all clients
-    }, []);
+    }, [currentUser?.email]);
 
     const updatePost = useCallback(async (postId, formData) => {
         const postPayload = createPostPayload(formData);
@@ -261,7 +274,7 @@ export const usePosts = (currentUser = null) => {
             throw new Error(await readErrorMessage(response));
         }
         // Change Stream will broadcast to all clients
-    }, []);
+    }, [currentUser?.email]);
 
     return {
         posts,
