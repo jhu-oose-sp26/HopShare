@@ -7,8 +7,7 @@ import {
   SheetTitle,
   SheetDescription,
 } from '@/components/ui/sheet';
-import { Bell, RefreshCw } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { Bell } from 'lucide-react';
 import { useNotifications } from '@/hooks/useNotifications';
 
 // Function to parse and render formatted message text
@@ -104,15 +103,6 @@ function NotificationMenu({ currentUser }) {
                 ? `Updated ${new Date(lastUpdatedAt).toLocaleTimeString()}`
                 : 'Waiting for updates'}
             </span>
-            <Button
-              variant='ghost'
-              size='sm'
-              onClick={() => refreshNotifications({ silent: true }).catch(() => {})}
-              disabled={isLoading || isRefreshing}
-            >
-              <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-              Refresh
-            </Button>
           </div>
 
           {error ? (
