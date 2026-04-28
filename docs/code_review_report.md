@@ -11,8 +11,7 @@
 | Member | Code-Review Activities |
 |--------|----------------------|
 | All members | Full walkthrough of backend routes, frontend hooks, and component layer; identified issues and agreed on priorities |
-| Louis Hu | Reviewed backend routes (`posts.js`, `chat.js`); identified DRY violations and missing coordinate validation |
-| Fengqi Hu | Reviewed `notifications.js` and `db.js`; identified god-function issue and missing DB indexes |
+| Louis Hu | Reviewed backend routes (`posts.js`, `chat.js`); identified DRY violations and missing coordinate validation. Reviewed `notifications.js` and `db.js`; identified god-function issue and missing DB indexes |
 | Han | Reviewed frontend hooks and `App.jsx`; identified duplicated socket configuration and test gaps |
 
 ---
