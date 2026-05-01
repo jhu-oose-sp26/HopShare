@@ -8,11 +8,12 @@
 
 ## Team Contributions
 
-| Member | Code-Review Activities |
-|--------|----------------------|
-| All members | Full walkthrough of backend routes, frontend hooks, and component layer; identified issues and agreed on priorities |
-| Louis Hu | Reviewed backend routes (`posts.js`, `chat.js`); identified DRY violations and missing coordinate validation. Reviewed `notifications.js` and `db.js`; identified god-function issue and missing DB indexes |
-| Han | Reviewed frontend hooks and `App.jsx`; identified duplicated socket configuration and test gaps |
+| Member      | Code-Review Activities                                                                                                                                                                                                               |
+| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| All members | Full walkthrough of backend routes, frontend hooks, and component layer; identified issues and agreed on priorities                                                                                                                  |
+| Junzhe Shi  | Reviewed ride/chat consistency, removal notifications, and chat leave/removal updates; added action-safety checks, fixed responsive UI overlap, improved location-based map filtering, and contributed to price-estimation direction |
+| Louis Hu    | Reviewed backend routes (`posts.js`, `chat.js`); identified DRY violations and missing coordinate validation. Reviewed `notifications.js` and `db.js`; identified god-function issue and missing DB indexes                          |
+| Han         | Reviewed frontend hooks and `App.jsx`; identified duplicated socket configuration and test gaps                                                                                                                                      |
 
 ---
 
@@ -43,7 +44,7 @@ The most extreme case is `PATCH /notifications/:id/respond` in [`backend/routes/
 
 - `posts.js` is 928 lines covering CRUD, ride joining, ride taking, member/driver removal, starring, cache management, and Google-ID enrichment — all in one file. A new contributor cannot understand it in a single session.
 - The `chat.js` access-control policy (`isActiveRideParticipant`, `hasChatHistory`, `hasReadOnlyAccess`) is correct but requires callers to combine all three checks manually. The intent of the overall authorization rule is not obvious from the call site.
-- The `encodeEmail` helper (replacing `.` with `(dot)` for MongoDB field-name compatibility) appears in both `App.jsx` and `chat.js` with no shared definition and no comment explaining *why* the encoding is needed.
+- The `encodeEmail` helper (replacing `.` with `(dot)` for MongoDB field-name compatibility) appears in both `App.jsx` and `chat.js` with no shared definition and no comment explaining _why_ the encoding is needed.
 
 ### Recommended Improvements
 
@@ -81,6 +82,7 @@ The most extreme case is `PATCH /notifications/:id/respond` in [`backend/routes/
 Names are generally clear and intention-revealing: `isActiveRideParticipant`, `hasChatHistory`, `invalidatePostsCache`, `enrichPostsWithGoogleIds`. The naming convention is consistent within each file.
 
 Minor issues:
+
 - The backend uses `senderName`/`senderId` while some endpoints also use `actorName`/`actorEmail` for the equivalent concept in the same request body. This inconsistency makes the API harder to use.
 - `encodeEmail` is a misleading name — it is not URL encoding or Base64; it replaces dots with `(dot)`. A name like `mongoKeyFromEmail` or `encodeEmailAsKey` would be more precise.
 - In `friends.js`, the helper `getFriendsDoc` creates a document if none exists (a side effect not suggested by a "get" name). `getOrCreateFriendsDoc` would be more accurate.
@@ -97,16 +99,19 @@ Minor issues:
 
 ### Findings
 
-Most existing comments are useful and explain the *why*:
+Most existing comments are useful and explain the _why_:
+
 - `// Archive all posts where trip.date is in the past (throttled to once per 5 minutes)` — explains the throttle design decision.
 - `// Change Stream will broadcast to all clients. No local state update needed` — explains why the UI doesn't update state after a mutation.
 - `// Only update picture from Google if user doesn't have a custom avatar` — explains a non-obvious conditional.
 
 However, some comments are redundant noise that restate what the code already says:
+
 - `// Delete the related trips` immediately above `db.collection('trips').deleteMany({ postId })` — the code is self-explanatory.
 - `// Mark as read` immediately above `$set: { read: true }`.
 
 Missing explanatory comments:
+
 - `encodeEmail` in both `chat.js` and `App.jsx` has no comment explaining the MongoDB field-name restriction that necessitates it. A future developer will find this confusing.
 - The in-memory `postsCache` in `posts.js` has no comment explaining why a server-side in-memory cache is used instead of client-side caching or a Redis layer.
 
@@ -126,7 +131,7 @@ Missing explanatory comments:
 - `const`/`let` are used throughout; no `var`.
 - Indentation and brace style are consistent.
 - Some `catch` blocks silently swallow errors with no logging: `catch {}` in `App.jsx` (unread count fetch, line 50) and `catch { /* ignore parse errors */ }` in `usePosts.js`. Silent failure makes debugging production issues very hard. At minimum these should `console.error` in development.
-- `toObjectId` is defined at the *bottom* of `chat.js` (line 616) but used throughout the file. JavaScript hoists function declarations but not `const` expressions — this definition uses `const` and `new ObjectId()`, meaning if the reference is ever evaluated before line 616 at module load time it would fail. The function should be at the top.
+- `toObjectId` is defined at the _bottom_ of `chat.js` (line 616) but used throughout the file. JavaScript hoists function declarations but not `const` expressions — this definition uses `const` and `new ObjectId()`, meaning if the reference is ever evaluated before line 616 at module load time it would fail. The function should be at the top.
 - `posts.js` uses a `try { ... } catch (validationError) { return ... }` pattern nested inside an outer `try/catch`. This two-level nesting within a single route handler reduces readability; a validation helper that throws and a single top-level catch would be cleaner.
 
 ### Recommended Improvements
@@ -155,32 +160,32 @@ The API has no machine-readable documentation (no OpenAPI/Swagger spec). A contr
 
 ## SOLID Principles Evaluation
 
-| Principle | Assessment | Location |
-|-----------|-----------|----------|
-| **S** — Single Responsibility | Violated. Route files mix HTTP, validation, business logic, and DB access. Worst case: `notifications.js` respond handler (170 lines, 4 notification types). | `backend/routes/*.js` |
-| **O** — Open/Closed | Violated for notifications: adding a new notification type requires editing the existing handler. Extracting per-type functions would fix this. | `backend/routes/notifications.js:88` |
-| **L** — Liskov Substitution | Not applicable (no class hierarchy). | — |
-| **I** — Interface Segregation | Mostly satisfied. React hooks expose focused APIs; `usePosts` does not bleed notification concerns. | `frontend/src/hooks/` |
-| **D** — Dependency Inversion | Violated. Routes call `getDB()` directly (concrete dependency). A repository/service abstraction would allow the business logic to be tested without a real database. | `backend/routes/*.js` |
+| Principle                     | Assessment                                                                                                                                                            | Location                             |
+| ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------ |
+| **S** — Single Responsibility | Violated. Route files mix HTTP, validation, business logic, and DB access. Worst case: `notifications.js` respond handler (170 lines, 4 notification types).          | `backend/routes/*.js`                |
+| **O** — Open/Closed           | Violated for notifications: adding a new notification type requires editing the existing handler. Extracting per-type functions would fix this.                       | `backend/routes/notifications.js:88` |
+| **L** — Liskov Substitution   | Not applicable (no class hierarchy).                                                                                                                                  | —                                    |
+| **I** — Interface Segregation | Mostly satisfied. React hooks expose focused APIs; `usePosts` does not bleed notification concerns.                                                                   | `frontend/src/hooks/`                |
+| **D** — Dependency Inversion  | Violated. Routes call `getDB()` directly (concrete dependency). A repository/service abstraction would allow the business logic to be tested without a real database. | `backend/routes/*.js`                |
 
 ---
 
 ## Summary Table
 
-| Category | Issue | Severity | Recommended Fix |
-|----------|-------|----------|-----------------|
-| Design | Validation logic duplicated across `posts.js` and `chat.js` | Medium | Extract `backend/utils/validation.js` |
-| Design | Socket URL resolution duplicated across 3 frontend files | Low | Extract `frontend/src/lib/socket.js` |
-| Design | Notification respond handler is a 170-line god function | Medium | Decompose into per-type handler functions |
-| Complexity | `posts.js` is 928 lines with 8+ responsibilities | Medium | Split into sub-modules |
-| Tests | Backend has zero automated tests | High | Add integration tests for critical routes |
-| Tests | `formatTime` and `formatDate` have no unit tests | Low | Add tests in `utils.test.js` |
-| Naming | `encodeEmail` misleading; `getFriendsDoc` has hidden side effects | Low | Rename to `encodeEmailAsMongoKey` / `getOrCreateFriendsDoc` |
-| Naming | `senderName`/`actorName` inconsistency across endpoints | Low | Standardise on `senderName`/`senderId` |
-| Comments | `encodeEmail` workaround has no explanation anywhere | Low | Add comment explaining MongoDB field-name restriction |
-| Style | Silent `catch {}` blocks in `App.jsx` and `usePosts.js` | Low | Add `console.error` logging |
-| Style | `toObjectId` defined at bottom of `chat.js` but used throughout | Low | Move to top / extract to shared utils |
-| Style | Missing coordinate range validation (lat/lng bounds not checked) | Medium | Add `validateCoordinate(lat, lng)` in `validateTripLocations` |
-| Documentation | No `README.md` or installation guide | Medium | Add `README.md` with setup instructions |
-| Architecture | No server-side auth on protected endpoints | High | Add session/token verification middleware |
-| Performance | Missing DB indexes for common query patterns | Medium | Add indexes on `notifications.recipientId`, `chats.participants`, `posts.user.email` |
+| Category      | Issue                                                             | Severity | Recommended Fix                                                                      |
+| ------------- | ----------------------------------------------------------------- | -------- | ------------------------------------------------------------------------------------ |
+| Design        | Validation logic duplicated across `posts.js` and `chat.js`       | Medium   | Extract `backend/utils/validation.js`                                                |
+| Design        | Socket URL resolution duplicated across 3 frontend files          | Low      | Extract `frontend/src/lib/socket.js`                                                 |
+| Design        | Notification respond handler is a 170-line god function           | Medium   | Decompose into per-type handler functions                                            |
+| Complexity    | `posts.js` is 928 lines with 8+ responsibilities                  | Medium   | Split into sub-modules                                                               |
+| Tests         | Backend has zero automated tests                                  | High     | Add integration tests for critical routes                                            |
+| Tests         | `formatTime` and `formatDate` have no unit tests                  | Low      | Add tests in `utils.test.js`                                                         |
+| Naming        | `encodeEmail` misleading; `getFriendsDoc` has hidden side effects | Low      | Rename to `encodeEmailAsMongoKey` / `getOrCreateFriendsDoc`                          |
+| Naming        | `senderName`/`actorName` inconsistency across endpoints           | Low      | Standardise on `senderName`/`senderId`                                               |
+| Comments      | `encodeEmail` workaround has no explanation anywhere              | Low      | Add comment explaining MongoDB field-name restriction                                |
+| Style         | Silent `catch {}` blocks in `App.jsx` and `usePosts.js`           | Low      | Add `console.error` logging                                                          |
+| Style         | `toObjectId` defined at bottom of `chat.js` but used throughout   | Low      | Move to top / extract to shared utils                                                |
+| Style         | Missing coordinate range validation (lat/lng bounds not checked)  | Medium   | Add `validateCoordinate(lat, lng)` in `validateTripLocations`                        |
+| Documentation | No `README.md` or installation guide                              | Medium   | Add `README.md` with setup instructions                                              |
+| Architecture  | No server-side auth on protected endpoints                        | High     | Add session/token verification middleware                                            |
+| Performance   | Missing DB indexes for common query patterns                      | Medium   | Add indexes on `notifications.recipientId`, `chats.participants`, `posts.user.email` |
