@@ -1,0 +1,4 @@
+In this iteration, we finished all the crucial features and polishes, such as integrating the Map View
+with the search view, implementing a DM feature, cleaning up each Post Card, viewing the rider list, and more.
+
+Like with the previous iterations, we were able to ship code at a very quick pace, and were able to finish all technical requirements in time. We also patched up our environment issues to get a fully functional app. The main downside was that communication was not very good for this iteration, so there was some confusion on what work people would do when, as well as lack of PR reviews.
