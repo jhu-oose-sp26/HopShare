@@ -25,8 +25,7 @@ function HomePage({ currentUser, onLogout }) {
     refreshPosts,
     isLoading,
     isRefreshing,
-    error,
-    lastUpdatedAt,
+    error
   } = usePosts(currentUser);
   const [isOpen, setIsOpen] = useState(false);
   const [coords, setCoords] = useState(null);
@@ -149,15 +148,6 @@ function HomePage({ currentUser, onLogout }) {
                 <p className='text-gray-600'>
                   Create and find rides with fellow Hopkins students
                 </p>
-                <p className='mt-2 text-xs text-gray-400'>
-                  {isPulling
-                    ? progress >= 1
-                      ? 'Release to refresh rides'
-                      : 'Pull down to refresh rides'
-                    : lastUpdatedAt
-                      ? `Updated ${new Date(lastUpdatedAt).toLocaleTimeString()}`
-                      : 'Waiting for live updates'}
-                </p>
               </div>
 
               <div className='flex flex-col items-start gap-2 sm:items-end'>
@@ -270,7 +260,6 @@ function HomePage({ currentUser, onLogout }) {
           currentUser={currentUser}
           onRefresh={() => refreshPosts({ silent: true })}
           isRefreshing={isRefreshing}
-          lastUpdatedAt={lastUpdatedAt}
           heading={isShowingSearchResults ? 'Matching Routes' : 'Available Rides'}
           subheading={
             isShowingSearchResults
@@ -297,7 +286,6 @@ function HomePage({ currentUser, onLogout }) {
           showActions
           onRefresh={() => refreshPosts({ silent: true })}
           isRefreshing={isRefreshing}
-          lastUpdatedAt={lastUpdatedAt}
           heading='My Rides'
           subheading={isLoading ? 'Loading rides...' : `${myPosts.length} upcoming ride${myPosts.length === 1 ? '' : 's'}`}
           emptyTitle='You have no rides yet.'

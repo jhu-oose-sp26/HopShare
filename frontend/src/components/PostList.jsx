@@ -1,7 +1,5 @@
 import React, { useState } from 'react';
-import { RefreshCw } from 'lucide-react';
 import PostCard from './PostCard';
-import { Button } from '@/components/ui/button';
 
 
 const PostList = ({
@@ -23,7 +21,6 @@ const PostList = ({
 }) => {
     const [dateOrder, setDateOrder] = useState('asc');
     const [timeOrder, setTimeOrder] = useState('asc');
-    const [isManualRefreshing, setIsManualRefreshing] = useState(false);
     const locationEnabled = coords !== null;
 
     const filteredPosts = [...posts].sort((a, b) => {
@@ -51,21 +48,6 @@ const PostList = ({
                         {heading}
                     </h2>
                     <div className="flex items-center gap-2 text-sm">
-                        {onRefresh ? (
-                            <Button
-                                variant='outline'
-                                size='sm'
-                                onClick={async () => {
-                                    setIsManualRefreshing(true);
-                                    try { await onRefresh(); } catch { /* ignore */ }
-                                    setIsManualRefreshing(false);
-                                }}
-                                disabled={isLoading || isManualRefreshing}
-                            >
-                                <RefreshCw className={`w-4 h-4 ${isManualRefreshing ? 'animate-spin' : ''}`} />
-                                Refresh Posts
-                            </Button>
-                        ) : null}
                         <button
                             onClick={() => setDateOrder(o => o === 'asc' ? 'desc' : 'asc')}
                             className={`px-2 py-1 rounded border text-sm font-medium transition-colors ${dateOrder === 'asc' ? 'border-blue-400 text-blue-600 bg-blue-50' : 'border-orange-400 text-orange-600 bg-orange-50'}`}
