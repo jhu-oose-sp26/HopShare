@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
 import { Cloud, Sun, CloudRain, CloudSnow, Wind, Droplets, Thermometer } from 'lucide-react';
-import { getWeatherIconUrl } from '../services/weatherService';
-
-const API_ROOT = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000').replace(/\/$/, '');
+import { API_ROOT, getWeatherIconUrl } from '../services/weatherService';
+import { formatDateOnly } from '../lib/dateUtils';
 
 export const WeatherForecastDialog = ({ open, onOpenChange, latitude, longitude, location, currentDate }) => {
   const [forecast, setForecast] = useState([]);
@@ -43,7 +42,7 @@ export const WeatherForecastDialog = ({ open, onOpenChange, latitude, longitude,
   };
 
   useEffect(() => {
-    if (!open || !latitude || !longitude) {
+    if (!open || latitude == null || longitude == null) {
       setForecast([]);
       setError(null);
       return;
@@ -63,11 +62,16 @@ export const WeatherForecastDialog = ({ open, onOpenChange, latitude, longitude,
           targetDate.setDate(targetDate.getDate() + i);
           
           // Format date as YYYY-MM-DD
-          const dateStr = targetDate.toISOString().split('T')[0];
+          const dateStr = formatDateOnly(targetDate);
           
           try {
+            const params = new URLSearchParams({
+              lat: String(latitude),
+              lon: String(longitude),
+              date: dateStr,
+            });
             const response = await fetch(
-              `${API_ROOT}/weather/forecast?lat=${latitude}&lon=${longitude}&date=${dateStr}`,
+              `${API_ROOT}/weather/forecast?${params}`,
               {
                 headers: {
                   'Content-Type': 'application/json',

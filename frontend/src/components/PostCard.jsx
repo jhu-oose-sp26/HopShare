@@ -7,6 +7,7 @@ import { useNavigate } from 'react-router-dom';
 import { formatTime, formatDate } from '@/lib/utils';
 import { MapPin, Calendar, Clock, MessageCircle, Pencil, Trash2, Info, User, Mail, Phone, Navigation, ExternalLink, UserPlus, Users, UserMinus, CheckCircle, Star } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { getCalendarDayDiff } from '@/lib/dateUtils';
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { HoverCard, HoverCardTrigger, HoverCardContent } from '@/components/ui/hover-card';
 import {
@@ -225,15 +226,7 @@ const PostCard = ({ post, onDelete, onUpdate, coords, showActions = false, route
     // Check if weather should be displayed (within 14 days and not in the past)
     const shouldShowWeather = () => {
         if (!trip?.date) return false;
-        
-        const targetDate = new Date(trip.date);
-        const today = new Date();
-        
-        // Reset time to start of day for accurate day comparison
-        today.setHours(0, 0, 0, 0);
-        targetDate.setHours(0, 0, 0, 0);
-        
-        const diffDays = Math.ceil((targetDate - today) / (1000 * 60 * 60 * 24));
+        const diffDays = getCalendarDayDiff(trip.date);
         
         // Only show weather for dates that are today or in the future, and within 14 days
         return diffDays >= 0 && diffDays <= 14;

@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { getWeatherForecast } from '../services/weatherService';
+import { getCalendarDayDiff } from '../lib/dateUtils';
 
 export function useWeather(latitude, longitude, date, time) {
   const [weather, setWeather] = useState(null);
@@ -8,20 +9,12 @@ export function useWeather(latitude, longitude, date, time) {
   const timeoutRef = useRef(null);
 
   useEffect(() => {
-    if (!latitude || !longitude || !date) {
+    if (latitude == null || longitude == null || !date) {
       setWeather(null);
       return;
     }
 
-    // Check if date is within 14 days from today (same logic as weatherService)
-    const targetDate = new Date(date);
-    const today = new Date();
-    
-    // Reset time to start of day for accurate day comparison
-    today.setHours(0, 0, 0, 0);
-    targetDate.setHours(0, 0, 0, 0);
-    
-    const diffDays = Math.ceil((targetDate - today) / (1000 * 60 * 60 * 24));
+    const diffDays = getCalendarDayDiff(date);
 
     // Don't even start loading for dates beyond 14 days
     if (diffDays > 14) {
