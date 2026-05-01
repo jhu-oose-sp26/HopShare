@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
-import { Cloud, Sun, CloudRain, CloudSnow, Wind, Droplets, Thermometer } from 'lucide-react';
+import { Cloud, CloudSun, Sun, CloudRain, CloudSnow, Wind, Droplets, Thermometer } from 'lucide-react';
 import { API_ROOT, getWeatherIconUrl } from '../services/weatherService';
 import { formatDateOnly } from '../lib/dateUtils';
 
@@ -10,23 +10,24 @@ export const WeatherForecastDialog = ({ open, onOpenChange, latitude, longitude,
   const [error, setError] = useState(null);
 
   const WeatherIcon = ({ condition, iconCode, size = 'w-8 h-8' }) => {
-    const iconMap = {
-      Clear: Sun,
-      Clouds: Cloud,
-      Rain: CloudRain,
-      Snow: CloudSnow,
-      Drizzle: CloudRain,
-    };
-    
-    const FallbackIcon = iconMap[condition] || Cloud;
+    const normalizedCondition = condition?.toLowerCase() || '';
+    const FallbackIcon = normalizedCondition.includes('partly cloudy')
+      ? CloudSun
+      : normalizedCondition.includes('clear') || normalizedCondition.includes('sunny')
+        ? Sun
+        : normalizedCondition.includes('rain') || normalizedCondition.includes('drizzle')
+          ? CloudRain
+          : normalizedCondition.includes('snow')
+            ? CloudSnow
+            : Cloud;
     
     return (
-      <div className={`flex items-center justify-center ${size}`}>
+      <div className={`flex items-center justify-center shrink-0 ${size}`}>
         {iconCode ? (
           <img 
             src={getWeatherIconUrl(iconCode)}
             alt={condition}
-            className={size}
+            className={`${size} object-contain`}
             onError={(e) => {
               e.target.style.display = 'none';
               e.target.nextSibling.style.display = 'block';

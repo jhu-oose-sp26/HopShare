@@ -1,27 +1,28 @@
 import React, { useState, useEffect } from 'react';
-import { Cloud, Sun, CloudRain, CloudSnow, Wind, Droplets, Thermometer } from 'lucide-react';
+import { Cloud, CloudSun, Sun, CloudRain, CloudSnow, Wind, Droplets, Thermometer } from 'lucide-react';
 import { useWeather } from '../hooks/useWeather';
 import { getWeatherIconUrl } from '../services/weatherService';
 
 const WeatherIcon = ({ condition, iconCode }) => {
   // Fallback icons if API icon fails
-  const iconMap = {
-    Clear: Sun,
-    Clouds: Cloud,
-    Rain: CloudRain,
-    Snow: CloudSnow,
-    Drizzle: CloudRain,
-  };
-  
-  const FallbackIcon = iconMap[condition] || Cloud;
+  const normalizedCondition = condition?.toLowerCase() || '';
+  const FallbackIcon = normalizedCondition.includes('partly cloudy')
+    ? CloudSun
+    : normalizedCondition.includes('clear') || normalizedCondition.includes('sunny')
+      ? Sun
+      : normalizedCondition.includes('rain') || normalizedCondition.includes('drizzle')
+        ? CloudRain
+        : normalizedCondition.includes('snow')
+          ? CloudSnow
+          : Cloud;
   
   return (
-    <div className="flex items-center justify-center w-8 h-8">
+    <div className="flex items-center justify-center w-8 h-8 shrink-0">
       {iconCode ? (
         <img 
           src={getWeatherIconUrl(iconCode)}
           alt={condition}
-          className="w-8 h-8"
+          className="max-w-8 max-h-8 object-contain"
           onError={(e) => {
             e.target.style.display = 'none';
             e.target.nextSibling.style.display = 'block';
