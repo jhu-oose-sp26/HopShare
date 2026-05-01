@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { User, Mail, Phone, BookOpen, Calendar, MapPin, Edit3, Save, X, Camera, Upload, ArrowLeft } from 'lucide-react';
+import { User, Mail, Phone, BookOpen, Calendar, MapPin, Edit3, Save, X, Camera, Upload } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { formatTime, formatDate } from '@/lib/utils';
 
@@ -48,7 +47,6 @@ async function parseApiResponse(response) {
 }
 
 function ProfilePage({ currentUser, onUserUpdate }) {
-  const navigate = useNavigate();
   const [isEditing, setIsEditing] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
@@ -72,6 +70,15 @@ function ProfilePage({ currentUser, onUserUpdate }) {
   const [avatarPreview, setAvatarPreview] = useState(null);
   const [archivedPosts, setArchivedPosts] = useState([]);
   const [archivedLoading, setArchivedLoading] = useState(true);
+
+  // Fetch fresh profile data from backend on mount
+  useEffect(() => {
+    if (!currentUser?._id) return;
+    fetch(`${API_ROOT}/profile/${currentUser._id}`)
+      .then(res => res.ok ? res.json() : null)
+      .then(data => { if (data?.user) onUserUpdate(data.user); })
+      .catch(() => {});
+  }, []);
 
   // Reset form when currentUser changes or edit mode is cancelled
   useEffect(() => {
@@ -274,15 +281,6 @@ function ProfilePage({ currentUser, onUserUpdate }) {
   return (
     <div className="min-h-screen bg-gray-50 pb-20">
       <div className="container mx-auto px-6 py-8 max-w-4xl">
-        <Button
-          variant="outline"
-          onClick={() => navigate('/')}
-          className="mb-4"
-        >
-          <ArrowLeft className="w-4 h-4 mr-2" />
-          Back to Home
-        </Button>
-
         <div className="bg-white rounded-lg shadow-sm border border-gray-200">
           <div className="px-6 py-8">
             {/* Header */}
@@ -314,17 +312,6 @@ function ProfilePage({ currentUser, onUserUpdate }) {
                     <h1 className="text-2xl font-bold text-gray-900">
                       {isEditing ? 'Edit Profile' : 'My Profile'}
                     </h1>
-                    {/* Edit Toggle Switch */}
-                    <label className="relative inline-flex items-center cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={isEditing}
-                        onChange={(e) => setIsEditing(e.target.checked)}
-                        className="sr-only peer"
-                      />
-                      <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-                      <span className="ml-2 text-sm font-medium text-gray-700">Edit</span>
-                    </label>
                   </div>
                   <p className="text-sm text-gray-600">
                     Joined {formatJoinDate(currentUser?.createdAt)}
@@ -346,7 +333,7 @@ function ProfilePage({ currentUser, onUserUpdate }) {
               </div>
 
               <div className="flex gap-2 sm:flex-col sm:items-end">
-                {isEditing && (
+                {isEditing ? (
                   <div className="flex gap-2">
                     <Button variant="outline" onClick={handleCancel} disabled={isLoading}>
                       <X className="w-4 h-4 mr-2" />
@@ -357,6 +344,11 @@ function ProfilePage({ currentUser, onUserUpdate }) {
                       {isLoading ? 'Saving...' : 'Save Changes'}
                     </Button>
                   </div>
+                ) : (
+                  <Button variant="outline" onClick={() => setIsEditing(true)}>
+                    <Edit3 className="w-4 h-4 mr-2" />
+                    Edit
+                  </Button>
                 )}
               </div>
             </div>

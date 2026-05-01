@@ -1,10 +1,25 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, useRef } from 'react';
+import { io } from 'socket.io-client';
 
 const API_ROOT = (import.meta.env.VITE_API_BASE_URL || '/api').replace(
     /\/$/,
     ''
 );
 const POSTS_ENDPOINT = `${API_ROOT}/posts`;
+const SOCKET_URL = (() => {
+    if (import.meta.env.VITE_SOCKET_URL) return import.meta.env.VITE_SOCKET_URL;
+    if (/^https?:\/\//i.test(API_ROOT)) {
+        try {
+            return new URL(API_ROOT, window.location.origin).origin;
+        } catch {
+            // Fall through to frontend origin.
+        }
+    }
+    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+        return `${window.location.protocol}//${window.location.hostname}:3000`;
+    }
+    return window.location.origin;
+})();
 
 function toShortPlaceName(value) {
     const raw = typeof value === 'string' ? value.trim() : '';
@@ -17,11 +32,11 @@ function createPostPayload(formData) {
     const endShort = toShortPlaceName(formData.endTitle);
 
     return {
-        title: `${startShort || formData.startTitle} → ${
-            endShort || formData.endTitle
-        }`,
+        title: `${startShort || formData.startTitle} → ${endShort || formData.endTitle
+            }`,
         description: formData.description,
         type: formData.type,
+        suggestedPrice: formData.type === 'offer' && formData.suggestedPrice ? Number(formData.suggestedPrice) : null,
         user: {
             name: formData.name,
             email: formData.email,
@@ -45,6 +60,7 @@ function createPostPayload(formData) {
             date: formData.date,
             time: formData.time,
         },
+        ...(formData.maxRiders != null ? { maxRiders: formData.maxRiders } : {}),
         createdAt: new Date().toISOString(),
     };
 }
@@ -68,12 +84,13 @@ async function readErrorMessage(response) {
     return `Request failed (${response.status})`;
 }
 
-export const usePosts = () => {
+export const usePosts = (currentUser = null) => {
     const [posts, setPosts] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isRefreshing, setIsRefreshing] = useState(false);
     const [error, setError] = useState('');
     const [lastUpdatedAt, setLastUpdatedAt] = useState(null);
+    const socketRef = useRef(null);
 
     const fetchPosts = useCallback(async () => {
         const response = await fetch(POSTS_ENDPOINT);
@@ -115,33 +132,89 @@ export const usePosts = () => {
         [fetchPosts]
     );
 
+    // WebSocket connection for real-time updates
     useEffect(() => {
-        refreshPosts().catch(() => {});
+        refreshPosts().catch(() => { });
 
-        const intervalId = window.setInterval(() => {
-            refreshPosts({ silent: true }).catch(() => {});
-        }, 15000);
+        const socket = io(SOCKET_URL, {
+            transports: ['websocket', 'polling'],
+        });
+        socketRef.current = socket;
 
-        const handleWindowFocus = () => {
-            refreshPosts({ silent: true }).catch(() => {});
-        };
+        socket.on('connect', () => {
+            console.log('Connected to posts socket:', socket.id);
+        });
 
-        const handleVisibilityChange = () => {
-            if (!document.hidden) {
-                refreshPosts({ silent: true }).catch(() => {});
+        socket.on('post:created', ({ post }) => {
+            console.log('Received new post:', post._id);
+            if (!post.archived) {
+                setPosts((prev) => {
+                    if (prev.some((p) => String(p._id) === String(post._id))) {
+                        return prev;
+                    }
+                    return [post, ...prev];
+                });
+                setLastUpdatedAt(new Date().toISOString());
             }
-        };
+        });
 
-        window.addEventListener('focus', handleWindowFocus);
-        document.addEventListener('visibilitychange', handleVisibilityChange);
+        socket.on('post:updated', ({ post }) => {
+            console.log('Received updated post:', post._id);
+            setPosts((prev) =>
+                prev
+                    .map((p) => (String(p._id) === String(post._id) ? post : p))
+                    .filter((p) => !p.archived)
+            );
+            setLastUpdatedAt(new Date().toISOString());
+        });
+
+        socket.on('post:deleted', ({ postId }) => {
+            console.log('Received deleted post:', postId);
+            setPosts((prev) => prev.filter((p) => String(p._id) !== String(postId)));
+            setLastUpdatedAt(new Date().toISOString());
+        });
+
+        socket.on('posts:refresh', () => {
+            console.log('Received refresh signal');
+            refreshPosts({ silent: true }).catch(() => { });
+        });
+
+        socket.on('disconnect', () => {
+            console.log('Disconnected from posts socket');
+        });
+
+        socket.on('connect_error', (err) => {
+            console.error('Socket connection error:', err.message);
+        });
 
         return () => {
-            window.clearInterval(intervalId);
-            window.removeEventListener('focus', handleWindowFocus);
-            document.removeEventListener('visibilitychange', handleVisibilityChange);
+            socket.disconnect();
+            socketRef.current = null;
         };
     }, [refreshPosts]);
 
+    // Fallback refresh on focus (only if socket disconnected)
+    useEffect(() => {
+        const handleFocus = () => {
+            if (!socketRef.current?.connected) {
+                refreshPosts({ silent: true }).catch(() => { });
+            }
+        };
+
+        const handleVisibility = () => {
+            if (!document.hidden && !socketRef.current?.connected) {
+                refreshPosts({ silent: true }).catch(() => { });
+            }
+        };
+
+        window.addEventListener('focus', handleFocus);
+        document.addEventListener('visibilitychange', handleVisibility);
+
+        return () => {
+            window.removeEventListener('focus', handleFocus);
+            document.removeEventListener('visibilitychange', handleVisibility);
+        };
+    }, [refreshPosts]);
 
     const addPost = useCallback(async (formData) => {
         const postPayload = createPostPayload(formData);
@@ -157,38 +230,32 @@ export const usePosts = () => {
             throw new Error(await readErrorMessage(response));
         }
 
-        const createdResult = await response.json();
-        const createdPost = {
+        const result = await response.json();
+        // Change Stream will broadcast to all clients. No local state update needed
+        return {
             ...postPayload,
-            _id: normalizeId(
-                createdResult.postId || createdResult.insertedId,
-                Date.now().toString()
-            ),
-            tripId: createdResult.tripId
-                ? normalizeId(createdResult.tripId, null)
-                : null,
+            _id: normalizeId(result.postId || result.insertedId, Date.now().toString()),
+            tripId: result.tripId ? normalizeId(result.tripId, null) : null,
+            confirmationCode: result.confirmationCode,
         };
-
-        setPosts((prevPosts) => [createdPost, ...prevPosts]);
-        setError('');
-        setLastUpdatedAt(new Date().toISOString());
-        return createdPost;
     }, []);
 
     const removePost = useCallback(async (postId) => {
         const response = await fetch(`${POSTS_ENDPOINT}/${postId}`, {
             method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                userEmail: currentUser?.email || '',
+            }),
         });
 
         if (!response.ok) {
             throw new Error(await readErrorMessage(response));
         }
-
-        setPosts((prevPosts) =>
-            prevPosts.filter((post) => String(post._id) !== String(postId))
-        );
-        setLastUpdatedAt(new Date().toISOString());
-    }, []);
+        // Change Stream will broadcast to all clients
+    }, [currentUser?.email]);
 
     const updatePost = useCallback(async (postId, formData) => {
         const postPayload = createPostPayload(formData);
@@ -197,23 +264,17 @@ export const usePosts = () => {
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify(postPayload),
+            body: JSON.stringify({
+                ...postPayload,
+                userEmail: currentUser?.email || '',
+            }),
         });
 
         if (!response.ok) {
             throw new Error(await readErrorMessage(response));
         }
-
-        // Update local state with the new data
-        setPosts((prevPosts) =>
-            prevPosts.map((post) =>
-                String(post._id) === String(postId)
-                    ? { ...post, ...postPayload }
-                    : post
-            )
-        );
-        setLastUpdatedAt(new Date().toISOString());
-    }, []);
+        // Change Stream will broadcast to all clients
+    }, [currentUser?.email]);
 
     return {
         posts,

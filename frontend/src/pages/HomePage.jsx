@@ -1,5 +1,4 @@
 import { useState, useEffect, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
 import {
   Dialog,
   DialogContent,
@@ -8,15 +7,16 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import PostList from '@/components/PostList';
+import RidesMapView from '@/components/RidesMapView';
 import RouteSearchPanel from '@/components/RouteSearchPanel';
 import SubmitBox from '@/components/SubmitBox';
 import NotificationMenu from '@/components/NotificationMenu';
+import StarredPage from '@/pages/StarredPage';
 import { usePosts } from '@/hooks/usePosts';
 import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 import { filterPostsByRouteRadius } from '@/lib/utils';
 
 function HomePage({ currentUser, onLogout }) {
-  const navigate = useNavigate();
   const {
     posts,
     addPost,
@@ -25,15 +25,14 @@ function HomePage({ currentUser, onLogout }) {
     refreshPosts,
     isLoading,
     isRefreshing,
-    error,
-    lastUpdatedAt,
-  } = usePosts();
+    error
+  } = usePosts(currentUser);
   const [isOpen, setIsOpen] = useState(false);
   const [coords, setCoords] = useState(null);
   const [routeSearch, setRouteSearch] = useState(null);
   const [hasSearched, setHasSearched] = useState(false);
   const [submitInitialData, setSubmitInitialData] = useState(null);
-  const [activeView, setActiveView] = useState('available');
+  const [activeView, setActiveView] = useState('map');
 
   // Get user's location on load to bias autocomplete results.
   useEffect(() => {
@@ -130,44 +129,47 @@ function HomePage({ currentUser, onLogout }) {
     { enabled: true }
   );
 
+  const userAvatar = currentUser?.picture
+    || currentUser?.avatar
+    || `https://ui-avatars.com/api/?name=${encodeURIComponent(currentUser?.name || 'User')}&background=e5e7eb&color=374151&size=128`;
+
   return (
     <div className='min-h-screen bg-white pb-20' {...handlers}>
       <div className='bg-white'>
-        <div className="relative">
-          <div className="absolute top-6 right-6">
-            <NotificationMenu currentUser={currentUser}/>
+        <div className='relative'>
+          <div className='absolute top-6 right-6 z-10'>
+            <NotificationMenu currentUser={currentUser} />
           </div>
+
           <div className='container mx-auto px-6 py-8 max-w-6xl space-y-6'>
-            <div className='flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between'>
+            <div className='flex flex-col gap-4 pr-14 lg:flex-row lg:items-end lg:justify-between sm:pr-20'>
               <div>
                 <h1 className='text-3xl font-bold text-gray-900 mb-2'>HopShare</h1>
                 <p className='text-gray-600'>
                   Create and find rides with fellow Hopkins students
                 </p>
-                <p className='mt-2 text-xs text-gray-400'>
-                  {isPulling
-                    ? progress >= 1
-                      ? 'Release to refresh rides'
-                      : 'Pull down to refresh rides'
-                    : lastUpdatedAt
-                      ? `Updated ${new Date(lastUpdatedAt).toLocaleTimeString()}`
-                      : 'Waiting for live updates'}
-                </p>
               </div>
 
-              <div className='flex flex-col items-end gap-2'>
-                <div className='text-right'>
-                  <p className='text-sm text-gray-700'>{currentUser?.name}</p>
-                  <p className='text-xs text-gray-500'>{currentUser?.email}</p>
+              <div className='flex flex-col items-start gap-2 sm:items-end'>
+                <div className='flex items-center gap-3 self-start sm:self-end'>
+                  <img
+                    src={userAvatar}
+                    alt={currentUser?.name || 'User avatar'}
+                    className='h-10 w-10 rounded-full border border-gray-200 object-cover'
+                    onError={(e) => {
+                      e.currentTarget.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(currentUser?.name || 'User')}&background=e5e7eb&color=374151&size=128`;
+                    }}
+                  />
+                  <div className='text-left sm:text-right'>
+                    <p className='text-sm text-gray-700'>{currentUser?.name}</p>
+                    <p className='max-w-[240px] truncate text-xs text-gray-500'>{currentUser?.email}</p>
+                  </div>
                 </div>
-                <div className='flex gap-2'>
-                  <Button variant='outline' size='sm' onClick={() => navigate('/profile')}>
-                    My Profile
-                  </Button>
-                  <Button variant='outline' size='sm' onClick={onLogout}>
+                <div className='flex w-full flex-wrap items-center gap-2 sm:w-auto sm:justify-end'>
+                  <Button size='sm' onClick={openCreateRequest}>Create a Request</Button>
+                  <Button size='sm' onClick={onLogout} className='bg-rose-600/70 hover:bg-rose-600/90 text-white border-0'>
                     Log out
                   </Button>
-                  <Button onClick={openCreateRequest}>Create a Request</Button>
                 </div>
               </div>
             </div>
@@ -185,6 +187,16 @@ function HomePage({ currentUser, onLogout }) {
 
             {/* View tabs */}
             <div className='flex gap-1 border-b border-gray-200 -mb-6'>
+              <button
+                onClick={() => setActiveView('map')}
+                className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px ${
+                  activeView === 'map'
+                    ? 'border-black text-gray-900'
+                    : 'border-transparent text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                Map
+              </button>
               <button
                 onClick={() => setActiveView('available')}
                 className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px ${
@@ -204,6 +216,16 @@ function HomePage({ currentUser, onLogout }) {
                 }`}
               >
                 My Rides
+              </button>
+              <button
+                onClick={() => setActiveView('starred')}
+                className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px ${
+                  activeView === 'starred'
+                    ? 'border-black text-gray-900'
+                    : 'border-transparent text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                Starred
               </button>
             </div>
 
@@ -228,7 +250,7 @@ function HomePage({ currentUser, onLogout }) {
         </div>
       </div>
 
-      {activeView === 'available' ? (
+      {activeView === 'available' && (
         <PostList
           posts={availablePosts}
           isLoading={isLoading}
@@ -238,7 +260,6 @@ function HomePage({ currentUser, onLogout }) {
           currentUser={currentUser}
           onRefresh={() => refreshPosts({ silent: true })}
           isRefreshing={isRefreshing}
-          lastUpdatedAt={lastUpdatedAt}
           heading={isShowingSearchResults ? 'Matching Routes' : 'Available Rides'}
           subheading={
             isShowingSearchResults
@@ -251,11 +272,13 @@ function HomePage({ currentUser, onLogout }) {
               : 'No rides available yet.'
           }
         />
-      ) : (
+      )}
+      {activeView === 'my-rides' && (
         <PostList
           posts={myPosts}
           isLoading={isLoading}
           error={error}
+          routeSearch={routeSearch}
           onDeletePost={removePost}
           onUpdatePost={updatePost}
           coords={coords}
@@ -263,11 +286,25 @@ function HomePage({ currentUser, onLogout }) {
           showActions
           onRefresh={() => refreshPosts({ silent: true })}
           isRefreshing={isRefreshing}
-          lastUpdatedAt={lastUpdatedAt}
           heading='My Rides'
+          subheading={isLoading ? 'Loading rides...' : `${myPosts.length} upcoming ride${myPosts.length === 1 ? '' : 's'}`}
           emptyTitle='You have no rides yet.'
           emptyDescription='Use the "Create a Request" button above to post your first ride!'
         />
+      )}
+      {activeView === 'map' && (
+        <RidesMapView
+          posts={visiblePosts}
+          isLoading={isLoading}
+          currentUser={currentUser}
+          coords={coords}
+          routeSearch={routeSearch}
+          onDeletePost={removePost}
+          onUpdatePost={updatePost}
+        />
+      )}
+      {activeView === 'starred' && (
+        <StarredPage currentUser={currentUser} />
       )}
     </div>
   );

@@ -7,19 +7,39 @@ import {
   SheetTitle,
   SheetDescription,
 } from '@/components/ui/sheet';
-import { Bell, RefreshCw } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { Bell } from 'lucide-react';
 import { useNotifications } from '@/hooks/useNotifications';
+
+// Function to parse and render formatted message text
+const renderFormattedMessage = (text) => {
+  if (!text) return '';
+  
+  // Split by double newlines for paragraphs
+  const paragraphs = text.split('\n\n');
+  
+  return paragraphs.map((paragraph, pIdx) => (
+    <div key={pIdx} className={pIdx > 0 ? 'mt-2' : ''}>
+      {paragraph.split(/(_[^_]+_)/g).map((segment, idx) => {
+        // Check if this is an italicized segment
+        if (segment.startsWith('_') && segment.endsWith('_')) {
+          return (
+            <em key={idx} className="italic">
+              {segment.slice(1, -1)}
+            </em>
+          );
+        }
+        return <span key={idx}>{segment}</span>;
+      })}
+    </div>
+  ));
+};
 
 function NotificationMenu({ currentUser }) {
   const {
     notifications,
     unreadCount,
     isLoading,
-    isRefreshing,
     error,
-    lastUpdatedAt,
-    refreshNotifications,
     markAllAsRead,
     sendReply: sendNotificationReply,
     respondToNotification,
@@ -27,6 +47,7 @@ function NotificationMenu({ currentUser }) {
   const [open, setOpen] = useState(false);
   const [replyingTo, setReplyingTo] = useState(null);
   const [replyMessage, setReplyMessage] = useState('');
+  const [visibleCount, setVisibleCount] = useState(10);
 
   const hasUnread = unreadCount > 0;
 
@@ -53,7 +74,7 @@ function NotificationMenu({ currentUser }) {
   }, [markAllAsRead, open]);
 
   return (
-    <Sheet open={open} onOpenChange={setOpen}>
+    <Sheet open={open} onOpenChange={(o) => { setOpen(o); if (!o) setVisibleCount(10); }}>
       <SheetTrigger asChild>
         <button className="relative p-3 rounded-full hover:bg-gray-100 transition">
           <Bell className="w-7 h-7 text-gray-700" />
@@ -72,30 +93,13 @@ function NotificationMenu({ currentUser }) {
           </SheetDescription>
         </SheetHeader>
 
-        <div className="mt-4 px-4">
-          <div className="mb-3 flex items-center justify-between text-xs text-gray-500">
-            <span>
-              {lastUpdatedAt
-                ? `Updated ${new Date(lastUpdatedAt).toLocaleTimeString()}`
-                : 'Waiting for updates'}
-            </span>
-            <Button
-              variant='ghost'
-              size='sm'
-              onClick={() => refreshNotifications({ silent: true }).catch(() => {})}
-              disabled={isLoading || isRefreshing}
-            >
-              <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-              Refresh
-            </Button>
-          </div>
-
           {error ? (
-            <p className='mb-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600'>
-              {error}
-            </p>
+            <div className="mt-4 px-4">
+              <p className='mb-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600'>
+                {error}
+              </p>
+            </div>
           ) : null}
-        </div>
 
         <div className="space-y-3 px-4 overflow-y-auto max-h-[calc(100vh-10rem)]">
           {isLoading ? (
@@ -105,7 +109,8 @@ function NotificationMenu({ currentUser }) {
               No notifications yet.
             </p>
           ) : (
-            notifications.map((notif) => {
+            <>
+            {notifications.slice(0, visibleCount).map((notif) => {
               const isLeftListMessage =
                 typeof notif.message === 'string' &&
                 /(left|removed)\b/i.test(notif.message) &&
@@ -115,17 +120,19 @@ function NotificationMenu({ currentUser }) {
                 : notif.type;
 
               const typeStyles = {
-                join_list:            { bg: 'bg-purple-50 border-purple-200', badge: 'bg-purple-100 text-purple-700', label: 'Joined List' },
-                ride_request:         { bg: 'bg-blue-50 border-blue-200',     badge: 'bg-blue-100 text-blue-700',     label: 'Ride Request' },
-                ride_request_response:{ bg: 'bg-gray-50 border-gray-200',     badge: notif.message?.includes('accepted') ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700', label: notif.message?.includes('accepted') ? 'Accepted' : 'Declined' },
-                left_list:            { bg: 'bg-red-50 border-red-200',       badge: 'bg-red-100 text-red-700',       label: 'Left List' },
-                message:              { bg: 'bg-gray-50 border-gray-200',     badge: 'bg-gray-100 text-gray-600',     label: 'Message' },
+                join_list:              { bg: 'bg-purple-50 border-purple-200', badge: 'bg-purple-100 text-purple-700',                                                                                     label: 'Joined List' },
+                ride_request:           { bg: 'bg-blue-50 border-blue-200',     badge: 'bg-blue-100 text-blue-700',                                                                                         label: 'Ride Request' },
+                ride_request_response:  { bg: 'bg-gray-50 border-gray-200',     badge: notif.message?.includes('accepted') ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700',                    label: notif.message?.includes('accepted') ? 'Accepted' : 'Declined' },
+                friend_request:         { bg: 'bg-yellow-50 border-yellow-200', badge: 'bg-yellow-100 text-yellow-700',                                                                                     label: 'Friend Request' },
+                friend_request_response:{ bg: 'bg-gray-50 border-gray-200',     badge: notif.message?.includes('accepted') ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700',                    label: notif.message?.includes('accepted') ? 'Accepted' : 'Declined' },
+                left_list:              { bg: 'bg-red-50 border-red-200',       badge: 'bg-red-100 text-red-700',                                                                                           label: 'Left List' },
+                message:                { bg: 'bg-gray-50 border-gray-200',     badge: 'bg-gray-100 text-gray-600',                                                                                         label: 'Message' },
               };
               const style = typeStyles[displayType] || typeStyles.message;
-              const actionableTypes = ['ride_request', 'join_list'];
+              const actionableTypes = ['ride_request', 'join_list', 'friend_request'];
               const isActionable = actionableTypes.includes(notif.type) && !notif.response;
               const hasResponded = actionableTypes.includes(notif.type) && notif.response;
-              const canReply = !actionableTypes.includes(notif.type);
+              const canReply = !actionableTypes.includes(notif.type) && notif.type !== 'friend_request_response';
 
               return (
                 <div
@@ -141,13 +148,13 @@ function NotificationMenu({ currentUser }) {
                     </span>
                   </div>
                   {notif.replyToMessage && (
-                    <p className="text-xs text-gray-400 mt-1 italic">
-                      Replying to: "{notif.replyToMessage}"
-                    </p>
+                    <div className="text-xs text-gray-400 mt-1 italic">
+                      Replying to: <div className="inline">{renderFormattedMessage(notif.replyToMessage)}</div>
+                    </div>
                   )}
-                  <p className="text-sm text-gray-700">
-                    {notif.message}
-                  </p>
+                  <div className="text-sm text-gray-700">
+                    {renderFormattedMessage(notif.message)}
+                  </div>
                   <p className="text-xs text-gray-400 mt-1">
                     {new Date(notif.createdAt).toLocaleString()}
                   </p>
@@ -208,7 +215,26 @@ function NotificationMenu({ currentUser }) {
                   )}
                 </div>
               );
-            })
+            })}
+            <div className='flex justify-center gap-4 py-2'>
+              {visibleCount < notifications.length && (
+                <button
+                  onClick={() => setVisibleCount(c => c + 10)}
+                  className='text-sm text-blue-600 hover:underline'
+                >
+                  See more ({notifications.length - visibleCount} remaining)
+                </button>
+              )}
+              {visibleCount > 10 && (
+                <button
+                  onClick={() => setVisibleCount(c => Math.max(10, c - 10))}
+                  className='text-sm text-gray-500 hover:underline'
+                >
+                  See less
+                </button>
+              )}
+            </div>
+            </>
           )}
         </div>
       </SheetContent>

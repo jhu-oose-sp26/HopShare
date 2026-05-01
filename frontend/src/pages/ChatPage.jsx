@@ -27,10 +27,10 @@ import placeholderAvatar from '@/user-placeholder.png';
 import { io } from "socket.io-client";
 
 const API_ROOT = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '');
-const CHAT_URL = import.meta.env.VITE_CHAT_URL || API_ROOT;
+const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || API_ROOT;
 const PROFILE_CACHE_KEY = 'profileCache';
 const PROFILE_CACHE_TTL = 1000 * 60 * 60 * 24; // 24 hours
-const socket = io(CHAT_URL);
+const socket = io(SOCKET_URL);
 
 const loadProfileCache = () => {
   if (typeof window === 'undefined') return {};
@@ -55,7 +55,7 @@ const isCacheExpired = (entry) => {
 const ChatPage = ({ currentUser }) => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { chatId, postId } = location.state || {};
+  const { chatId, postId, isDm } = location.state || {};
   const [post, setPost] = useState(null);
   const [messages, setMessages] = useState([]);
   const [usersMap, setUsersMap] = useState({});
@@ -63,6 +63,7 @@ const ChatPage = ({ currentUser }) => {
   const [error, setError] = useState(null);
   const [message, setMessage] = useState('');
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const [otherUser, setOtherUser] = useState(null);
 
   const getAvatar = (user) => {
     const url = user?.picture || user?.avatar;
@@ -80,19 +81,33 @@ const ChatPage = ({ currentUser }) => {
     socket.emit("joinChat", chatId);
 
     return () => {
-      socket.off("joinChat");
+      socket.emit("leaveChat", chatId);
     };
   }, [chatId]);
 
   useEffect(() => {
-    socket.on("newMessage", (message) => {
-      setMessages((prev) => [...prev, message]);
-    });
+    const handleNewMessage = (incomingMessage) => {
+      setMessages(prev => {
+        const exists = prev.some(m => m._id === incomingMessage._id);
+        if (exists) return prev;
+        return [...prev, incomingMessage];
+      });
+
+      if (incomingMessage.sender !== currentUser?.email) {
+        fetch(`${API_ROOT}/chat/${chatId}/read`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userEmail: currentUser.email }),
+        }).catch(() => {});
+      }
+    };
+
+    socket.on("newMessage", handleNewMessage);
 
     return () => {
-      socket.off("newMessage");
+      socket.off("newMessage", handleNewMessage);
     };
-  }, []);
+  }, [chatId, currentUser?.email]);
 
   useEffect(() => {
     if (!post?.user?.googleId) return;
@@ -121,9 +136,49 @@ const ChatPage = ({ currentUser }) => {
 
     const fetchChat = async () => {
       try {
-        const response = await fetch(`${API_ROOT}/chat/${chatId}`);
-        const chat = await response.json();
+        const viewerEmail = encodeURIComponent(currentUser?.email || '');
+        let chat;
+        
+        if (isDm) {
+          // Fetch DM chat
+          const response = await fetch(`${API_ROOT}/chat/dm/${chatId}?viewerEmail=${viewerEmail}`);
+          if (!response.ok) {
+            const payload = await response.json().catch(() => ({}));
+            throw new Error(payload.error || 'Failed to load DM chat');
+          }
+          chat = await response.json();
+          // For DMs, get the other participant's info
+          const otherEmail = chat.participants?.find(
+            p => p.toLowerCase() !== currentUser.email.toLowerCase()
+          );
+          if (otherEmail) {
+            const profileRes = await fetch(`${API_ROOT}/profile/by-email/${encodeURIComponent(otherEmail)}`);
+            if (profileRes.ok) {
+              const profileData = await profileRes.json();
+              setOtherUser(profileData.user);
+            }
+          }
+        } else {
+          // Fetch post-based chat
+          const response = await fetch(`${API_ROOT}/chat/${chatId}?viewerEmail=${viewerEmail}`);
+          if (!response.ok) {
+            const payload = await response.json().catch(() => ({}));
+            throw new Error(payload.error || 'Failed to load chat');
+          }
+          chat = await response.json();
+        }
+        
         setMessages(chat.messages || []);
+
+        await fetch(`${API_ROOT}/chat/${chatId}/read`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            userEmail: currentUser.email,
+          }),
+        }).catch(err => console.error('Failed to mark chat as read:', err));
       } catch (err) {
         console.error('Error loading chat:', err);
         setError(err.message);
@@ -133,7 +188,7 @@ const ChatPage = ({ currentUser }) => {
     };
 
     fetchChat();
-  }, [chatId]);
+  }, [chatId, currentUser?.email]);
 
   useEffect(() => {
     if (messages.length === 0) return;
@@ -255,31 +310,69 @@ const ChatPage = ({ currentUser }) => {
   }, [messages, usersMap]);
 
   const participantCount = 1 + (post?.riderList?.length || 0) + (post?.drivers?.length || 0);
+  const currentEmail = (currentUser?.email || '').trim().toLowerCase();
+  const isOwner = currentEmail && (post?.user?.email || '').trim().toLowerCase() === currentEmail;
+  const isRider = Array.isArray(post?.riderList)
+    && post.riderList.some((rider) => (rider?.email || '').trim().toLowerCase() === currentEmail);
+  const isDriver = Array.isArray(post?.drivers)
+    && post.drivers.some((driver) => (driver?.email || '').trim().toLowerCase() === currentEmail);
+  const canSendMessages = Boolean(currentEmail && (isOwner || isRider || isDriver));
   
   const handleSendMessage = async () => {
     if (!message.trim() || !chatId) return;
 
+    if (!isDm && !canSendMessages) {
+      setError('You can view this chat history, but you are no longer allowed to send messages for this ride.');
+      return;
+    }
+
+    // FRONTEND VALIDATION: Prevent sending empty messages
+    const trimmedMessage = message.trim();
+    if (!trimmedMessage || trimmedMessage.length === 0) {
+      setError('Message cannot be empty');
+      return;
+    }
+
+    // FRONTEND VALIDATION: Prevent messages exceeding max length
+    if (trimmedMessage.length > 10000) {
+      setError('Message is too long (max 10,000 characters)');
+      return;
+    }
+
+    // FRONTEND VALIDATION: Basic XSS check
+    const xssPatterns = /<script|javascript:|on\w+\s*=/i;
+    if (xssPatterns.test(trimmedMessage)) {
+      setError('Invalid characters in message');
+      return;
+    }
+
     try {
-      const response = await fetch(`${API_ROOT}/chat/${chatId}/messages`, {
+      const endpoint = isDm 
+        ? `${API_ROOT}/chat/dm/${chatId}/messages`
+        : `${API_ROOT}/chat/${chatId}/messages`;
+      const response = await fetch(endpoint, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          sender: currentUser._id,
-          message: message.trim(),
+          sender: currentUser.email || currentUser._id,
+          message: trimmedMessage,
+          recipientEmail: post?.user?.email, // Optional: for backend validation of self-messaging
         }),
       });
 
       if (!response.ok) {
-        throw new Error('Failed to send message');
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to send message');
       }
 
       const newMessage = await response.json();
       setMessage('');
+      setError(null); // Clear any previous errors
     } catch (err) {
       console.error('Error sending message:', err);
-      setError('Failed to send message');
+      setError(err.message || 'Failed to send message');
     }
   };
 
@@ -292,19 +385,35 @@ const ChatPage = ({ currentUser }) => {
           </ChatHeaderButton>
         </ChatHeaderAddon>
         <ChatHeaderMain>
-          <span className="font-medium">{post?.title}</span>
-          <span className="text-sm font-semibold">—</span>
-          <span className="flex-1 grid">
-            <span className="text-sm font-medium truncate">
-              {participantCount} people
-            </span>
-          </span>
+          {isDm ? (
+            <>
+              <span className="font-medium">{otherUser?.name || 'Direct Message'}</span>
+              <span className="text-sm font-semibold">—</span>
+              <span className="flex-1 grid">
+                <span className="text-sm font-medium truncate">
+                  {otherUser?.email || ''}
+                </span>
+              </span>
+            </>
+          ) : (
+            <>
+              <span className="font-medium">{post?.title}</span>
+              <span className="text-sm font-semibold">—</span>
+              <span className="flex-1 grid">
+                <span className="text-sm font-medium truncate">
+                  {participantCount} people
+                </span>
+              </span>
+            </>
+          )}
         </ChatHeaderMain>
-        <ChatHeaderAddon>
-          <ChatHeaderButton className="@2xl/chat:inline-flex hidden" onClick={() => setDetailsOpen(true)}>
-            <Info />
-          </ChatHeaderButton>
-        </ChatHeaderAddon>
+        {!isDm && (
+          <ChatHeaderAddon>
+            <ChatHeaderButton className="@2xl/chat:inline-flex hidden" onClick={() => setDetailsOpen(true)}>
+              <Info />
+            </ChatHeaderButton>
+          </ChatHeaderAddon>
+        )}
       </ChatHeader>
 
       <ChatMessages className="px-2 sm:px-4 lg:px-6">
@@ -381,13 +490,21 @@ const ChatPage = ({ currentUser }) => {
           value={message}
           onChange={(e) => setMessage(e.target.value)}
           onSubmit={() => handleSendMessage()}
+          placeholder={!canSendMessages ? 'cannot sent message in quitted group chat' : 'Type your message...'}
+          className={!canSendMessages ? 'text-center placeholder:text-center' : ''}
+          disabled={!canSendMessages}
         />
         <ChatToolbarAddon align="inline-end">
-          <ChatToolbarButton onClick={handleSendMessage}>
+          <ChatToolbarButton onClick={handleSendMessage} disabled={!canSendMessages}>
             <SquareChevronRightIcon />
           </ChatToolbarButton>
         </ChatToolbarAddon>
       </ChatToolbar>
+      {!canSendMessages && (
+        <div className="px-4 pb-2 text-xs text-amber-700">
+          You were removed from this ride. Chat history remains visible, but sending new messages is disabled.
+        </div>
+      )}
 
       <Dialog open={detailsOpen} onOpenChange={setDetailsOpen}>
         <DialogContent className='sm:max-w-2xl max-h-[85vh] overflow-y-auto'>

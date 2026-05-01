@@ -1,7 +1,5 @@
 import React, { useState } from 'react';
-import { RefreshCw } from 'lucide-react';
 import PostCard from './PostCard';
-import { Button } from '@/components/ui/button';
 
 
 const PostList = ({
@@ -19,7 +17,6 @@ const PostList = ({
     showActions = false,
     currentUser,
     onRefresh,
-    isRefreshing = false,
     lastUpdatedAt = null,
 }) => {
     const [dateOrder, setDateOrder] = useState('asc');
@@ -51,32 +48,24 @@ const PostList = ({
                         {heading}
                     </h2>
                     <div className="flex items-center gap-2 text-sm">
-                        {onRefresh ? (
-                            <Button
-                                variant='outline'
-                                size='sm'
-                                onClick={() => onRefresh().catch(() => {})}
-                                disabled={isLoading || isRefreshing}
-                            >
-                                <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-                                Refresh Posts
-                            </Button>
-                        ) : null}
                         <button
                             onClick={() => setDateOrder(o => o === 'asc' ? 'desc' : 'asc')}
-                            className="px-2 py-1 rounded border border-gray-300 text-gray-600 hover:text-gray-800 hover:border-gray-500"
+                            className={`px-2 py-1 rounded border text-sm font-medium transition-colors ${dateOrder === 'asc' ? 'border-blue-400 text-blue-600 bg-blue-50' : 'border-orange-400 text-orange-600 bg-orange-50'}`}
                         >
                             Date {dateOrder === 'asc' ? '↑' : '↓'}
                         </button>
                         <button
                             onClick={() => setTimeOrder(o => o === 'asc' ? 'desc' : 'asc')}
-                            className="px-2 py-1 rounded border border-gray-300 text-gray-600 hover:text-gray-800 hover:border-gray-500"
+                            className={`px-2 py-1 rounded border text-sm font-medium transition-colors ${timeOrder === 'asc' ? 'border-blue-400 text-blue-600 bg-blue-50' : 'border-orange-400 text-orange-600 bg-orange-50'}`}
                         >
                             Time {timeOrder === 'asc' ? '↑' : '↓'}
                         </button>
                     </div>
                 </div>
 
+                <p className="text-xs text-gray-400 mb-1">
+                    Sorted by date {dateOrder === 'asc' ? 'ascending' : 'descending'}, then time {timeOrder === 'asc' ? 'ascending' : 'descending'}
+                </p>
                 <p className="text-gray-600">
                     {subheading ||
                         (isLoading
@@ -97,8 +86,9 @@ const PostList = ({
             )}
 
             {isLoading ? (
-                <div className='text-center py-12'>
-                    <p className='text-gray-500 text-lg'>Loading rides...</p>
+                <div className='flex flex-col items-center justify-center py-20 gap-4'>
+                    <div className='w-10 h-10 rounded-full border-4 border-gray-200 border-t-gray-800 animate-spin' />
+                    <p className='text-sm text-gray-400 animate-pulse'>Loading rides...</p>
                 </div>
             ) : posts.length === 0 ? (
                 <div className='text-center py-12'>
