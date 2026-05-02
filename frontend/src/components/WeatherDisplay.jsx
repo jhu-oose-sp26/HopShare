@@ -22,7 +22,7 @@ const WeatherIcon = ({ condition, iconCode }) => {
         <img 
           src={getWeatherIconUrl(iconCode)}
           alt={condition}
-          className="max-w-8 max-h-8 object-contain"
+          className="w-8 h-8 min-w-8 object-contain"
           onError={(e) => {
             e.target.style.display = 'none';
             e.target.nextSibling.style.display = 'block';
