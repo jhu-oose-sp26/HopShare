@@ -253,7 +253,7 @@ router.get('/starred', async (req, res) => {
       .map(id => toObjectId(id))
       .filter(Boolean);
 
-    const posts = await db.collection('posts').find({ _id: { $in: objectIds } }).toArray();
+    const posts = await db.collection('posts').find({ _id: { $in: objectIds }, archived: { $ne: true } }).toArray();
     const enriched = await enrichPostsWithGoogleIds(posts);
     res.json(enriched);
   } catch (err) {
