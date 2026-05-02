@@ -1,7 +1,8 @@
-// Weather service that calls our backend API
-// Backend handles weather API calls securely with server-side caching
+import { getCalendarDayDiff } from '../lib/dateUtils';
 
-const API_ROOT = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000').replace(/\/$/, '');
+// Weather service that calls our backend API.
+// Backend handles weather API calls securely with server-side caching.
+export const API_ROOT = (import.meta.env.VITE_API_BASE_URL || '/api').replace(/\/$/, '');
 
 // Simple cache to avoid redundant requests within the same session
 const cache = new Map();
@@ -18,19 +19,11 @@ setInterval(() => {
 }, 10 * 60 * 1000); // Clean every 10 minutes
 
 export async function getWeatherForecast(latitude, longitude, date, time = '12:00') {
-  if (!latitude || !longitude || !date) {
+  if (latitude == null || longitude == null || !date) {
     return null;
   }
 
-  // Check if date is within 14 days from today
-  const targetDate = new Date(date);
-  const today = new Date();
-  
-  // Reset time to start of day for accurate day comparison
-  today.setHours(0, 0, 0, 0);
-  targetDate.setHours(0, 0, 0, 0);
-  
-  const diffDays = Math.ceil((targetDate - today) / (1000 * 60 * 60 * 24));
+  const diffDays = getCalendarDayDiff(date);
 
   // Only provide weather forecast for dates within 14 days from today
   if (diffDays > 14) {
@@ -49,8 +42,8 @@ export async function getWeatherForecast(latitude, longitude, date, time = '12:0
   try {
     // Call our backend weather API
     const params = new URLSearchParams({
-      lat: latitude.toString(),
-      lon: longitude.toString(),
+      lat: String(latitude),
+      lon: String(longitude),
       date: date,
       time: time
     });
